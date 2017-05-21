@@ -3,6 +3,7 @@ from keras.layers import Input, Activation, Dropout, Dense, concatenate
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
+from keras.layers import Embedding
 
 # def discriminator_model():
 #     model = Sequential()
@@ -23,14 +24,14 @@ from keras.layers.normalization import BatchNormalization
 #     return model
 
 class Encoder(Model):
-    def __init__(self, src_shape):
-        self._build(src_shape):
+    def __init__(self):
+        self._build()
         super(Encoder, self).__init__(inputs=self.inp, outputs=self.layer8)
 
     def _build(self):
-        self.inp = Input(shape=src_shape)
+        self.inp = Input(shape=(256, 256, 1))
 
-        self.layer1 = Conv2D(64, (4, 4), strides=(2, 2), padding='same')(inp)
+        self.layer1 = Conv2D(64, (4, 4), strides=(2, 2), padding='same')(self.inp)
 
         self.layer2 = LeakyReLU(alpha=0.2)(self.layer1)
         self.layer2 = Conv2D(128, (4, 4), strides=(2, 2), padding='same')(self.layer2)
@@ -59,14 +60,15 @@ class Encoder(Model):
         self.layer8 = LeakyReLU(alpha=0.2)(self.layer7)
         self.layer8 = Conv2D(512, (4, 4), strides=(2, 2), padding='same')(self.layer8)
         self.layer8 = BatchNormalization()(self.layer8)
+        # (26, 256, 256, 1) -> (26, 2, 2, 512)
 
-class Decoder(Sequential):
-    def __init__(self, encoder, gen_shpae):
-        self._build(encoder, gen_shape):
+class Decoder(Model):
+    def __init__(self, encoder):
+        self._build(encoder)
         super(Decoder, self).__init__(inputs=self.inp, outputs=self.layer8)
 
-    def _build(self, encoder, gen_shape):
-        self.inp = Input(shape=gen_shape)
+    def _build(self, encoder):
+        self.inp = Input(shape=(2, 2, 512))
 
         self.layer1 = Activation('relu')(self.inp)
         self.layer1 = Conv2DTranspose(512, (4, 4), strides=(2, 2))(self.layer1)
@@ -109,3 +111,14 @@ class Decoder(Sequential):
         self.layer8 = Activation('relu')(self.layer7)
         self.layer8 = Conv2DTranspose(1, (4, 4), strides=(2, 2))(self.layer8)
 
+class Generator(Model):
+    def __init__(self, encoder):
+        self._build(encoder)
+        super(Generator, self).__init__(inputs=[self.inp, self.fontid], outputs=self.embed)
+
+    def _build(self, encoder):
+        self.inp = Input(shape=(256, 256, 1))
+        self.encoded = encoder(self.inp)
+        self.fontid = Input(shape=(1))
+        self.emb = Embedding(12sh, 512, input_length=40)(self.fontid)
+        self.embed = concatenate([self.encoded, self.emb])
