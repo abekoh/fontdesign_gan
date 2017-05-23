@@ -111,14 +111,14 @@ class Decoder(Model):
         self.layer8 = Activation('relu')(self.layer7)
         self.layer8 = Conv2DTranspose(1, (4, 4), strides=(2, 2))(self.layer8)
 
-class Generator(Model):
-    def __init__(self, encoder):
-        self._build(encoder)
-        super(Generator, self).__init__(inputs=[self.inp, self.fontid], outputs=self.embed)
-
-    def _build(self, encoder):
-        self.inp = Input(shape=(256, 256, 1))
-        self.encoded = encoder(self.inp)
-        self.fontid = Input(shape=(1))
-        self.emb = Embedding(12sh, 512, input_length=40)(self.fontid)
-        self.embed = concatenate([self.encoded, self.emb])
+# class Generator(Model):
+#     def __init__(self, encoder):
+#         self._build(encoder)
+#         super(Generator, self).__init__(inputs=[self.inp, self.fontid], outputs=self.embed)
+#
+#     def _build(self, encoder):
+#         self.inp = Input(shape=(256, 256, 1))
+#         self.encoded = encoder(self.inp)
+#         self.fontid = Input(shape=(1))
+#         self.emb = Embedding(12sh, 512, input_length=40)(self.fontid)
+#         self.embed = concatenate([self.encoded, self.emb])
