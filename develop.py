@@ -1,6 +1,6 @@
 from PIL import Image
 from keras.models import Model
-from models import Encoder, Decoder, Generator
+from models import Generator
 import numpy as np
 from keras.utils import np_utils
 

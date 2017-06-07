@@ -6,113 +6,98 @@ from keras.layers.normalization import BatchNormalization
 from keras.initializers import random_normal
 
 
-def Encoder():
+def Generator():
+    # Encoder
+    en_inp = Input(shape=(256, 256, 3))
 
-    inp = Input(shape=(256, 256, 3))
-
-    layer1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', name='en_1')(inp)
+    en_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', name='en_1')(en_inp)
     # -> (:, 128, 128, 64)
 
-    layer2 = LeakyReLU(alpha=0.2)(layer1)
-    layer2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same')(layer2)
-    layer2 = BatchNormalization(name='en_2')(layer2)
+    en_2 = LeakyReLU(alpha=0.2)(en_1)
+    en_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same')(en_2)
+    en_2 = BatchNormalization(name='en_2')(en_2)
     # -> (:, 64, 64, 128)
 
-    layer3 = LeakyReLU(alpha=0.2)(layer2)
-    layer3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same')(layer3)
-    layer3 = BatchNormalization(name='en_3')(layer3)
+    en_3 = LeakyReLU(alpha=0.2)(en_2)
+    en_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same')(en_3)
+    en_3 = BatchNormalization(name='en_3')(en_3)
     # -> (:, 32, 32, 256)
 
-    layer4 = LeakyReLU(alpha=0.2)(layer3)
-    layer4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(layer4)
-    layer4 = BatchNormalization(name='en_4')(layer4)
+    en_4 = LeakyReLU(alpha=0.2)(en_3)
+    en_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(en_4)
+    en_4 = BatchNormalization(name='en_4')(en_4)
     # -> (:, 16, 16, 512)
 
-    layer5 = LeakyReLU(alpha=0.2)(layer4)
-    layer5 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(layer5)
-    layer5 = BatchNormalization(name='en_5')(layer5)
+    en_5 = LeakyReLU(alpha=0.2)(en_4)
+    en_5 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(en_5)
+    en_5 = BatchNormalization(name='en_5')(en_5)
     # -> (:, 8, 8, 512)
 
-    layer6 = LeakyReLU(alpha=0.2)(layer5)
-    layer6 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(layer6)
-    layer6 = BatchNormalization(name='en_6')(layer6)
+    en_6 = LeakyReLU(alpha=0.2)(en_5)
+    en_6 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(en_6)
+    en_6 = BatchNormalization(name='en_6')(en_6)
     # -> (:, 4, 4, 512)
 
-    layer7 = LeakyReLU(alpha=0.2)(layer6)
-    layer7 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(layer7)
-    layer7 = BatchNormalization(name='en_7')(layer7)
+    en_7 = LeakyReLU(alpha=0.2)(en_6)
+    en_7 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(en_7)
+    en_7 = BatchNormalization(name='en_7')(en_7)
     # -> (:, 2, 2, 512)
 
-    layer8 = LeakyReLU(alpha=0.2)(layer7)
-    layer8 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(layer8)
-    layer8 = BatchNormalization(name='en_8')(layer8)
+    en_8 = LeakyReLU(alpha=0.2)(en_7)
+    en_8 = Conv2D(512, (5, 5), strides=(2, 2), padding='same')(en_8)
+    en_8 = BatchNormalization(name='en_8')(en_8)
     # -> (:, 1, 1, 512)
 
-    model = Model(inputs=inp, outputs=[layer8, en_layers])
-
-    return model
-
-
-def Decoder():
-
-    inp = Input(shape=(1, 1, 512 + 128))
-    en_layers = Input()
-
-    layer1 = Activation('relu')(inp)
-    layer1 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(layer1)
-    layer1 = BatchNormalization()(layer1)
-    layer1 = Dropout(0.5)(layer1)
-    # -> (:, 2, 512, 512)
-    layer1 = concatenate([layer1, en_layers['en_1']], axis=3)
-
-    layer2 = Activation('relu')(layer1)
-    layer2 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(layer2)
-    layer2 = BatchNormalization()(layer2)
-    layer2 = Dropout(0.5)(layer2)
-    # layer2 = concatenate([layer2, encoder.get_layer('en_l6').output], axis=3)
-
-    layer3 = Activation('relu')(layer2)
-    layer3 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(layer3)
-    layer3 = BatchNormalization()(layer3)
-    layer3 = Dropout(0.5)(layer3)
-    # layer3 = concatenate([layer3, encoder.get_layer('en_l5').output], axis=3)
-
-    layer4 = Activation('relu')(layer3)
-    layer4 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(layer4)
-    layer4 = BatchNormalization()(layer4)
-    # layer4 = concatenate([layer4, encoder.get_layer('en_l4').output], axis=3)
-
-    layer5 = Activation('relu')(layer4)
-    layer5 = Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same')(layer5)
-    layer5 = BatchNormalization()(layer5)
-    # layer5 = concatenate([layer5, encoder.get_layer('en_l3').output], axis=3)
-
-    layer6 = Activation('relu')(layer5)
-    layer6 = Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same')(layer6)
-    layer6 = BatchNormalization()(layer6)
-    # layer6 = concatenate([layer6, encoder.get_layer('en_l2').output], axis=3)
-
-    layer7 = Activation('relu')(layer6)
-    layer7 = Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same')(layer7)
-    layer7 = BatchNormalization()(layer7)
-    # layer7 = concatenate([layer7, encoder.get_layer('en_l1').output], axis=3)
-
-    layer8 = Activation('relu')(layer7)
-    layer8 = Conv2DTranspose(3, (5, 5), strides=(2, 2), padding='same')(layer8)
-
-    model = Model(inputs=[inp, en_layers], outputs=layer1)
-
-    return model
-
-
-def Generator():
-    # https://github.com/fchollet/keras/issues/4205
-    encoder = Encoder()
-    decoder = Decoder()
+    # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
+
     embedding = Embedding(40, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
     embedding = Reshape((1, 1, 128))(embedding)
-    model = Model(inputs=[encoder.input, embedding_inp], outputs=decoder([concatenate([encoder.output[0], embedding], axis=3), encoder.output[1]]))
-    # model = Model(inputs=embedding_inp, outputs=embedding)
+
+    de_inp = concatenate([en_8, embedding], axis=3)
+
+    de_1 = Activation('relu')(de_inp)
+    de_1 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(de_1)
+    de_1 = BatchNormalization()(de_1)
+    de_1 = Dropout(0.5)(de_1)
+    # -> (:, 2, 512, 512)
+    de_1 = concatenate([de_1, en_7], axis=3)
+
+    de_2 = Activation('relu')(de_1)
+    de_2 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(de_2)
+    de_2 = BatchNormalization()(de_2)
+    de_2 = Dropout(0.5)(de_2)
+    de_2 = concatenate([de_2, en_6], axis=3)
+
+    de_3 = Activation('relu')(de_2)
+    de_3 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(de_3)
+    de_3 = BatchNormalization()(de_3)
+    de_3 = Dropout(0.5)(de_3)
+    de_3 = concatenate([de_3, en_5], axis=3)
+
+    de_4 = Activation('relu')(de_3)
+    de_4 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same')(de_4)
+    de_4 = BatchNormalization()(de_4)
+    de_4 = concatenate([de_4, en_4], axis=3)
+
+    de_5 = Activation('relu')(de_4)
+    de_5 = Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same')(de_5)
+    de_5 = BatchNormalization()(de_5)
+    de_5 = concatenate([de_5, en_3], axis=3)
+
+    de_6 = Activation('relu')(de_5)
+    de_6 = Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same')(de_6)
+    de_6 = BatchNormalization()(de_6)
+    de_6 = concatenate([de_6, en_2], axis=3)
+
+    de_7 = Activation('relu')(de_6)
+    de_7 = Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same')(de_7)
+    de_7 = BatchNormalization()(de_7)
+    de_6 = concatenate([de_7, en_1], axis=3)
+
+    de_8 = Activation('relu')(de_7)
+    de_8 = Conv2DTranspose(3, (5, 5), strides=(2, 2), padding='same')(de_8)
+
+    model = Model(inputs=[en_inp, embedding_inp], outputs=de_8)
 
     return model
