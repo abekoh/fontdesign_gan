@@ -11,42 +11,42 @@ def Generator():
     en_inp = Input(shape=(256, 256, 3))
 
     en_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                  kernel_initializer=truncated_normal(stddev=0.02))(en_inp)
+                  kernel_initializer=truncated_normal(stddev=0.02), name='en_1')(en_inp)
     # -> (:, 128, 128, 64)
 
     en_2 = LeakyReLU(alpha=0.2)(en_1)
     en_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_2)
-    en_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_2)
+    en_2 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_2')(en_2)
     # -> (:, 64, 64, 128)
 
     en_3 = LeakyReLU(alpha=0.2)(en_2)
     en_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_3)
-    en_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_3)
+    en_3 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_3')(en_3)
     # -> (:, 32, 32, 256)
 
     en_4 = LeakyReLU(alpha=0.2)(en_3)
     en_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_4)
-    en_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_4)
+    en_4 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_4')(en_4)
     # -> (:, 16, 16, 512)
 
     en_5 = LeakyReLU(alpha=0.2)(en_4)
     en_5 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_5)
-    en_5 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_5)
+    en_5 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_5')(en_5)
     # -> (:, 8, 8, 512)
 
     en_6 = LeakyReLU(alpha=0.2)(en_5)
     en_6 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_6)
-    en_6 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_6)
+    en_6 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_6')(en_6)
     # -> (:, 4, 4, 512)
 
     en_7 = LeakyReLU(alpha=0.2)(en_6)
     en_7 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_7)
-    en_7 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_7)
+    en_7 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_7')(en_7)
     # -> (:, 2, 2, 512)
 
     en_8 = LeakyReLU(alpha=0.2)(en_7)
     en_8 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(en_8)
-    en_8 = BatchNormalization(momentum=0.9, epsilon=0.00001)(en_8)
+    en_8 = BatchNormalization(momentum=0.9, epsilon=0.00001, name='en_8')(en_8)
     # -> (:, 1, 1, 512)
 
     # Embedding
@@ -150,4 +150,4 @@ def Discriminator():
 
     model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
 
-    return model
+    eturn model
