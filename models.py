@@ -8,7 +8,7 @@ from keras.initializers import random_normal, truncated_normal
 
 def Generator():
     # Encoder
-    en_inp = Input(shape=(256, 256, 3))
+    en_inp = Input(shape=(256, 256, 1))
 
     en_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same',
                   kernel_initializer=truncated_normal(stddev=0.02), name='en_1')(en_inp)
@@ -52,7 +52,7 @@ def Generator():
     # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
     # -> (:)
-    embedding = Embedding(40, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
+    embedding = Embedding(160, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
     # -> (:, 1, 128)
     embedding = Reshape((1, 1, 128))(embedding)
     # -> (:, 1, 1, 128)
@@ -113,8 +113,8 @@ def Generator():
     # -> (:, 128, 128, 128)
 
     de_8 = Activation('relu')(de_7)
-    de_8 = Conv2DTranspose(3, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(de_8)
-    # -> (:, 256, 256, 3)
+    de_8 = Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(de_8)
+    # -> (:, 256, 256, 1)
 
     model = Model(inputs=[en_inp, embedding_inp], outputs=de_8)
 
@@ -122,7 +122,7 @@ def Generator():
 
 
 def Discriminator():
-    dis_inp = Input(shape=(256, 256, 3))
+    dis_inp = Input(shape=(256, 256, 1))
 
     dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
     dis_1 = LeakyReLU(alpha=0.2)(dis_1)
@@ -146,8 +146,8 @@ def Discriminator():
     fc_0 = Flatten()(dis_4)
     fc_1 = Dense(1, activation='sigmoid')(fc_0)
 
-    fc_2 = Dense(40, activation='softmax')(fc_0)
+    fc_2 = Dense(160, activation='softmax')(fc_0)
 
     model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
 
-    eturn model
+    return model
