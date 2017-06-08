@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Activation, Dropout, Embedding, Reshape, concatenate
+from keras.layers import Input, Activation, Dropout, Embedding, Reshape, Flatten, Dense, concatenate
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
@@ -57,6 +57,7 @@ def Generator():
     embedding = Reshape((1, 1, 128))(embedding)
     # -> (:, 1, 1, 128)
 
+    # Decoder
     de_inp = concatenate([en_8, embedding], axis=3)
 
     de_1 = Activation('relu')(de_inp)
@@ -116,5 +117,37 @@ def Generator():
     # -> (:, 256, 256, 3)
 
     model = Model(inputs=[en_inp, embedding_inp], outputs=de_8)
+
+    return model
+
+
+def Discriminator():
+    dis_inp = Input(shape=(256, 256, 3))
+
+    dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
+    dis_1 = LeakyReLU(alpha=0.2)(dis_1)
+    # -> (:, 128, 128, 64)
+
+    dis_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_1)
+    dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
+    dis_2 = LeakyReLU(alpha=0.2)(dis_2)
+    # -> (:, 64, 64, 128)
+
+    dis_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_2)
+    dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
+    dis_3 = LeakyReLU(alpha=0.2)(dis_3)
+    # -> (:, 32, 32, 256)
+
+    dis_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_3)
+    dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
+    dis_4 = LeakyReLU(alpha=0.2)(dis_4)
+    # -> (:, 16, 16, 512)
+
+    fc_0 = Flatten()(dis_4)
+    fc_1 = Dense(1, activation='sigmoid')(fc_0)
+
+    fc_2 = Dense(40, activation='softmax')(fc_0)
+
+    model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
 
     return model

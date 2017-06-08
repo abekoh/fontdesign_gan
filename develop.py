@@ -1,6 +1,7 @@
 from PIL import Image
-from keras.models import Model
 from models import Generator
+from keras.layers import Dense
+from keras.layers import Conv2D
 import numpy as np
 from keras.utils import np_utils
 
