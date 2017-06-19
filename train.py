@@ -9,18 +9,13 @@ from models import Generator, Discriminator
 from dataset import Dataset
 
 
-class FontDesignGAN():
+class TrainingFontDesignGAN():
 
     def __init__(self):
         self._build_models()
         self.output_dir_path = 'output'
         if not os.path.exists(self.output_dir_path):
             os.mkdir(self.output_dir_path)
-
-    def load_dataset(self, src_h5_path):
-        dataset = Dataset()
-        dataset.load_h5(src_h5_path)
-        self.src_imgs, self.dst_imgs, self.char_ids, self.font_ids = dataset.get()
 
     def _build_models(self):
 
@@ -46,16 +41,19 @@ class FontDesignGAN():
                                           loss='mean_squared_error',
                                           loss_weight=[15.])
 
-    def save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
-        epoch_output_dir_path = os.path.join(self.output_dir_path, '{}'.format(epoch_i))
-        if not os.path.exists(epoch_output_dir_path):
-            os.mkdir(epoch_output_dir_path)
-        for img_i in range(dst_imgs.shape[0]):
-            num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
-            num_img = num_img * 255
-            num_img = np.reshape(num_img, (256, 512))
-            pil_img = Image.fromarray(np.uint8(num_img))
-            pil_img.save(os.path.join(epoch_output_dir_path, '{}_{}.png'.format(batch_i, img_i)))
+    def load_dataset(self, src_h5_path):
+        dataset = Dataset()
+        dataset.load_h5(src_h5_path)
+        self.src_imgs, self.dst_imgs, self.char_ids, self.font_ids = dataset.get()
+        self._shuffle_dataset()
+
+    def _shuffle_dataset(self):
+        combined = np.c_[self.dst_imgs.reshape(len(self.dst_imgs), -1), self.char_ids, self.font_ids]
+        np.random.shuffle(combined)
+        dst_imgs_n = self.dst_imgs.size // len(self.dst_imgs)
+        self.dst_imgs = combined[:, :dst_imgs_n].reshape(self.dst_imgs.shape)
+        self.char_ids = combined[:, dst_imgs_n:dst_imgs_n + 1].reshape(self.char_ids.shape)
+        self.font_ids = combined[:, dst_imgs_n + 1:].reshape(self.font_ids.shape)
 
     def train(self):
         epoch_n = 100
@@ -72,8 +70,8 @@ class FontDesignGAN():
                 batched_font_ids = np.zeros((batch_size), dtype=np.int32)
                 for i, j in enumerate(range(batch_i * batch_size, (batch_i + 1) * batch_size)):
                     batched_dst_imgs[i, :, :, :] = self.dst_imgs[j]
-                    batched_src_imgs[i, :, :, :] = self.src_imgs[j % self.src_imgs.shape[0]]
                     batched_font_ids[i] = self.font_ids[j]
+                    batched_src_imgs[i, :, :, :] = self.src_imgs[int(self.char_ids[j])]
 
                 batched_generated_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
                 batched_src_imgs_encoded = self.encoder.predict_on_batch(batched_src_imgs)
@@ -87,7 +85,7 @@ class FontDesignGAN():
 
                 const_loss = self.generator_to_encoder.train_on_batch([batched_src_imgs, batched_font_ids], batched_src_imgs_encoded)
 
-                self.save_images(batched_dst_imgs, batched_generated_imgs, epoch_i, batch_i)
+                self._save_images(batched_dst_imgs, batched_generated_imgs, epoch_i, batch_i)
 
                 category_loss = real_category_loss + fake_category_loss_d
                 d_loss = d_loss_real + (real_category_loss + fake_category_loss_d) / 2.0
@@ -96,8 +94,29 @@ class FontDesignGAN():
                 log_format = 'd_loss: {}, g_loss: {}, category_loss: {}, cheat_loss: {}, const_loss: {}, l1_loss: {}'
                 print(log_format.format(d_loss, g_loss, category_loss, cheat_loss, const_loss, l1_loss))
 
+                if (batch_i % 100 == 0 and batch_i != 0) or batch_i == batch_n - 1:
+                    self._save_model_weights(epoch_i, batch_i)
+
+    def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
+        epoch_output_dir_path = os.path.join(self.output_dir_path, 'temp', '{}'.format(epoch_i))
+        if not os.path.exists(epoch_output_dir_path):
+            os.makedirs(epoch_output_dir_path)
+        for img_i in range(dst_imgs.shape[0]):
+            num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
+            num_img = num_img * 255
+            num_img = np.reshape(num_img, (256, 512))
+            pil_img = Image.fromarray(np.uint8(num_img))
+            pil_img.save(os.path.join(epoch_output_dir_path, '{}_{}.png'.format(batch_i, img_i)))
+
+    def _save_model_weights(self, epoch_i, batch_i):
+        model_weights_dir_path = os.path.join(self.output_dir_path, 'model_weights')
+        if not os.path.exists(model_weights_dir_path):
+            os.makedirs(model_weights_dir_path)
+        self.generator.save_weights(os.path.join(model_weights_dir_path, 'gen_{}_{}.h5'.format(epoch_i, batch_i)))
+        self.discriminator.save_weights(os.path.join(model_weights_dir_path, 'dis_{}_{}.h5'.format(epoch_i, batch_i)))
+
 
 if __name__ == '__main__':
-    gan = FontDesignGAN()
+    gan = TrainingFontDesignGAN()
     gan.load_dataset('./font_jp.h5')
     gan.train()
