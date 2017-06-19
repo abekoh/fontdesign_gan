@@ -52,7 +52,7 @@ def Generator():
     # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
     # -> (:)
-    embedding = Embedding(160, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
+    embedding = Embedding(40, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
     # -> (:, 1, 128)
     embedding = Reshape((1, 1, 128))(embedding)
     # -> (:, 1, 1, 128)
@@ -146,7 +146,7 @@ def Discriminator():
     fc_0 = Flatten()(dis_4)
     fc_1 = Dense(1, activation='sigmoid')(fc_0)
 
-    fc_2 = Dense(160, activation='softmax')(fc_0)
+    fc_2 = Dense(40, activation='softmax')(fc_0)
 
     model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
 

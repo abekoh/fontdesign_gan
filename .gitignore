@@ -102,3 +102,4 @@ ENV/
 
 # written by abekoh
 *.png
+*.h5
