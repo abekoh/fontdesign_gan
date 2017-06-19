@@ -13,33 +13,33 @@ class TrainingFontDesignGAN():
 
     def __init__(self):
         self._build_models()
-        self.output_dir_path = 'output'
+        self.output_dir_path = 'output_train'
         if not os.path.exists(self.output_dir_path):
             os.mkdir(self.output_dir_path)
 
     def _build_models(self):
 
         self.discriminator = Discriminator()
-        self.discriminator.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
+        self.discriminator.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
                                    loss=['binary_crossentropy', 'categorical_crossentropy'],
-                                   loss_weights=[1., 0.5])
+                                   loss_weights=[1., 1.])
 
         self.generator = Generator()
-        self.generator.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
+        self.generator.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
                                loss='mean_absolute_error', loss_weights=[100.])
 
         self.discriminator.trainable = False
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
-        self.generator_to_discriminator.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
+        self.generator_to_discriminator.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
                                                 loss=['binary_crossentropy', 'categorical_crossentropy'],
                                                 loss_weights=[1., 1.])
 
         self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_8').output)
         self.encoder.trainable = False
         self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
-        self.generator_to_encoder.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
+        self.generator_to_encoder.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
                                           loss='mean_squared_error',
-                                          loss_weight=[15.])
+                                          loss_weights=[15.])
 
     def load_dataset(self, src_h5_path):
         dataset = Dataset()
@@ -76,10 +76,11 @@ class TrainingFontDesignGAN():
                 batched_generated_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
                 batched_src_imgs_encoded = self.encoder.predict_on_batch(batched_src_imgs)
 
-                _, d_loss_real, real_category_loss = self.discriminator.train_on_batch(batched_dst_imgs, [np.zeros(batch_size, dtype=np.int32), to_categorical(batched_font_ids, embedding_n)])
-                _, d_loss_fake, fake_category_loss_d = self.discriminator.train_on_batch(batched_generated_imgs, [np.ones(batch_size, dtype=np.int32), to_categorical(batched_font_ids, embedding_n)])
+                _, d_loss_real, real_category_loss = self.discriminator.train_on_batch(batched_dst_imgs, [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, embedding_n)])
 
-                _, cheat_loss, fake_category_loss_g = self.generator_to_discriminator.train_on_batch([batched_src_imgs, batched_font_ids], [np.zeros(batch_size, dtype=np.int32), to_categorical(batched_font_ids, embedding_n)])
+                _, d_loss_fake, fake_category_loss_d = self.discriminator.train_on_batch(batched_generated_imgs, [np.zeros((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, embedding_n)])
+
+                _, cheat_loss, fake_category_loss_g = self.generator_to_discriminator.train_on_batch([batched_src_imgs, batched_font_ids], [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, embedding_n)])
 
                 l1_loss = self.generator.train_on_batch([batched_src_imgs, batched_font_ids], batched_dst_imgs)
 
@@ -91,8 +92,8 @@ class TrainingFontDesignGAN():
                 d_loss = d_loss_real + (real_category_loss + fake_category_loss_d) / 2.0
                 g_loss = cheat_loss + l1_loss + fake_category_loss_g + const_loss
 
-                log_format = 'd_loss: {}, g_loss: {}, category_loss: {}, cheat_loss: {}, const_loss: {}, l1_loss: {}'
-                print(log_format.format(d_loss, g_loss, category_loss, cheat_loss, const_loss, l1_loss))
+                log_format = 'd_loss: {}, g_loss: {}, category_loss: {}, cheat_loss: {}, const_loss: {}, l1_loss: {}, d_loss_real: {}, d_loss_fake: {}'
+                print(log_format.format(d_loss, g_loss, category_loss, cheat_loss, const_loss, l1_loss, d_loss_real, d_loss_fake))
 
                 if (batch_i % 100 == 0 and batch_i != 0) or batch_i == batch_n - 1:
                     self._save_model_weights(epoch_i, batch_i)
