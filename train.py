@@ -20,12 +20,12 @@ class TrainingFontDesignGAN():
     def _build_models(self):
 
         self.discriminator = Discriminator()
-        self.discriminator.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
+        self.discriminator.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
                                    loss=['binary_crossentropy', 'categorical_crossentropy'],
-                                   loss_weights=[1., 1.])
+                                   loss_weights=[1., 0.5])
 
         self.generator = Generator()
-        self.generator.compile(optimizer=Adam(lr=0.001, beta_1=0.5),
+        self.generator.compile(optimizer=Adam(lr=0.0002, beta_1=0.5),
                                loss='mean_absolute_error', loss_weights=[100.])
 
         self.discriminator.trainable = False
@@ -75,6 +75,8 @@ class TrainingFontDesignGAN():
 
                 batched_generated_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
                 batched_src_imgs_encoded = self.encoder.predict_on_batch(batched_src_imgs)
+
+                _, d_loss_real, real_category_loss = self.discriminator.train_on_batch(batched_dst_imgs, [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, embedding_n)])
 
                 _, d_loss_real, real_category_loss = self.discriminator.train_on_batch(batched_dst_imgs, [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, embedding_n)])
 

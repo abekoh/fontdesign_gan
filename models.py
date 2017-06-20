@@ -114,6 +114,7 @@ def Generator():
 
     de_8 = Activation('relu')(de_7)
     de_8 = Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(de_8)
+    de_8 = Activation('sigmoid')(de_8)
     # -> (:, 256, 256, 1)
 
     model = Model(inputs=[en_inp, embedding_inp], outputs=de_8)
@@ -129,17 +130,17 @@ def Discriminator():
     # -> (:, 128, 128, 64)
 
     dis_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_1)
-    dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
+    # dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
     dis_2 = LeakyReLU(alpha=0.2)(dis_2)
     # -> (:, 64, 64, 128)
 
     dis_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_2)
-    dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
+    # dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
     dis_3 = LeakyReLU(alpha=0.2)(dis_3)
     # -> (:, 32, 32, 256)
 
     dis_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_3)
-    dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
+    # dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
     dis_4 = LeakyReLU(alpha=0.2)(dis_4)
     # -> (:, 16, 16, 512)
 
