@@ -117,11 +117,13 @@ class TrainingFontDesignGAN():
                 self.losses[k] = np.append(self.losses[k], np.array([v]))
 
     def _show_losses(self):
-        data = []
+        graphs = []
         for k, v in self.losses.items():
-            data.append(go.Scatter(x=self.timeline, y=v, mode='lines', name=k))
+            graph = go.Scatter(x=self.timeline, y=v, mode='lines', name=k)
+            offline.plot([graph], filename=os.path.join(self.output_dir_path, '{}.html'.format(k)), auto_open=False)
+            graphs.append(graph)
         layout = {'yaxis': {'range': [0, 100.]}}
-        fig = {'data': data, 'layout': layout}
+        fig = {'data': graphs, 'layout': layout}
         offline.plot(fig, filename=os.path.join(self.output_dir_path, 'losses.html'), auto_open=False)
 
     def _save_losses(self):
