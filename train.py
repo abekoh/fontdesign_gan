@@ -78,28 +78,44 @@ class TrainingFontDesignGAN():
         for epoch_i in range(epoch_n):
             for batch_i in range(batch_n):
                 print('batch {} of {} / epoch {} of {}'.format(batch_i + 1, batch_n, epoch_i + 1, epoch_n))
-                batched_dst_imgs = np.zeros((batch_size, 256, 256, 1), dtype=np.float32)
+
                 batched_src_imgs = np.zeros((batch_size, 256, 256, 1), dtype=np.float32)
+                batched_dst_imgs = np.zeros((batch_size, 256, 256, 1), dtype=np.float32)
                 batched_font_ids = np.zeros((batch_size), dtype=np.int32)
                 for i, j in enumerate(range(batch_i * batch_size, (batch_i + 1) * batch_size)):
+                    batched_src_imgs[i, :, :, :] = self.src_imgs[int(self.char_ids[j])]
                     batched_dst_imgs[i, :, :, :] = self.dst_imgs[j]
                     batched_font_ids[i] = self.font_ids[j]
-                    batched_src_imgs[i, :, :, :] = self.src_imgs[int(self.char_ids[j])]
-
-                losses = {}
 
                 batched_generated_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
                 batched_src_imgs_encoded = self.encoder.predict_on_batch(batched_src_imgs)
 
-                _, losses['d_real_bin'], losses['d_real_cat'] = self.discriminator.train_on_batch(batched_dst_imgs, [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                losses = {}
 
-                _, losses['d_fake_bin'], losses['d_fake_cat'] = self.discriminator.train_on_batch(batched_generated_imgs, [np.zeros((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                _, losses['d_real_bin'], losses['d_real_cat'] = \
+                    self.discriminator.train_on_batch(
+                        batched_dst_imgs,
+                        [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
 
-                _, losses['g_fake_bin'], losses['g_fake_cat'] = self.generator_to_discriminator.train_on_batch([batched_src_imgs, batched_font_ids], [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                _, losses['d_fake_bin'], losses['d_fake_cat'] = \
+                    self.discriminator.train_on_batch(
+                        batched_generated_imgs,
+                        [np.zeros((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
 
-                losses['g_l1'] = self.generator.train_on_batch([batched_src_imgs, batched_font_ids], batched_dst_imgs)
+                _, losses['g_fake_bin'], losses['g_fake_cat'] = \
+                    self.generator_to_discriminator.train_on_batch(
+                        [batched_src_imgs, batched_font_ids],
+                        [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
 
-                losses['g_const'] = self.generator_to_encoder.train_on_batch([batched_src_imgs, batched_font_ids], batched_src_imgs_encoded)
+                losses['g_l1'] = \
+                    self.generator.train_on_batch(
+                        [batched_src_imgs, batched_font_ids],
+                        batched_dst_imgs)
+
+                losses['g_const'] = \
+                    self.generator_to_encoder.train_on_batch(
+                        [batched_src_imgs, batched_font_ids],
+                        batched_src_imgs_encoded)
 
                 losses['d_cat'] = (losses['d_real_cat'] + losses['d_fake_cat']) * 0.5
                 losses['d_bin'] = losses['d_real_bin'] + losses['d_fake_bin']
@@ -151,8 +167,6 @@ class TrainingFontDesignGAN():
             num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
             num_img = num_img * 255
             num_img = np.reshape(num_img, (256, 512))
-            print(num_img.shape)
-            print(concatenated_num_img.shape)
             concatenated_num_img = np.concatenate((concatenated_num_img, num_img), axis=0)
             concatenated_num_img = np.reshape(concatenated_num_img, (-1, 512))
         pil_img = Image.fromarray(np.uint8(concatenated_num_img))

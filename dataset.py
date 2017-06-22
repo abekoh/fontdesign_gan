@@ -1,7 +1,7 @@
+import os
 import numpy as np
 from PIL import Image
 import h5py
-import os
 import json
 from glob import glob
 

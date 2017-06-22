@@ -5,6 +5,11 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.initializers import random_normal, truncated_normal
 
+'''
+zi2ziの構成ほぼそのまま
+途中の -> (:, -, -, -)などはそこで出力されるnumpyのshape(:はバッチサイズ)
+'''
+
 
 def Generator(img_dim=1, embedding_n=40):
     # Encoder
