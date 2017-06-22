@@ -115,7 +115,7 @@ def Generator(img_dim=1, embedding_n=40):
     de_7 = Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(de_7)
     de_7 = BatchNormalization(momentum=0.9, epsilon=0.00001)(de_7)
     # -> (:, 128, 128, 64)
-    de_6 = concatenate([de_7, en_1], axis=3)
+    de_7 = concatenate([de_7, en_1], axis=3)
     # -> (:, 128, 128, 128)
 
     de_8 = Activation('relu')(de_7)
