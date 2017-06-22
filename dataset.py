@@ -13,9 +13,22 @@ class Dataset():
         self.dst_imgs = np.empty((0, 256, 256, 1), np.float32)
         self.char_ids = np.array([])
         self.font_ids = np.array([])
-        self.charset = self._load_charset(lang=lang, src_json_path='./cjk.json')
 
-    def _load_charset(self, lang='eng_caps', src_json_path=''):
+    def load_images(self, fonts_dir_path, src_font_name, lang='eng_caps'):
+        self.charset = self._load_charset(lang=lang, src_json_path='./cjk.json')
+        font_dir_paths = self._get_dir_paths(fonts_dir_path)
+        src_font_dir_path = os.path.join(fonts_dir_path, src_font_name)
+        font_id = 0
+        for i, font_dir_path in enumerate(font_dir_paths):
+            print('loading ({}/{}): {}'.format(i + 1, len(font_dir_paths), font_dir_path))
+            if font_dir_path == src_font_dir_path:
+                print('this is src')
+                self._load_font_imgs(font_dir_path, True)
+            else:
+                self._load_font_imgs(font_dir_path, False, font_id=font_id)
+                font_id += 1
+
+    def _load_charset(self, lang, src_json_path=''):
         if lang == 'eng_caps':
             caps = [chr(i) for i in range(65, 65 + 26)]
             return caps
@@ -30,7 +43,7 @@ class Dataset():
         dir_paths.sort()
         return dir_paths
 
-    def _load_font_imgs(self, font_dir_path, is_src, font_id=0):
+    def _load_font_imgs(self, font_dir_path, is_src, font_id):
         for char_id, c in enumerate(self.charset):
             img_pil = Image.open(os.path.join(font_dir_path, '{}.png'.format(c)))
             img_np = np.asarray(img_pil)
@@ -42,18 +55,6 @@ class Dataset():
                 self.dst_imgs = np.append(self.dst_imgs, img_np, axis=0)
                 self.char_ids = np.append(self.char_ids, np.array([char_id]))
                 self.font_ids = np.append(self.font_ids, np.array([font_id]))
-
-    def load_images(self, fonts_dir_path, src_font_name):
-        font_dir_paths = self._get_dir_paths(fonts_dir_path)
-        src_font_dir_path = os.path.join(fonts_dir_path, src_font_name)
-        font_id = 0
-        for i, font_dir_path in enumerate(font_dir_paths):
-            print('loading ({}/{}): {}'.format(i + 1, len(font_dir_paths), font_dir_path))
-            if font_dir_path == src_font_dir_path:
-                self._load_font_imgs(font_dir_path, True)
-            else:
-                self._load_font_imgs(font_dir_path, False, font_id=font_id)
-                font_id += 1
 
     def save_h5(self, dst_hdf5_path):
         h5file = h5py.File(dst_hdf5_path, 'w')
@@ -77,6 +78,6 @@ class Dataset():
 
 
 if __name__ == '__main__':
-    dataset = Dataset(lang='jp')
-    dataset.load_images('../../font_dataset/font_jp/', 'NotoSansCJKjp-Regular')
-    dataset.save_h5('./font_jp.h5')
+    dataset = Dataset(lang='eng_caps')
+    dataset.load_images('../../font_dataset/selected_200_256x256', 'Arial', lang='jp')
+    dataset.save_h5('./font_200_selected_alphs.h5')
