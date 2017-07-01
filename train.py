@@ -7,7 +7,6 @@ import plotly.graph_objs as go
 
 from keras.models import Model
 from keras.optimizers import Adam
-from keras.utils.np_utils import to_categorical
 
 from models import Generator, Discriminator
 from dataset import Dataset
@@ -35,8 +34,8 @@ class TrainingFontDesignGAN():
 
         self.discriminator = Discriminator(img_dim=self.img_dim, embedding_n=self.embedding_n)
         self.discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
-                                   loss=['binary_crossentropy', 'categorical_crossentropy'],
-                                   loss_weights=[1., 0.5])
+                                   loss='binary_crossentropy',
+                                   loss_weights=[1.])
 
         self.generator = Generator(img_dim=self.img_dim, embedding_n=self.embedding_n)
         self.generator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
@@ -45,8 +44,8 @@ class TrainingFontDesignGAN():
         self.discriminator.trainable = False
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
         self.generator_to_discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
-                                                loss=['binary_crossentropy', 'categorical_crossentropy'],
-                                                loss_weights=[1., 1.])
+                                                loss='binary_crossentropy',
+                                                loss_weights=[1.])
 
         self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
         self.encoder.trainable = False
@@ -92,20 +91,20 @@ class TrainingFontDesignGAN():
 
                 losses = {}
 
-                _, losses['d_real_bin'], losses['d_real_cat'] = \
+                losses['d_real_bin'] = \
                     self.discriminator.train_on_batch(
                         batched_dst_imgs,
-                        [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                        np.ones((batch_size, 1), dtype=np.float32))
 
-                _, losses['d_fake_bin'], losses['d_fake_cat'] = \
+                losses['d_fake_bin'] = \
                     self.discriminator.train_on_batch(
                         batched_generated_imgs,
-                        [np.zeros((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                        np.zeros((batch_size, 1), dtype=np.float32))
 
-                _, losses['g_fake_bin'], losses['g_fake_cat'] = \
+                losses['g_fake_bin'] = \
                     self.generator_to_discriminator.train_on_batch(
                         [batched_src_imgs, batched_font_ids],
-                        [np.ones((batch_size, 1), dtype=np.float32), to_categorical(batched_font_ids, self.embedding_n)])
+                        np.ones((batch_size, 1), dtype=np.float32))
 
                 losses['g_l1'] = \
                     self.generator.train_on_batch(
@@ -117,10 +116,9 @@ class TrainingFontDesignGAN():
                         [batched_src_imgs, batched_font_ids],
                         batched_src_imgs_encoded)
 
-                losses['d_cat'] = (losses['d_real_cat'] + losses['d_fake_cat']) * 0.5
                 losses['d_bin'] = losses['d_real_bin'] + losses['d_fake_bin']
-                losses['d'] = losses['d_bin'] + losses['d_cat']
-                losses['g'] = losses['g_fake_bin'] + losses['g_fake_cat'] + losses['g_l1'] + losses['g_const']
+                losses['d'] = losses['d_bin']
+                losses['g'] = losses['g_fake_bin'] + losses['g_l1'] + losses['g_const']
 
                 self._update_losses_progress(losses, epoch_i, batch_i, batch_n)
                 self._save_losses_progress_html()

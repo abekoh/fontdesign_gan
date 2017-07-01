@@ -156,9 +156,9 @@ def Discriminator(img_dim=1, embedding_n=40):
     fc_1 = Dense(1, activation='sigmoid')(fc_0)
     # -> (:, 1)
 
-    fc_2 = Dense(embedding_n, activation='softmax')(fc_0)
+    # fc_2 = Dense(embedding_n, activation='softmax')(fc_0)
     # -> (:, embedding_n)
 
-    model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
+    model = Model(inputs=dis_inp, outputs=fc_1)
 
     return model
