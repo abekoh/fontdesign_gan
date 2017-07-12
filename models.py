@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Activation, Dropout, Embedding, Reshape, Flatten, Dense, concatenate
+from keras.layers import Input, Activation, Dropout, Embedding, Reshape, Flatten, Dense, concatenate, MaxPool2D
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
@@ -160,5 +160,31 @@ def Discriminator(img_dim=1, embedding_n=40):
     # -> (:, embedding_n)
 
     model = Model(inputs=dis_inp, outputs=fc_1)
+
+    return model
+
+
+def Classifier(img_dim=1, class_n=26):
+    cl_inp = Input(shape=(256, 256, img_dim))
+
+    cl_1 = Conv2D(96, (8, 8), strides=(4, 4), padding='same')(cl_inp)
+    cl_1 = Activation('relu')(cl_1)
+    cl_1 = MaxPool2D((3, 3), strides=(2, 2))(cl_1)
+
+    cl_2 = Conv2D(256, (5, 5), padding='same')(cl_1)
+    cl_2 = Activation('relu')(cl_2)
+    cl_2 = MaxPool2D((3, 3), strides=(2, 2))(cl_2)
+
+    cl_3 = Conv2D(384, (3, 3), padding='same')(cl_2)
+    cl_3 = Activation('relu')(cl_3)
+
+    cl_4 = Conv2D(384, (3, 3), padding='same')(cl_3)
+    cl_4 = Activation('relu')(cl_4)
+
+    cl_5 = Conv2D(256, (3, 3), padding='same')(cl_4)
+    cl_5 = Activation('relu')(cl_5)
+    cl_5 = MaxPool2D((3, 3), strides=(2, 2))(cl_5)
+
+    model = Model(inputs=cl_inp, outputs=fc_1)
 
     return model

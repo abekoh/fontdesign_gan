@@ -56,12 +56,33 @@ class Dataset():
                 self.char_ids = np.append(self.char_ids, np.array([char_id]))
                 self.font_ids = np.append(self.font_ids, np.array([font_id]))
 
+    def make_train_test(self, train_n_rate=0.9):
+        combined = np.c_[self.dst_imgs.reshape(self.dst_imgs.shape[0], -1), self.char_ids]
+        np.random.shuffle(combined)
+        imgs_n = self.dst_imgs.size // self.dst_imgs.shape[0]
+        imgs = combined[:, :imgs_n].reshape(self.dst_imgs.shape)
+        labels = combined[:, imgs_n:].reshape(self.char_ids.shape)
+        train_n = int(imgs.shape[0] * train_n_rate)
+        self.train_imgs = imgs[:train_n]
+        self.train_labels = labels[:train_n]
+        self.test_imgs = imgs[train_n:]
+        self.test_labels = labels[train_n:]
+
     def save_h5(self, dst_hdf5_path):
         h5file = h5py.File(dst_hdf5_path, 'w')
         h5file.create_dataset('src_imgs', data=self.src_imgs)
         h5file.create_dataset('dst_imgs', data=self.dst_imgs)
         h5file.create_dataset('char_ids', data=self.char_ids)
         h5file.create_dataset('font_ids', data=self.font_ids)
+        h5file.flush()
+        h5file.close()
+
+    def save_h5_for_classifier(self, dst_hdf5_path):
+        h5file = h5py.File(dst_hdf5_path, 'w')
+        h5file.create_dataset('train_imgs', data=self.train_imgs)
+        h5file.create_dataset('test_imgs', data=self.test_imgs)
+        h5file.create_dataset('train_labels', data=self.train_labels)
+        h5file.create_dataset('test_labels', data=self.test_labels)
         h5file.flush()
         h5file.close()
 
@@ -73,11 +94,26 @@ class Dataset():
         self.font_ids = h5file['font_ids'].value
         h5file.close()
 
+    def load_h5_for_classifier(self, src_hdf5_path):
+        h5file = h5py.File(src_hdf5_path, 'r')
+        self.train_imgs = h5file['train_imgs'].value
+        self.train_labels = h5file['train_labels'].value
+        self.test_imgs = h5file['test_imgs'].value
+        self.test_labels = h5file['test_labels'].value
+        h5file.close()
+
     def get(self):
         return self.src_imgs, self.dst_imgs, self.char_ids, self.font_ids
 
+    def get_for_classifier(self):
+        return self.train_imgs, self.train_labels, self.test_imgs, self.test_labels
+
 
 if __name__ == '__main__':
+    # dataset = Dataset(lang='eng_caps')
+    # dataset.load_images('../../font_dataset/selected_200_256x256', 'Arial', lang='jp')
+    # dataset.save_h5('./font_200_selected_alphs.h5')
     dataset = Dataset(lang='eng_caps')
-    dataset.load_images('../../font_dataset/selected_200_256x256', 'Arial', lang='jp')
-    dataset.save_h5('./font_200_selected_alphs.h5')
+    dataset.load_h5('./font_200_selected_alphs.h5')
+    dataset.make_train_test()
+    dataset.save_h5_for_classifier('./font_200_selected_alphs_for_classifier.h5')
