@@ -185,6 +185,48 @@ def Classifier(img_dim=1, class_n=26):
     cl_5 = Activation('relu')(cl_5)
     cl_5 = MaxPool2D((3, 3), strides=(2, 2))(cl_5)
 
-    model = Model(inputs=cl_inp, outputs=fc_1)
+    cl_6 = Flatten()(cl_5)
+    cl_6 = Dense(4096)(cl_6)
+    cl_6 = Dropout(0.5)(cl_6)
+
+    cl_7 = Dense(4096)(cl_6)
+    cl_7 = Dropout(0.5)(cl_7)
+
+    cl_8 = Dense(class_n, activation='softmax')(cl_7)
+
+    model = Model(inputs=cl_inp, outputs=cl_8)
+
+    return model
+
+
+def Classifier2(img_dim=1, class_n=26):
+    dis_inp = Input(shape=(256, 256, img_dim))
+
+    dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
+    dis_1 = LeakyReLU(alpha=0.2)(dis_1)
+    # -> (:, 128, 128, 64)
+
+    dis_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_1)
+    dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
+    dis_2 = LeakyReLU(alpha=0.2)(dis_2)
+    # -> (:, 64, 64, 128)
+
+    dis_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_2)
+    dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
+    dis_3 = LeakyReLU(alpha=0.2)(dis_3)
+    # -> (:, 32, 32, 256)
+
+    dis_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_3)
+    dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
+    dis_4 = LeakyReLU(alpha=0.2)(dis_4)
+    # -> (:, 16, 16, 512)
+
+    fc_0 = Flatten()(dis_4)
+    # -> (:, 131072)
+
+    fc_1 = Dense(class_n, activation='sigmoid')(fc_0)
+    # -> (:, 1)
+
+    model = Model(inputs=dis_inp, outputs=fc_1)
 
     return model

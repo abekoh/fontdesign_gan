@@ -1,8 +1,7 @@
 import os
-import numpy as np
 
-from keras.optimizers import Adam
-from keras.utils import to_categorical
+from keras.optimizers import SGD
+from keras.utils import to_categorical, Progbar
 
 from models import Classifier
 from dataset import Dataset
@@ -23,35 +22,51 @@ class TrainingClassifier():
         self.class_n = class_n
 
         self.classifier = Classifier(img_dim=img_dim, class_n=class_n)
-        self.classifier.compile(optimizer=Adam(),
+        self.classifier.compile(optimizer=SGD(lr=0.01, decay=0.0005),
                                 loss='categorical_crossentropy', metrics=['accuracy'])
 
-    def load_dataset(self, src_h5_path, is_shuffle=True):
-        dataset = Dataset()
-        dataset.load_h5_for_classifier(src_h5_path)
-        self.train_imgs, self.train_labels, self.test_imgs, self.test_labels = dataset.get_for_classifier()
-
-    def _shuffle_dataset(self, imgs, labels):
-        combined = np.c_[imgs.reshape(imgs.shape[0], -1), labels]
-        np.random.shuffle(combined)
-        imgs_n = imgs.size // imgs.shape[0]
-        imgs = combined[:, :imgs_n].reshape(imgs.shape)
-        labels = combined[:, imgs_n:].reshape(labels.shape)
-        return imgs, labels
+    def load_dataset(self, src_h5_path, is_shuffle=True, train_rate=0.9):
+        self.dataset = Dataset(src_h5_path, 'r')
+        self.dataset.set_load_data(train_rate=train_rate)
+        if is_shuffle:
+            self.dataset.shuffle()
+        self.train_data_n = self.dataset.get_img_len()
+        self.test_data_n = self.dataset.get_img_len(is_test=True)
+        print(self.train_data_n, self.test_data_n)
 
     def train(self, epoch_n=20, batch_size=16):
+        train_batch_n = self.train_data_n // batch_size
+        test_batch_n = self.test_data_n // batch_size
+        for epoch_i in range(epoch_n):
+            # train
+            progbar = Progbar(train_batch_n)
+            losses, accs = list(), list()
+            for batch_i in range(train_batch_n):
+                progbar.update(batch_i)
+                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, batch_size)
+                batched_categorical_labels = self._labels_to_categorical(batched_labels)
+                loss, acc = self.classifier.train_on_batch(batched_imgs, batched_categorical_labels)
+                losses.append(loss)
+                accs.append(acc)
+            print('[train] loss: {}, acc: {}'.format(sum(losses) / len(losses), sum(accs) / len(accs)))
+            # test
+            progbar = Progbar(test_batch_n)
+            losses, accs = list(), list()
+            for batch_i in range(test_batch_n):
+                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, batch_size, is_test=True)
+                batched_categorical_labels = self._labels_to_categorical(batched_labels)
+                loss, acc = self.classifier.test_on_batch(batched_imgs, batched_categorical_labels)
+                losses.append(loss)
+                accs.append(acc)
+            print('[test] loss: {}, acc: {}'.format(sum(losses) / len(losses), sum(accs) / len(accs)))
+        self.classifier.save_weights(os.path.join(self.output_root_dir_path, 'classifier.h5'))
 
-        self.classifier.fit(self.train_imgs, to_categorical(self.train_labels, 26), batch_size=16, epochs=epoch_n)
-
-        loss, acc = self.classifier.evaluate(self.test_imgs, to_categorical(self.test_labels, 26), batch_size=16)
-
-        print('accuracy: {}'.foramt(acc))
-
-        self.classifier.save_weights(os.path.join(self.output_root_dir_path, 'classifier_h5'))
+    def _labels_to_categorical(self, labels):
+        return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
 
 
 if __name__ == '__main__':
     cl = TrainingClassifier()
     cl.build_models()
-    cl.load_dataset('./font_200_selected_alphs_for_classifier.h5')
-    cl.train(epoch_n=1)
+    cl.load_dataset('./fonts_selected_200_eng.h5')
+    cl.train(epoch_n=20)
