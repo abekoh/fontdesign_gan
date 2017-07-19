@@ -73,8 +73,8 @@ class Dataset():
 
 
 if __name__ == '__main__':
-    dataset = Dataset('./fonts_selected_200_eng.h5', 'w')
-    dataset.load_imgs('../../font_dataset/selected_200_png')
+    dataset = Dataset('./fonts_6628_eng.h5', 'w')
+    dataset.load_imgs('../../font_dataset/6628_256x256')
     # dataset = Dataset('./test.h5', 'r')
     # dataset.set_load_data()
     # for i in range(2):
