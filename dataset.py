@@ -58,13 +58,27 @@ class Dataset():
         return len(self.keys_queue_train)
 
     def get_batch(self, batch_i, batch_size, is_test=False):
-        imgs = np.empty((0, 256, 256, 1), np.float32)
-        labels = list()
+        keys_list = list()
         for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
             if is_test:
-                keys = self.keys_queue_test[i]
+                keys_list.append(self.keys_queue_test[i])
             else:
-                keys = self.keys_queue_train[i]
+                keys_list.append(self.keys_queue_train[i])
+        return self._get(keys_list)
+
+    def get_random(self, batch_size, is_test=False):
+        keys_list = list()
+        for i in range(batch_size):
+            if is_test:
+                keys_list.append(random.choice(self.keys_queue_test))
+            else:
+                keys_list.append(random.choice(self.keys_queue_train))
+        return self._get(keys_list)
+
+    def _get(self, keys_list):
+        imgs = np.empty((0, 256, 256, 1), np.float32)
+        labels = list()
+        for keys in keys_list:
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
             img = img[np.newaxis, :]
             imgs = np.append(imgs, img, axis=0)
@@ -72,9 +86,10 @@ class Dataset():
         return imgs, labels
 
 
+
 if __name__ == '__main__':
-    dataset = Dataset('./fonts_6628_eng.h5', 'w')
-    dataset.load_imgs('../../font_dataset/6628_256x256')
+    dataset = Dataset('./arial.h5', 'w')
+    dataset.load_imgs('../../font_dataset/ariel_256x256/')
     # dataset = Dataset('./test.h5', 'r')
     # dataset.set_load_data()
     # for i in range(2):

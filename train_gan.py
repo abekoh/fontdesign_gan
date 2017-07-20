@@ -7,8 +7,9 @@ import plotly.graph_objs as go
 
 from keras.models import Model
 from keras.optimizers import Adam
+from keras.utils import Progbar, to_categorical
 
-from models import Generator, Discriminator
+from models import Generator, Discriminator, Classifier
 from dataset import Dataset
 
 
@@ -28,7 +29,7 @@ class TrainingFontDesignGAN():
             if not os.path.exists(self.dst_dir_paths[dst_dir_name]):
                 os.mkdir(self.dst_dir_paths[dst_dir_name])
 
-    def build_models(self, img_dim=1, embedding_n=40, lr=0.0002, beta_1=0.5):
+    def build_models(self, classifier_h5_path, img_dim=1, embedding_n=40, lr=0.0002, beta_1=0.5):
         self.img_dim = img_dim
         self.embedding_n = embedding_n
 
@@ -38,8 +39,8 @@ class TrainingFontDesignGAN():
                                    loss_weights=[1.])
 
         self.generator = Generator(img_dim=self.img_dim, embedding_n=self.embedding_n)
-        self.generator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
-                               loss='mean_absolute_error', loss_weights=[100.])
+        # self.generator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
+        #                        loss='mean_absolute_error', loss_weights=[100.])
 
         self.discriminator.trainable = False
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
@@ -54,51 +55,55 @@ class TrainingFontDesignGAN():
                                           loss='mean_squared_error',
                                           loss_weights=[15.])
 
-    def load_dataset(self, src_h5_path, is_shuffle=True):
-        dataset = Dataset()
-        dataset.load_h5(src_h5_path)
-        self.src_imgs, self.dst_imgs, self.char_ids, self.font_ids = dataset.get()
+        self.classifier = Classifier(img_dim=img_dim, class_n=26)
+        self.classifier.load_weights(classifier_h5_path)
+        self.classifier.trainable = False
+        self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
+        self.generator_to_classifier.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
+                                             loss='categorical_crossentropy',
+                                             loss_weights=[0.1])
+
+    def load_dataset(self, src_real_h5_path, src_src_h5_path, is_shuffle=True):
+        self.real_dataset = Dataset(src_real_h5_path, 'r')
+        self.real_dataset.set_load_data()
         if is_shuffle:
-            self._shuffle_dataset()
+            self.real_dataset.shuffle()
+        self.real_data_n = self.real_dataset.get_img_len()
+        self.src_dataset = Dataset(src_src_h5_path, 'r')
+        self.src_dataset.set_load_data()
 
-    def _shuffle_dataset(self):
-        combined = np.c_[self.dst_imgs.reshape(len(self.dst_imgs), -1), self.char_ids, self.font_ids]
-        np.random.shuffle(combined)
-        dst_imgs_n = self.dst_imgs.size // len(self.dst_imgs)
-        self.dst_imgs = combined[:, :dst_imgs_n].reshape(self.dst_imgs.shape)
-        self.char_ids = combined[:, dst_imgs_n:dst_imgs_n + 1].reshape(self.char_ids.shape)
-        self.font_ids = combined[:, dst_imgs_n + 1:].reshape(self.font_ids.shape)
-
-    def train(self, epoch_n=30, batch_size=16):
+    def train(self, epoch_n=30, batch_size=16, save_imgs_interval=10):
         self._init_losses_progress()
 
-        batch_n = int(self.dst_imgs.shape[0] / batch_size)
+        batch_n = self.real_data_n // batch_size
 
         for epoch_i in range(epoch_n):
+
+            progbar = Progbar(batch_n)
+
             for batch_i in range(batch_n):
-                print('batch {} of {} / epoch {} of {}'.format(batch_i + 1, batch_n, epoch_i + 1, epoch_n))
 
-                batched_src_imgs = np.zeros((batch_size, 256, 256, 1), dtype=np.float32)
-                batched_dst_imgs = np.zeros((batch_size, 256, 256, 1), dtype=np.float32)
-                batched_font_ids = np.zeros((batch_size), dtype=np.int32)
-                for i, j in enumerate(range(batch_i * batch_size, (batch_i + 1) * batch_size)):
-                    batched_src_imgs[i, :, :, :] = self.src_imgs[int(self.char_ids[j])]
-                    batched_dst_imgs[i, :, :, :] = self.dst_imgs[j]
-                    batched_font_ids[i] = self.font_ids[j]
+                progbar.update(batch_i + 1)
 
-                batched_generated_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
+                batched_font_ids = np.random.randint(0, 40, batch_size, dtype=np.int32)
+                batched_src_imgs, batched_src_labels = self.src_dataset.get_random(batch_size)
+                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, batch_size)
+
+                batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
+
+                batched_fake_imgs = self.generator.predict_on_batch([batched_src_imgs, batched_font_ids])
                 batched_src_imgs_encoded = self.encoder.predict_on_batch(batched_src_imgs)
 
-                losses = {}
+                losses = dict()
 
                 losses['d_real_bin'] = \
                     self.discriminator.train_on_batch(
-                        batched_dst_imgs,
+                        batched_real_imgs,
                         np.ones((batch_size, 1), dtype=np.float32))
 
                 losses['d_fake_bin'] = \
                     self.discriminator.train_on_batch(
-                        batched_generated_imgs,
+                        batched_fake_imgs,
                         np.zeros((batch_size, 1), dtype=np.float32))
 
                 losses['g_fake_bin'] = \
@@ -106,36 +111,39 @@ class TrainingFontDesignGAN():
                         [batched_src_imgs, batched_font_ids],
                         np.ones((batch_size, 1), dtype=np.float32))
 
-                losses['g_l1'] = \
-                    self.generator.train_on_batch(
-                        [batched_src_imgs, batched_font_ids],
-                        batched_dst_imgs)
-
                 losses['g_const'] = \
                     self.generator_to_encoder.train_on_batch(
                         [batched_src_imgs, batched_font_ids],
                         batched_src_imgs_encoded)
 
+                losses['g_class'] = \
+                    self.generator_to_classifier.train_on_batch(
+                        [batched_src_imgs, batched_font_ids],
+                        batched_categorical_src_labels)
+
                 losses['d_bin'] = losses['d_real_bin'] + losses['d_fake_bin']
                 losses['d'] = losses['d_bin']
-                losses['g'] = losses['g_fake_bin'] + losses['g_l1'] + losses['g_const']
+                losses['g'] = losses['g_fake_bin'] + losses['g_const'] + losses['g_class']
 
                 self._update_losses_progress(losses, epoch_i, batch_i, batch_n)
                 self._save_losses_progress_html()
 
-                if batch_i % 50 == 0 or batch_i == batch_n - 1:
-                    self._save_images(batched_dst_imgs, batched_generated_imgs, epoch_i, batch_i)
+                if (batch_i + 1) % save_imgs_interval == 0 or batch_i + 1 == batch_n:
+                    self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
             self._save_model_weights(epoch_i)
         self._save_losses_progress_h5()
 
+    def _labels_to_categorical(self, labels):
+        return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
+
     def _init_losses_progress(self):
         self.x_time = np.array([])
-        self.y_losses = {}
+        self.y_losses = dict()
 
     def _update_losses_progress(self, losses, epoch_i, batch_i, batch_n):
         self.x_time = np.append(self.x_time, np.array([epoch_i * batch_n + batch_i]))
-        if self.y_losses == {}:
+        if self.y_losses == dict():
             for k, v in losses.items():
                 self.y_losses[k] = np.array([v], dtype=np.float32)
         else:
@@ -143,17 +151,15 @@ class TrainingFontDesignGAN():
                 self.y_losses[k] = np.append(self.y_losses[k], np.array([v]))
 
     def _save_losses_progress_html(self):
-        graphs = []
+        graphs = list()
         for k, v in self.y_losses.items():
             graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k)
-            offline.plot([graph], filename=os.path.join(self.output_dir_paths['losses'], '{}.html'.format(k)), auto_open=False)
+            offline.plot([graph], filename=os.path.join(self.dst_dir_paths['losses'], '{}.html'.format(k)), auto_open=False)
             graphs.append(graph)
-        layout = {'yaxis': {'range': [0, 100.]}}
-        fig = {'data': graphs, 'layout': layout}
-        offline.plot(fig, filename=os.path.join(self.output_dir_paths['losses'], 'all.html'), auto_open=False)
+        offline.plot(graphs, filename=os.path.join(self.dst_dir_paths['losses'], 'all.html'), auto_open=False)
 
     def _save_losses_progress_h5(self):
-        h5file = h5py.File(os.path.join(self.output_dir_paths['losses'], 'all.h5'))
+        h5file = h5py.File(os.path.join(self.dst_dir_paths['losses'], 'all.h5'))
         h5file.create_dataset('x_time', data=self.x_time)
         h5file.create_dataset('y_losses', data=self.y_losses)
         h5file.flush()
@@ -168,15 +174,15 @@ class TrainingFontDesignGAN():
             concatenated_num_img = np.concatenate((concatenated_num_img, num_img), axis=0)
             concatenated_num_img = np.reshape(concatenated_num_img, (-1, 512))
         pil_img = Image.fromarray(np.uint8(concatenated_num_img))
-        pil_img.save(os.path.join(self.output_dir_paths['generated_imgs'], '{}_{}.png'.format(epoch_i, batch_i)))
+        pil_img.save(os.path.join(self.dst_dir_paths['generated_imgs'], '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
     def _save_model_weights(self, epoch_i):
-        self.generator.save_weights(os.path.join(self.output_dir_paths['model_weights'], 'gen_{}.h5'.format(epoch_i)))
-        self.discriminator.save_weights(os.path.join(self.output_dir_paths['model_weights'], 'dis_{}.h5'.format(epoch_i)))
+        self.generator.save_weights(os.path.join(self.dst_dir_paths['model_weights'], 'gen_{}.h5'.format(epoch_i + 1)))
+        self.discriminator.save_weights(os.path.join(self.dst_dir_paths['model_weights'], 'dis_{}.h5'.format(epoch_i + 1)))
 
 
 if __name__ == '__main__':
     gan = TrainingFontDesignGAN()
-    gan.build_models()
-    gan.load_dataset('./font_jp.h5')
+    gan.build_models(classifier_h5_path='output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5')
+    gan.load_dataset('src/fonts_6628_caps_256x256.h5', 'src/arial.h5')
     gan.train()
