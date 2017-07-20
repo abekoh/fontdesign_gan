@@ -14,19 +14,19 @@ from dataset import Dataset
 
 class TrainingFontDesignGAN():
 
-    def __init__(self, output_dir_path='output_train'):
-        self._set_outputs(output_root_dir_path=output_dir_path)
+    def __init__(self, dst_dir_path='output_gan'):
+        self._set_dsts(dst_root_dir_path=dst_dir_path)
 
-    def _set_outputs(self, output_root_dir_path):
-        self.output_root_dir_path = output_root_dir_path
-        if not os.path.exists(self.output_root_dir_path):
-            os.mkdir(self.output_root_dir_path)
-        output_dir_names = ['generated_imgs', 'model_weights', 'losses']
-        self.output_dir_paths = {}
-        for output_dir_name in output_dir_names:
-            self.output_dir_paths[output_dir_name] = os.path.join(output_root_dir_path, output_dir_name)
-            if not os.path.exists(self.output_dir_paths[output_dir_name]):
-                os.mkdir(self.output_dir_paths[output_dir_name])
+    def _set_dsts(self, dst_root_dir_path):
+        self.dst_root_dir_path = dst_root_dir_path
+        if not os.path.exists(self.dst_root_dir_path):
+            os.mkdir(self.dst_root_dir_path)
+        dst_dir_names = ['generated_imgs', 'model_weights', 'losses']
+        self.dst_dir_paths = {}
+        for dst_dir_name in dst_dir_names:
+            self.dst_dir_paths[dst_dir_name] = os.path.join(dst_root_dir_path, dst_dir_name)
+            if not os.path.exists(self.dst_dir_paths[dst_dir_name]):
+                os.mkdir(self.dst_dir_paths[dst_dir_name])
 
     def build_models(self, img_dim=1, embedding_n=40, lr=0.0002, beta_1=0.5):
         self.img_dim = img_dim
