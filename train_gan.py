@@ -131,7 +131,14 @@ class TrainingFontDesignGAN():
                 if (batch_i + 1) % save_imgs_interval == 0 or batch_i + 1 == batch_n:
                     self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
+                if self._is_early_stopping(10):
+                    print('early stop')
+                    break
+            else:
+                continue
+
             self._save_model_weights(epoch_i)
+            break
         self._save_losses_progress_h5()
 
     def _labels_to_categorical(self, labels):
@@ -158,13 +165,6 @@ class TrainingFontDesignGAN():
             graphs.append(graph)
         offline.plot(graphs, filename=os.path.join(self.dst_dir_paths['losses'], 'all.html'), auto_open=False)
 
-    def _save_losses_progress_h5(self):
-        h5file = h5py.File(os.path.join(self.dst_dir_paths['losses'], 'all.h5'))
-        h5file.create_dataset('x_time', data=self.x_time)
-        h5file.create_dataset('y_losses', data=self.y_losses)
-        h5file.flush()
-        h5file.close()
-
     def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
         concatenated_num_img = np.empty((0, 512))
         for img_i in range(dst_imgs.shape[0]):
@@ -176,9 +176,24 @@ class TrainingFontDesignGAN():
         pil_img = Image.fromarray(np.uint8(concatenated_num_img))
         pil_img.save(os.path.join(self.dst_dir_paths['generated_imgs'], '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
+    def _is_early_stopping(self, patience):
+        for key in self.y_losses.keys():
+            if self.y_losses[key].shape[0] > patience:
+                recent_losses = self.y_losses[key][-patience:]
+                if False not in (recent_losses[:] == recent_losses[0]):
+                    return True
+        return False
+
     def _save_model_weights(self, epoch_i):
         self.generator.save_weights(os.path.join(self.dst_dir_paths['model_weights'], 'gen_{}.h5'.format(epoch_i + 1)))
         self.discriminator.save_weights(os.path.join(self.dst_dir_paths['model_weights'], 'dis_{}.h5'.format(epoch_i + 1)))
+
+    def _save_losses_progress_h5(self):
+        h5file = h5py.File(os.path.join(self.dst_dir_paths['losses'], 'all.h5'))
+        h5file.create_dataset('x_time', data=self.x_time)
+        h5file.create_dataset('y_losses', data=self.y_losses)
+        h5file.flush()
+        h5file.close()
 
 
 if __name__ == '__main__':
