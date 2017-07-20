@@ -86,7 +86,6 @@ class Dataset():
         return imgs, labels
 
 
-
 if __name__ == '__main__':
     dataset = Dataset('./arial.h5', 'w')
     dataset.load_imgs('../../font_dataset/ariel_256x256/')
