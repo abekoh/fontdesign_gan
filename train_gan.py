@@ -29,14 +29,15 @@ class TrainingFontDesignGAN():
             if not os.path.exists(self.dst_dir_paths[dst_dir_name]):
                 os.mkdir(self.dst_dir_paths[dst_dir_name])
 
-    def build_models(self, classifier_h5_path, img_dim=1, embedding_n=40, lr=0.0002, beta_1=0.5):
+    def build_models(self, classifier_h5_path, img_dim=1, embedding_n=40, lr=0.0002, beta_1=0.5,
+                     loss_weights={'d': [1.], 'g2d': [1.], 'g2e': [15.], 'g2c': [0.1]}):
         self.img_dim = img_dim
         self.embedding_n = embedding_n
 
         self.discriminator = Discriminator(img_dim=self.img_dim, embedding_n=self.embedding_n)
         self.discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
                                    loss='binary_crossentropy',
-                                   loss_weights=[1.])
+                                   loss_weights=loss_weights['d'])
 
         self.generator = Generator(img_dim=self.img_dim, embedding_n=self.embedding_n)
         # self.generator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
@@ -46,14 +47,14 @@ class TrainingFontDesignGAN():
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
         self.generator_to_discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
                                                 loss='binary_crossentropy',
-                                                loss_weights=[1.])
+                                                loss_weights=loss_weights['g2d'])
 
         self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
         self.encoder.trainable = False
         self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
         self.generator_to_encoder.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
                                           loss='mean_squared_error',
-                                          loss_weights=[15.])
+                                          loss_weights=loss_weights['g2e'])
 
         self.classifier = Classifier(img_dim=img_dim, class_n=26)
         self.classifier.load_weights(classifier_h5_path)
@@ -61,7 +62,7 @@ class TrainingFontDesignGAN():
         self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
         self.generator_to_classifier.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
                                              loss='categorical_crossentropy',
-                                             loss_weights=[0.1])
+                                             loss_weights=loss_weights['g2c'])
 
     def load_dataset(self, src_real_h5_path, src_src_h5_path, is_shuffle=True):
         self.real_dataset = Dataset(src_real_h5_path, 'r')
@@ -140,6 +141,7 @@ class TrainingFontDesignGAN():
             self._save_model_weights(epoch_i)
             break
         self._save_losses_progress_h5()
+        return losses['d'] + losses['g']
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
@@ -163,7 +165,7 @@ class TrainingFontDesignGAN():
             graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k)
             offline.plot([graph], filename=os.path.join(self.dst_dir_paths['losses'], '{}.html'.format(k)), auto_open=False)
             graphs.append(graph)
-        offline.plot(graphs, filename=os.path.join(self.dst_dir_paths['losses'], 'all.html'), auto_open=False)
+        offline.plot(graphs, filename=os.path.join(self.dst_dir_paths['losses'], 'all_losses.html'), auto_open=False)
 
     def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
         concatenated_num_img = np.empty((0, 512))
@@ -189,15 +191,11 @@ class TrainingFontDesignGAN():
         self.discriminator.save_weights(os.path.join(self.dst_dir_paths['model_weights'], 'dis_{}.h5'.format(epoch_i + 1)))
 
     def _save_losses_progress_h5(self):
-        h5file = h5py.File(os.path.join(self.dst_dir_paths['losses'], 'all.h5'))
+        h5file = h5py.File(os.path.join(self.dst_dir_paths['losses'], 'all_losses.h5'))
         h5file.create_dataset('x_time', data=self.x_time)
         h5file.create_dataset('y_losses', data=self.y_losses)
         h5file.flush()
         h5file.close()
 
-
-if __name__ == '__main__':
-    gan = TrainingFontDesignGAN()
-    gan.build_models(classifier_h5_path='output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5')
-    gan.load_dataset('src/fonts_6628_caps_256x256.h5', 'src/arial.h5')
-    gan.train()
+    def get_generator_model(self):
+        return self.generator
