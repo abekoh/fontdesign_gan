@@ -11,6 +11,7 @@ from keras.utils import Progbar, to_categorical
 
 from models import Generator, Discriminator, Classifier
 from dataset import Dataset
+from ops import mean_only, wasserstein_distance
 
 
 class TrainingFontDesignGAN():
@@ -36,7 +37,7 @@ class TrainingFontDesignGAN():
 
         self.discriminator = Discriminator(img_dim=self.img_dim, embedding_n=self.embedding_n)
         self.discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
-                                   loss='binary_crossentropy',
+                                   loss=wasserstein_distance,
                                    loss_weights=loss_weights['d'])
 
         self.generator = Generator(img_dim=self.img_dim, embedding_n=self.embedding_n)
@@ -46,7 +47,7 @@ class TrainingFontDesignGAN():
         self.discriminator.trainable = False
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
         self.generator_to_discriminator.compile(optimizer=Adam(lr=lr, beta_1=beta_1),
-                                                loss='binary_crossentropy',
+                                                loss=mean_only,
                                                 loss_weights=loss_weights['g2d'])
 
         self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
