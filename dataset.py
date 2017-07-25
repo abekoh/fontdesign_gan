@@ -87,8 +87,8 @@ class Dataset():
 
 
 if __name__ == '__main__':
-    dataset = Dataset('./arial.h5', 'w')
-    dataset.load_imgs('../../font_dataset/ariel_256x256/')
+    dataset = Dataset('src/fonts_200_caps_256x256', 'w')
+    dataset.load_imgs('../../font_dataset/png/200_256x256')
     # dataset = Dataset('./test.h5', 'r')
     # dataset.set_load_data()
     # for i in range(2):
