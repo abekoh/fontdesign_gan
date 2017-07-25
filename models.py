@@ -11,7 +11,7 @@ zi2ziの構成ほぼそのまま
 '''
 
 
-def Generator(img_dim=1, embedding_n=40):
+def GeneratorPix2Pix(img_dim=1, embedding_n=40):
     # Encoder
     en_inp = Input(shape=(256, 256, img_dim))
     # -> (:, 256, 256, img_dim)
@@ -128,7 +128,7 @@ def Generator(img_dim=1, embedding_n=40):
     return model
 
 
-def Discriminator(img_dim=1, embedding_n=40):
+def Discriminator(img_dim=1):
     dis_inp = Input(shape=(256, 256, img_dim))
 
     dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
@@ -155,9 +155,6 @@ def Discriminator(img_dim=1, embedding_n=40):
 
     fc_1 = Dense(1, activation=None)(fc_0)
     # -> (:, 1)
-
-    # fc_2 = Dense(embedding_n, activation='softmax')(fc_0)
-    # -> (:, embedding_n)
 
     model = Model(inputs=dis_inp, outputs=fc_1)
 

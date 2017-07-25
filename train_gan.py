@@ -6,89 +6,97 @@ import plotly.offline as offline
 import plotly.graph_objs as go
 
 from keras.models import Model
-# from keras.layers import Input
 from keras.optimizers import RMSprop
 from keras.utils import Progbar, to_categorical
 
-from models import Generator, Discriminator, Classifier
+import models
 from dataset import Dataset
 from ops import multiple_loss
+from params import ModelParams, GANParams, GANPaths
 
 
 class TrainingFontDesignGAN():
 
-    def __init__(self, dst_dir_path='output_gan'):
-        self._set_dsts(dst_root_dir_path=dst_dir_path)
+    def __init__(self, params, paths):
+        self.params = params
+        self.paths = paths
+        self._set_dsts()
+        self._build_models()
+        self._load_dataset()
 
-    def _set_dsts(self, dst_root_dir_path):
-        self.dst_root_dir_path = dst_root_dir_path
+    def _set_dsts(self):
+        self.dst_root_dir_path = self.paths.dst_dir_path
         if not os.path.exists(self.dst_root_dir_path):
             os.mkdir(self.dst_root_dir_path)
         dst_dir_names = ['generated_imgs', 'model_weights', 'losses']
         self.dst_dir_paths = {}
         for dst_dir_name in dst_dir_names:
-            self.dst_dir_paths[dst_dir_name] = os.path.join(dst_root_dir_path, dst_dir_name)
+            self.dst_dir_paths[dst_dir_name] = os.path.join(self.dst_root_dir_path, dst_dir_name)
             if not os.path.exists(self.dst_dir_paths[dst_dir_name]):
                 os.mkdir(self.dst_dir_paths[dst_dir_name])
 
-    def build_models(self, classifier_h5_path, img_dim=1, embedding_n=50, lr=0.00005, clipvalue=0.01,
-                     loss_weights={'d': [1.], 'g2d': [1.], 'g2e': [10.], 'g2c': [1.]}):
-        self.img_dim = img_dim
-        self.embedding_n = embedding_n
+    def _build_models(self):
 
-        self.discriminator = Discriminator(img_dim=self.img_dim, embedding_n=self.embedding_n)
-        self.discriminator.compile(optimizer=RMSprop(lr=lr, clipvalue=clipvalue),
-                                   loss=multiple_loss,
-                                   loss_weights=loss_weights['d'])
+        if hasattr(self.params, 'g'):
+            if self.params.g.arch == 'dcgan':
+                self.generator = models.GeneratorDCGAN(img_dim=self.params.img_dim, embedding_n=self.params.embedding_n)
+            if self.params.g.arch == 'pix2pix':
+                self.generator = models.GeneratorPix2Pix(img_dim=self.params.img_dim, embedding_n=self.params.embedding_n)
 
-        # fake_input, real_input = Input(shape=(256, 256, self.img_dim)), Input(shape=(256, 256, self.img_dim))
-        # subtracted = Subtract()([self.discriminator(fake_input), self.discriminator(real_input)])
-        # self.discriminator_two_inputs = Model(inputs=[fake_input, real_input], outputs=subtracted)
-        #
-        # self.discriminator_two_inputs.compile(optimizer=RMSprop(lr=lr, clipvalue=clipvalue),
-        #                                       loss=multiple_loss,
-        #                                       loss_weights=loss_weights['d'])
+        if hasattr(self.params, 'd'):
+            if self.params.d.arch == 'pix2pix':
+                self.discriminator = models.DiscriminatorPix2Pix(img_dim=self.params.img_dim)
+                self.discriminator.compile(optimizer=RMSprop(lr=self.params.d.lr,
+                                                             clipvalue=self.params.d.clipvalue),
+                                           loss=multiple_loss,
+                                           loss_weights=self.params.d.loss_weights)
 
-        self.generator = Generator(img_dim=self.img_dim, embedding_n=self.embedding_n)
-        # self.generator.compile(optimizer=RMSprop(lr=lr),
-        #                        loss='mean_absolute_error', loss_weights=[100.])
+        if hasattr(self.params, 'g2d'):
+            self.discriminator.trainable = False
+            self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
+            self.generator_to_discriminator.compile(optimizer=RMSprop(lr=self.params.g2d.lr),
+                                                    loss=multiple_loss,
+                                                    loss_weights=self.params.g2d.loss_weights)
 
-        self.discriminator.trainable = False
-        self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
-        self.generator_to_discriminator.compile(optimizer=RMSprop(lr=lr),
-                                                loss=multiple_loss,
-                                                loss_weights=loss_weights['g2d'])
+        if hasattr(self.params, 'c'):
+            self.classifier = models.Classifier(img_dim=self.params.img_dim, class_n=26)
+            self.classifier.load_weights(self.paths.weight_h5_path)
 
-        self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
-        self.encoder.trainable = False
-        self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
-        self.generator_to_encoder.compile(optimizer=RMSprop(lr=lr),
-                                          loss='mean_squared_error',
-                                          loss_weights=loss_weights['g2e'])
+        if hasattr(self.params, 'g2c'):
+            self.classifier.trainable = False
+            self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
+            self.generator_to_classifier.compile(optimizer=RMSprop(lr=self.params.g2c.lr),
+                                                 loss='categorical_crossentropy',
+                                                 loss_weights=self.params.g2c)
 
-        self.classifier = Classifier(img_dim=img_dim, class_n=26)
-        self.classifier.load_weights(classifier_h5_path)
-        self.classifier.trainable = False
-        self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
-        self.generator_to_classifier.compile(optimizer=RMSprop(lr=lr),
-                                             loss='categorical_crossentropy',
-                                             loss_weights=loss_weights['g2c'])
+        if hasattr(self.params, 'l1'):
+            self.generator.compile(optimizer=RMSprop(lr=self.params.l1.lr),
+                                   loss='mean_absolute_error', loss_weights=self.params.l1.loss_weights)
 
-    def load_dataset(self, src_real_h5_path, src_src_h5_path, is_shuffle=True):
-        self.real_dataset = Dataset(src_real_h5_path, 'r')
+        if hasattr(self.params, 'e'):
+            self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
+        if hasattr(self.params, 'g2e'):
+            self.encoder.trainable = False
+            self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
+            self.generator_to_encoder.compile(optimizer=RMSprop(lr=self.params.g2e.lr),
+                                              loss='mean_squared_error',
+                                              loss_weights=self.params.g2e.loss_weights)
+
+    def _load_dataset(self, is_shuffle=True):
+        self.real_dataset = Dataset(self.paths.src_real_h5_path, 'r')
         self.real_dataset.set_load_data()
         if is_shuffle:
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
-        self.src_dataset = Dataset(src_src_h5_path, 'r')
+        self.src_dataset = Dataset(self.paths.src_src_h5_path, 'r')
         self.src_dataset.set_load_data()
 
     def train(self, epoch_n=30, batch_size=32, n_critic=5, early_stopping_n=10, save_imgs_interval=10):
         self._init_losses_progress()
 
-        batch_n = self.real_data_n // batch_size
+        batch_n = self.real_data_n // self.params.self.params.batch_size
 
-        for epoch_i in range(epoch_n):
+        for epoch_i in range(self.params.epoch_n):
 
             progbar = Progbar(batch_n)
 
@@ -96,9 +104,9 @@ class TrainingFontDesignGAN():
 
                 progbar.update(batch_i + 1)
 
-                batched_font_ids = np.random.randint(0, 40, batch_size, dtype=np.int32)
-                batched_src_imgs, batched_src_labels = self.src_dataset.get_random(batch_size)
-                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, batch_size)
+                batched_font_ids = np.random.randint(0, 40, self.params.batch_size, dtype=np.int32)
+                batched_src_imgs, batched_src_labels = self.src_dataset.get_random(self.params.batch_size)
+                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, self.params.batch_size)
 
                 batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
 
@@ -109,22 +117,22 @@ class TrainingFontDesignGAN():
 
                 losses['d_fake'] = 0
                 losses['d_real'] = 0
-                for i in range(n_critic):
+                for i in range(self.params.critic_n):
                     loss_d_fake_tmp = \
                         self.discriminator.train_on_batch(
                             batched_fake_imgs,
-                            np.ones((batch_size, 1), dtype=np.float32))
-                    losses['d_fake'] += loss_d_fake_tmp / n_critic
+                            np.ones((self.params.batch_size, 1), dtype=np.float32))
+                    losses['d_fake'] += loss_d_fake_tmp / self.params.critic_n
                     loss_d_real_tmp = \
                         self.discriminator.train_on_batch(
                             batched_fake_imgs,
-                            -np.ones((batch_size, 1), dtype=np.float32))
-                    losses['d_real'] += loss_d_real_tmp / n_critic
+                            -np.ones((self.params.batch_size, 1), dtype=np.float32))
+                    losses['d_real'] += loss_d_real_tmp / self.params.critic_n
 
                 losses['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
                         [batched_src_imgs, batched_font_ids],
-                        -np.ones((batch_size, 1), dtype=np.float32))
+                        -np.ones((self.params.batch_size, 1), dtype=np.float32))
 
                 losses['g_const'] = \
                     self.generator_to_encoder.train_on_batch(
@@ -142,10 +150,10 @@ class TrainingFontDesignGAN():
                 self._update_losses_progress(losses, epoch_i, batch_i, batch_n)
                 self._save_losses_progress_html()
 
-                if (batch_i + 1) % save_imgs_interval == 0 or batch_i + 1 == batch_n:
+                if (batch_i + 1) % 10 == 0 or batch_i + 1 == batch_n:
                     self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
-                if self._is_early_stopping(10):
+                if self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
                     break
             else:
@@ -210,12 +218,16 @@ class TrainingFontDesignGAN():
         h5file.flush()
         h5file.close()
 
-    def get_generator_model(self):
-        return self.generator
-
 
 if __name__ == '__main__':
-    gan = TrainingFontDesignGAN(dst_dir_path='output_gan_0724')
-    gan.build_models('output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5')
-    gan.load_dataset('src/fonts_200_caps_256x256.h5', 'src/arial.h5')
-    gan.train()
+    # d = {
+    #     'arch: '
+    #     }
+    # params = {
+    #     'img_dim': 3
+    #
+    #     }
+    # p = GANParams(params)
+    # print(p.img_dim)
+    # gan = TrainingFontDesignGAN(dst_dir_path='output_gan_0724')
+    # gan.train()
