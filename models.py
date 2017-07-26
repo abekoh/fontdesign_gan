@@ -5,11 +5,6 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.initializers import random_normal, truncated_normal
 
-'''
-zi2ziの構成ほぼそのまま
-途中の -> (:, -, -, -)などはそこで出力されるnumpyのshape(:はバッチサイズ)
-'''
-
 
 def GeneratorPix2Pix(img_dim=1, embedding_n=40):
     # Encoder
@@ -128,7 +123,74 @@ def GeneratorPix2Pix(img_dim=1, embedding_n=40):
     return model
 
 
-def Discriminator(img_dim=1):
+def GeneratorDCGAN(img_dim=1, font_embedding_n=40, char_embedding_n=26):
+    font_embedding = Input(shape=(1,), dtype='int32')
+    # -> (:)
+    font_embedding = Embedding(font_embedding_n, 512, embeddings_initializer=random_normal(stddev=0.01))(font_embedding)
+    # -> (:, 1, 512)
+    font_embedding = Reshape((1, 1, 512))(font_embedding)
+    # -> (:, 1, 1, 512)
+
+    char_embedding = Input(shape=(1,), dtype='int32')
+    # -> (:)
+    char_embedding = Embedding(char_embedding_n, 128, embeddings_initializer=random_normal(stddev=0.01))(char_embedding)
+    # -> (:, 1, 128)
+    char_embedding = Reshape((1, 1, 128))(char_embedding)
+    # -> (:, 1, 1, 128)
+
+    # Decoder
+    g_0 = concatenate([font_embedding, char_embedding], axis=3)
+    # -> (:, 1, 1, 640)
+
+    g_1 = Activation('relu')(g_0)
+    g_1 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_1)
+    g_1 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_1)
+    g_1 = Dropout(0.5)(g_1)
+    # -> (:, 2, 2, 512)
+
+    g_2 = Activation('relu')(g_1)
+    g_2 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_2)
+    g_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_2)
+    g_2 = Dropout(0.5)(g_2)
+    # -> (:, 4, 4, 512)
+
+    g_3 = Activation('relu')(g_2)
+    g_3 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_3)
+    g_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_3)
+    g_3 = Dropout(0.5)(g_3)
+    # -> (:, 8, 8, 512)
+
+    g_4 = Activation('relu')(g_3)
+    g_4 = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_4)
+    g_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_4)
+    # -> (:, 16, 16, 512)
+
+    g_5 = Activation('relu')(g_4)
+    g_5 = Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_5)
+    g_5 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_5)
+    # -> (:, 32, 32, 256)
+
+    g_6 = Activation('relu')(g_5)
+    g_6 = Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_6)
+    g_6 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_6)
+    # -> (:, 64, 64, 128)
+
+    g_7 = Activation('relu')(g_6)
+    g_7 = Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_7)
+    g_7 = BatchNormalization(momentum=0.9, epsilon=0.00001)(g_7)
+    # -> (:, 128, 128, 64)
+
+    g_8 = Activation('relu')(g_7)
+    g_8 = Conv2DTranspose(img_dim, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(g_8)
+    g_8 = Activation('sigmoid')(g_8)
+    # -> (:, 256, 256, img_dim)
+
+    model = Model(inputs=[font_embedding, char_embedding], outputs=g_8)
+
+    return model
+
+
+def DiscriminatorPix2Pix(img_dim=1):
     dis_inp = Input(shape=(256, 256, img_dim))
 
     dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
