@@ -12,8 +12,8 @@ class Dataset():
         self.mode = mode
         self.h5file = h5py.File(h5_path, mode)
 
-    def __del__(self):
-        self.h5file.close()
+    # def __del__(self):
+    #     self.h5file.close()
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))

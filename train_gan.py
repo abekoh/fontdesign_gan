@@ -25,7 +25,8 @@ class TrainingFontDesignGAN():
         self._load_dataset()
 
     def _set_dsts(self):
-        for path in self.paths.dst.values():
+        for path in self.paths.dst.__dict__.values():
+            print(path)
             if not os.path.exists(path):
                 os.makedirs(path)
 
@@ -82,7 +83,7 @@ class TrainingFontDesignGAN():
 
         self._init_losses_progress()
 
-        batch_n = self.real_data_n // self.params.self.params.batch_size
+        batch_n = self.real_data_n // self.params.batch_size
 
         for epoch_i in range(self.params.epoch_n):
 
@@ -209,7 +210,7 @@ class TrainingFontDesignGAN():
 
 
 if __name__ == '__main__':
-    params = Params({
+    params = Params(d={
         'img_dim': 1,
         'embedding_n': 40,
         'epoch_n': 30,
@@ -236,15 +237,19 @@ if __name__ == '__main__':
         })
     })
 
+    dst_root = 'output_gan_0726'
+
     paths = Params({
         'src': Params({
-            'real_h5': 'src/',
-            'src_h5': 'src/',
-            'cls_weight_h5': ''
+            'real_h5': 'src/fonts_200_caps_256x256.h5',
+            'src_h5': 'src/arial.h5',
+            'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
         }),
         'dst': Params({
-            'generated_imgs': 'output_gan/generated_imgs',
-            'model_weights': 'output_gan/model_weights',
-            'losses': 'output_gan/losses'
+            'generated_imgs': '{}/generated_imgs'.format(dst_root),
+            'model_weights': '{}/model_weights'.format(dst_root),
+            'losses': '{}/losses'.format(dst_root)
         })
     })
+    gan = TrainingFontDesignGAN(params, paths)
+    gan.train()

@@ -6,5 +6,7 @@ class Params():
 
     def from_dict(self, d):
         for attr, value in d.items():
-            if hasattr(self, attr):
-                setattr(self, attr, value)
+            setattr(self, attr, value)
+
+    # def values(self):
+    #     
