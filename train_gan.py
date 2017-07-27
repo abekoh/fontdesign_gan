@@ -108,10 +108,11 @@ class TrainingFontDesignGAN():
 
                 progbar.update(batch_i + 1)
 
+                # real imgs
+                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, self.params.batch_size)
+
                 # src fonts info
                 batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
-                batched_noise = np.random.uniform(0, 1, (self.params.batch_size, 50))
-
                 # src chars info
                 if self.params.g.arch == 'dcgan':
                     batched_src_labels = [random.choice(CAPS) for i in range(self.params.batch_size)]
@@ -119,11 +120,8 @@ class TrainingFontDesignGAN():
                 elif self.params.g.arch == 'pix2pix':
                     batched_src_chars, batched_src_labels = self.src_dataset.get_random(self.params.batch_size)
 
-                # real imgs
-                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, self.params.batch_size)
-
                 # fake imgs
-                batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts, batched_noise])
+                batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
 
                 losses = dict()
 
@@ -143,11 +141,11 @@ class TrainingFontDesignGAN():
                 losses['g'] = 0
                 losses['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
-                        [batched_src_chars, batched_src_fonts, batched_noise],
+                        [batched_src_chars, batched_src_fonts],
                         -np.ones((self.params.batch_size, 1), dtype=np.float32))
                 losses['g'] += losses['g_fake']
 
-                losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts, batched_noise]))
+                losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
 
                 if hasattr(self.params, 'e'):
                     batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
