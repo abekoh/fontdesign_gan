@@ -8,8 +8,9 @@ import random
 
 class Dataset():
 
-    def __init__(self, h5_path, mode):
+    def __init__(self, h5_path, mode, img_size=(256, 256)):
         self.mode = mode
+        self.img_size = img_size
         self.h5file = h5py.File(h5_path, mode)
 
     # def __del__(self):
@@ -19,7 +20,7 @@ class Dataset():
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
         for dir_path in dir_paths:
             print('loading {}'.format(dir_path))
-            imgs = np.empty((0, 256, 256, 1), dtype=np.float32)
+            imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), dtype=np.float32)
             img_paths = sorted(glob('{}/*.png'.format(dir_path)))
             labels = np.array([], dtype=object)
             for img_path in img_paths:
@@ -76,7 +77,7 @@ class Dataset():
         return self._get(keys_list)
 
     def _get(self, keys_list):
-        imgs = np.empty((0, 256, 256, 1), np.float32)
+        imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), np.float32)
         labels = list()
         for keys in keys_list:
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
@@ -87,9 +88,10 @@ class Dataset():
 
 
 if __name__ == '__main__':
-    dataset = Dataset('src/fonts_200_caps_256x256', 'w')
-    dataset.load_imgs('../../font_dataset/png/200_256x256')
-    # dataset = Dataset('./test.h5', 'r')
-    # dataset.set_load_data()
-    # for i in range(2):
-    #     imgs, labels = dataset.get_batch(i, 10)
+    # dataset = Dataset('src/fonts_200new_caps_64x64', 'w', img_size=(64, 64))
+    # dataset.load_imgs('../../font_dataset/png/200new_64x64_maximum/')
+    dataset = Dataset('src/arial.h5', 'r')
+    dataset.set_load_data()
+    for i in range(26):
+        imgs, labels = dataset.get_batch(i, 1)
+        print(labels)
