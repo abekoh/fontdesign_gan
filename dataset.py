@@ -76,6 +76,16 @@ class Dataset():
                 keys_list.append(random.choice(self.keys_queue_train))
         return self._get(keys_list)
 
+    def get_selected(self, labels, is_test=False):
+        keys_list = list()
+        for label in labels:
+            num = ord(label) - 65
+            if is_test:
+                keys_list.append(self.keys_queue_test[num])
+            else:
+                keys_list.append(self.keys_queue_train[num])
+        return self._get(keys_list)
+
     def _get(self, keys_list):
         imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), np.float32)
         labels = list()

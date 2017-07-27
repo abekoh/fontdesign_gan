@@ -6,6 +6,8 @@ from PIL import Image
 import plotly.offline as offline
 import plotly.graph_objs as go
 
+import tensorflow as tf
+
 from keras.models import Model
 from keras.optimizers import RMSprop
 from keras.utils import Progbar, to_categorical
@@ -73,8 +75,9 @@ class TrainingFontDesignGAN():
                                                  loss_weights=self.params.c.loss_weights)
 
         if hasattr(self.params, 'l1'):
-            self.generator.compile(optimizer=RMSprop(lr=self.params.l1.lr),
-                                   loss='mean_absolute_error', loss_weights=self.params.l1.loss_weights)
+            self.generator.compile(optimizer=self.params.l1.opt,
+                                   loss='mean_absolute_error',
+                                   loss_weights=self.params.l1.loss_weights)
 
         if hasattr(self.params, 'e'):
             self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
@@ -109,8 +112,7 @@ class TrainingFontDesignGAN():
                 progbar.update(batch_i + 1)
 
                 # real imgs
-                batched_real_imgs, _ = self.real_dataset.get_batch(batch_i, self.params.batch_size)
-
+                batched_real_imgs, batched_real_labels = self.real_dataset.get_batch(batch_i, self.params.batch_size)
                 # src fonts info
                 batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
                 # src chars info
@@ -118,7 +120,7 @@ class TrainingFontDesignGAN():
                     batched_src_labels = [random.choice(CAPS) for i in range(self.params.batch_size)]
                     batched_src_chars = np.array([ord(i) - 65 for i in batched_src_labels], dtype=np.int32)
                 elif self.params.g.arch == 'pix2pix':
-                    batched_src_chars, batched_src_labels = self.src_dataset.get_random(self.params.batch_size)
+                    batched_src_chars, batched_src_labels = self.src_dataset.get_selected(batched_real_labels)
 
                 # fake imgs
                 batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
@@ -147,14 +149,6 @@ class TrainingFontDesignGAN():
 
                 losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
 
-                if hasattr(self.params, 'e'):
-                    batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
-                    losses['g_const'] = \
-                        self.generator_to_encoder.train_on_batch(
-                            [batched_src_chars, batched_src_fonts],
-                            batched_src_chars_encoded)
-                    losses['g'] += losses['g_const']
-
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
                     losses['g_class'] = \
@@ -163,11 +157,26 @@ class TrainingFontDesignGAN():
                             batched_categorical_src_labels)
                     losses['g'] += losses['g_class']
 
-                if batch_i + 1 == batch_n:
-                    self._update_losses_progress(losses, epoch_i + 1)
+                if hasattr(self.params, 'e'):
+                    batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
+                    losses['g_const'] = \
+                        self.generator_to_encoder.train_on_batch(
+                            [batched_src_chars, batched_src_fonts],
+                            batched_src_chars_encoded)
+                    losses['g'] += losses['g_const']
+
+                if hasattr(self.params, 'l1'):
+                    losses['g_l1'] = \
+                        self.generator.train_on_batch(
+                            [batched_src_chars, batched_src_fonts],
+                            batched_real_imgs)
+                    losses['g'] += losses['g_l1']
+
+                if (batch_i + 1) % self.params.save_graphs_interval == 0:
+                    self._update_losses_progress(losses, epoch_i * batch_n + batch_i)
                     self._save_losses_progress_html()
 
-                if batch_i + 1 == batch_n:
+                if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
                 if self._is_early_stopping(self.params.early_stopping_n):
@@ -176,7 +185,7 @@ class TrainingFontDesignGAN():
             else:
                 continue
 
-            if (epoch_i + 1) % 20 == 0:
+            if (epoch_i + 1) % self.params.save_weights_interval == 0:
                 self._save_model_weights(epoch_i)
             break
         # self._save_losses_progress_h5()
@@ -238,7 +247,7 @@ class TrainingFontDesignGAN():
 
 if __name__ == '__main__':
     params = Params(d={
-        'img_size': (64, 64),
+        'img_size': (256, 256),
         'img_dim': 1,
         'font_embedding_n': 40,
         'char_embedding_n': 26,
@@ -246,13 +255,16 @@ if __name__ == '__main__':
         'batch_size': 32,
         'critic_n': 5,
         'early_stopping_n': 10,
+        'save_graphs_interval': 1,
+        'save_imgs_interval': 10,
+        'save_weights_interval': 5,
         'g': Params({
-            'arch': 'dcgan',
+            'arch': 'pix2pix',
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
         }),
         'd': Params({
-            'arch': 'dcgan',
+            'arch': 'pix2pix',
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
         }),
@@ -260,18 +272,22 @@ if __name__ == '__main__':
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [1.]
         # }),
-        # 'e': Params({
-        #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [1.]
-        # })
+        'l1': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [100.]
+        }),
+        'e': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [15.]
+        })
     })
 
     dst_root = 'output/0727'
 
     paths = Params({
         'src': Params({
-            'real_h5': 'src/fonts_200new_caps_64x64.h5',
-            # 'src_h5': 'src/arial.h5',
+            'real_h5': 'src/fonts_200_caps_256x256.h5',
+            'src_h5': 'src/arial.h5',
             # 'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
         }),
         'dst': Params({
