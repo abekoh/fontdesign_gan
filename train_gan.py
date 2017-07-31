@@ -141,17 +141,19 @@ class TrainingFontDesignGAN():
                             [batched_real_imgs, batched_fake_imgs],
                             -np.ones((self.params.batch_size, 1), dtype=np.float32))
                     losses['d_wasserstein'] += loss_d_wasserstein_tmp / self.params.critic_n
+                losses['d_wasserstein'] *= -1
 
-                losses['true_wasserstein'] = np.mean(self.discriminator_subtract.predict_on_batch([batched_real_imgs, batched_fake_imgs]))
+                # losses['true_wasserstein'] = np.mean(self.discriminator_subtract.predict_on_batch([batched_real_imgs, batched_fake_imgs]))
 
                 losses['g'] = 0
                 losses['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
                         [batched_src_chars, batched_src_fonts],
                         -np.ones((self.params.batch_size, 1), dtype=np.float32))
+                losses['g_fake'] *= -1
                 losses['g'] += losses['g_fake']
 
-                losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
+                # losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
 
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
@@ -176,13 +178,15 @@ class TrainingFontDesignGAN():
                             batched_real_imgs)
                     losses['g'] += losses['g_l1']
 
+                # save losses
+                self._update_tensorboard_losses(losses, count_i)
                 if (batch_i + 1) % self.params.save_graphs_interval == 0:
                     self._update_losses_progress(losses, epoch_i * batch_n + batch_i)
                     self._save_losses_progress_html()
 
-                self._update_tensorboard(losses, count_i)
-                # if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                #     self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
+                # save images
+                if (batch_i + 1) % self.params.save_imgs_interval == 0:
+                    self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
                 if self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
@@ -199,7 +203,7 @@ class TrainingFontDesignGAN():
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
 
-    def _update_tensorboard(self, losses, count_i):
+    def _update_tensorboard_losses(self, losses, count_i):
         for name, value in losses.items():
             summary = tf.Summary()
             summary_value = summary.value.add()
@@ -212,8 +216,8 @@ class TrainingFontDesignGAN():
         self.x_time = np.array([])
         self.y_losses = dict()
 
-    def _update_losses_progress(self, losses, x):
-        self.x_time = np.append(self.x_time, np.array([x]))
+    def _update_losses_progress(self, losses, count_i):
+        self.x_time = np.append(self.x_time, np.array([count_i]))
         if self.y_losses == dict():
             for k, v in losses.items():
                 self.y_losses[k] = np.array([v], dtype=np.float32)
@@ -297,7 +301,7 @@ if __name__ == '__main__':
         })
     })
 
-    dst_root = 'output/0727'
+    dst_root = 'output/0731'
 
     paths = Params({
         'src': Params({
