@@ -51,6 +51,7 @@ class TrainingFontDesignGAN():
         elif self.params.d.arch == 'pix2pix':
             self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
                                                              img_dim=self.params.img_dim)
+
         self.discriminator_subtract = models.DiscriminatorSubtract(discriminator=self.discriminator,
                                                                    img_size=self.params.img_size,
                                                                    img_dim=self.params.img_dim,)
@@ -103,6 +104,8 @@ class TrainingFontDesignGAN():
 
         batch_n = self.real_data_n // self.params.batch_size
 
+        self.tb_writer = tf.summary.FileWriter(self.paths.dst.tensorboard_log)
+
         for epoch_i in range(self.params.epoch_n):
 
             progbar = Progbar(batch_n)
@@ -110,6 +113,7 @@ class TrainingFontDesignGAN():
             for batch_i in range(batch_n):
 
                 progbar.update(batch_i + 1)
+                count_i = epoch_i * batch_n + batch_i
 
                 # real imgs
                 batched_real_imgs, batched_real_labels = self.real_dataset.get_batch(batch_i, self.params.batch_size)
@@ -176,12 +180,14 @@ class TrainingFontDesignGAN():
                     self._update_losses_progress(losses, epoch_i * batch_n + batch_i)
                     self._save_losses_progress_html()
 
-                if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
+                self._update_tensorboard(losses, count_i)
+                # if (batch_i + 1) % self.params.save_imgs_interval == 0:
+                #     self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
 
                 if self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
                     break
+
             else:
                 continue
 
@@ -192,6 +198,15 @@ class TrainingFontDesignGAN():
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
+
+    def _update_tensorboard(self, losses, count_i):
+        for name, value in losses.items():
+            summary = tf.Summary()
+            summary_value = summary.value.add()
+            summary_value.simple_value = value
+            summary_value.tag = name
+            self.tb_writer.add_summary(summary, count_i)
+            self.tb_writer.flush()
 
     def _init_losses_progress(self):
         self.x_time = np.array([])
@@ -291,6 +306,7 @@ if __name__ == '__main__':
             # 'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
         }),
         'dst': Params({
+            'tensorboard_log': '{}/tensorboard_log'.format(dst_root),
             'generated_imgs': '{}/generated_imgs'.format(dst_root),
             'model_weights': '{}/model_weights'.format(dst_root),
             'losses': '{}/losses'.format(dst_root)
