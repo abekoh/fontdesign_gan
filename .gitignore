@@ -104,3 +104,4 @@ ENV/
 *.png
 *.h5
 *.html
+output/

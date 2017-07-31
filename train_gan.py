@@ -2,9 +2,12 @@ import os
 import random
 import numpy as np
 import h5py
+import json
+from datetime import datetime, timezone, timedelta
 from PIL import Image
-import plotly.offline as offline
+import plotly.offline as py
 import plotly.graph_objs as go
+from scipy.signal import savgol_filter
 
 import tensorflow as tf
 
@@ -28,11 +31,16 @@ class TrainingFontDesignGAN():
         self._set_dsts()
         self._build_models()
         self._load_dataset()
+        self._save_params()
 
     def _set_dsts(self):
         for path in self.paths.dst.__dict__.values():
             if not os.path.exists(path):
                 os.makedirs(path)
+
+    def _save_params(self):
+        with open(os.path.join(self.paths.dst.root, 'params.txt'), 'w') as f:
+            json.dump(self.params.to_dict(), f, indent=4)
 
     def _build_models(self):
 
@@ -100,11 +108,11 @@ class TrainingFontDesignGAN():
 
     def train(self):
 
-        self._init_losses_progress()
+        self._init_metrics()
 
         batch_n = self.real_data_n // self.params.batch_size
 
-        self.tb_writer = tf.summary.FileWriter(self.paths.dst.tensorboard_log)
+        # self.tb_writer = tf.summary.FileWriter(self.paths.dst.tensorboard_log)
 
         for epoch_i in range(self.params.epoch_n):
 
@@ -129,9 +137,9 @@ class TrainingFontDesignGAN():
                 # fake imgs
                 batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
 
-                losses = dict()
+                metrics = dict()
 
-                losses['d_wasserstein'] = 0
+                metrics['d_wasserstein'] = 0
                 for i in range(self.params.critic_n):
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
@@ -140,49 +148,51 @@ class TrainingFontDesignGAN():
                         self.discriminator_subtract.train_on_batch(
                             [batched_real_imgs, batched_fake_imgs],
                             -np.ones((self.params.batch_size, 1), dtype=np.float32))
-                    losses['d_wasserstein'] += loss_d_wasserstein_tmp / self.params.critic_n
-                losses['d_wasserstein'] *= -1
+                    metrics['d_wasserstein'] += loss_d_wasserstein_tmp / self.params.critic_n
+                metrics['d_wasserstein'] *= -1
 
-                # losses['true_wasserstein'] = np.mean(self.discriminator_subtract.predict_on_batch([batched_real_imgs, batched_fake_imgs]))
+                # metrics['true_wasserstein'] = np.mean(self.discriminator_subtract.predict_on_batch([batched_real_imgs, batched_fake_imgs]))
 
-                losses['g'] = 0
-                losses['g_fake'] = \
+                metrics['g'] = 0
+                metrics['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
                         [batched_src_chars, batched_src_fonts],
                         -np.ones((self.params.batch_size, 1), dtype=np.float32))
-                losses['g_fake'] *= -1
-                losses['g'] += losses['g_fake']
+                metrics['g_fake'] *= -1
+                metrics['g'] += metrics['g_fake']
 
-                # losses['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
+                # metrics['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
 
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
-                    losses['g_class'] = \
+                    metrics['g_class'] = \
                         self.generator_to_classifier.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
                             batched_categorical_src_labels)
-                    losses['g'] += losses['g_class']
+                    metrics['g'] += metrics['g_class']
 
                 if hasattr(self.params, 'e'):
                     batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
-                    losses['g_const'] = \
+                    metrics['g_const'] = \
                         self.generator_to_encoder.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
                             batched_src_chars_encoded)
-                    losses['g'] += losses['g_const']
+                    metrics['g'] += metrics['g_const']
 
                 if hasattr(self.params, 'l1'):
-                    losses['g_l1'] = \
+                    metrics['g_l1'] = \
                         self.generator.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
                             batched_real_imgs)
-                    losses['g'] += losses['g_l1']
+                    metrics['g'] += metrics['g_l1']
 
-                # save losses
-                self._update_tensorboard_losses(losses, count_i)
-                if (batch_i + 1) % self.params.save_graphs_interval == 0:
-                    self._update_losses_progress(losses, epoch_i * batch_n + batch_i)
-                    self._save_losses_progress_html()
+                # save metrics
+                # self._update_tensorboard_metrics(metrics, count_i)
+                if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
+                    self._update_metrics(metrics, count_i)
+                    self._save_metrics_graph(is_smoothing=False)
+                if (batch_i + 1) % self.params.save_metrics_smoothing_graph_interval == 0:
+                    self._save_metrics_graph(is_smoothing=True)
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
@@ -193,18 +203,17 @@ class TrainingFontDesignGAN():
                     break
 
             else:
+                if (epoch_i + 1) % self.params.save_weights_interval == 0:
+                    self._save_model_weights(epoch_i)
                 continue
-
-            if (epoch_i + 1) % self.params.save_weights_interval == 0:
-                self._save_model_weights(epoch_i)
             break
-        # self._save_losses_progress_h5()
+        # self._save_metrics_progress_h5()
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
 
-    def _update_tensorboard_losses(self, losses, count_i):
-        for name, value in losses.items():
+    def _update_tensorboard_metrics(self, metrics, count_i):
+        for name, value in metrics.items():
             summary = tf.Summary()
             summary_value = summary.value.add()
             summary_value.simple_value = value
@@ -212,26 +221,34 @@ class TrainingFontDesignGAN():
             self.tb_writer.add_summary(summary, count_i)
             self.tb_writer.flush()
 
-    def _init_losses_progress(self):
+    def _init_metrics(self):
         self.x_time = np.array([])
-        self.y_losses = dict()
+        self.y_metrics = dict()
 
-    def _update_losses_progress(self, losses, count_i):
+    def _update_metrics(self, metrics, count_i):
         self.x_time = np.append(self.x_time, np.array([count_i]))
-        if self.y_losses == dict():
-            for k, v in losses.items():
-                self.y_losses[k] = np.array([v], dtype=np.float32)
+        if self.y_metrics == dict():
+            for k, v in metrics.items():
+                self.y_metrics[k] = np.array([v], dtype=np.float32)
         else:
-            for k, v in losses.items():
-                self.y_losses[k] = np.append(self.y_losses[k], np.array([v]))
+            for k, v in metrics.items():
+                self.y_metrics[k] = np.append(self.y_metrics[k], np.array([v]))
 
-    def _save_losses_progress_html(self):
+    def _save_metrics_graph(self, is_smoothing=False):
+        if is_smoothing:
+            dst_path = self.paths.dst.metrics_smoothing
+        else:
+            dst_path = self.paths.dst.metrics
         graphs = list()
-        for k, v in self.y_losses.items():
-            graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k)
-            offline.plot([graph], filename=os.path.join(self.paths.dst.losses, '{}.html'.format(k)), auto_open=False)
+        for k, v in self.y_metrics.items():
+            if is_smoothing:
+                y = savgol_filter(v, 7, 3)
+            else:
+                y = v
+            graph = go.Scatter(x=self.x_time, y=y, mode='lines', name=k)
+            py.plot([graph], filename=os.path.join(dst_path, '{}.html'.format(k)), auto_open=False)
             graphs.append(graph)
-        offline.plot(graphs, filename=os.path.join(self.paths.dst.losses, 'all_losses.html'), auto_open=False)
+        py.plot(graphs, filename=os.path.join(dst_path, 'all_metrics.html'), auto_open=False)
 
     def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
         concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
@@ -245,10 +262,10 @@ class TrainingFontDesignGAN():
         pil_img.save(os.path.join(self.paths.dst.generated_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
     def _is_early_stopping(self, patience):
-        for key in self.y_losses.keys():
-            if self.y_losses[key].shape[0] > patience:
-                recent_losses = self.y_losses[key][-patience:]
-                if False not in (recent_losses[:] == recent_losses[0]):
+        for key in self.y_metrics.keys():
+            if self.y_metrics[key].shape[0] > patience:
+                recent_metrics = self.y_metrics[key][-patience:]
+                if False not in (recent_metrics[:] == recent_metrics[0]):
                     return True
         return False
 
@@ -256,10 +273,10 @@ class TrainingFontDesignGAN():
         self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
         self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
 
-    def _save_losses_progress_h5(self):
-        h5file = h5py.File(os.path.join(self.paths.dst.losses, 'all_losses.h5'))
+    def _save_metrics_progress_h5(self):
+        h5file = h5py.File(os.path.join(self.paths.dst.metrics, 'all_metrics.h5'))
         h5file.create_dataset('x_time', data=self.x_time)
-        h5file.create_dataset('y_losses', data=self.y_losses)
+        h5file.create_dataset('y_metrics', data=self.y_metrics)
         h5file.flush()
         h5file.close()
 
@@ -268,15 +285,16 @@ if __name__ == '__main__':
     params = Params(d={
         'img_size': (256, 256),
         'img_dim': 1,
-        'font_embedding_n': 40,
+        'font_embedding_n': 5,
         'char_embedding_n': 26,
         'epoch_n': 1000,
-        'batch_size': 32,
+        'batch_size': 16,
         'critic_n': 5,
         'early_stopping_n': 10,
-        'save_graphs_interval': 1,
+        'save_metrics_graph_interval': 1,
+        'save_metrics_smoothing_graph_interval': 10,
         'save_imgs_interval': 10,
-        'save_weights_interval': 5,
+        'save_weights_interval': 1,
         'g': Params({
             'arch': 'pix2pix',
             'opt': RMSprop(lr=0.00005),
@@ -287,33 +305,36 @@ if __name__ == '__main__':
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
         }),
-        # 'c': Params({
-        #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [1.]
-        # }),
-        'l1': Params({
+        'c': Params({
             'opt': RMSprop(lr=0.00005),
-            'loss_weights': [100.]
+            'loss_weights': [0.5]
         }),
+        # 'l1': Params({
+        #     'opt': RMSprop(lr=0.00005),
+        #     'loss_weights': [100.]
+        # }),
         'e': Params({
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [15.]
         })
     })
 
-    dst_root = 'output/0731'
+    tz = timezone(timedelta(hours=+9), 'JST')
+    dst_root = 'output/{}'.format(datetime.now(tz))
 
     paths = Params({
         'src': Params({
             'real_h5': 'src/fonts_200_caps_256x256.h5',
             'src_h5': 'src/arial.h5',
-            # 'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
+            'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
         }),
         'dst': Params({
+            'root': dst_root,
             'tensorboard_log': '{}/tensorboard_log'.format(dst_root),
             'generated_imgs': '{}/generated_imgs'.format(dst_root),
             'model_weights': '{}/model_weights'.format(dst_root),
-            'losses': '{}/losses'.format(dst_root)
+            'metrics': '{}/metrics'.format(dst_root),
+            'metrics_smoothing': '{}/metrics_smoothing'.format(dst_root)
         })
     })
     gan = TrainingFontDesignGAN(params, paths)
