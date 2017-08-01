@@ -73,6 +73,18 @@ class TrainingFontDesignGAN():
         self.generator_to_discriminator.compile(optimizer=self.params.g.opt,
                                                 loss=multiple_loss,
                                                 loss_weights=self.params.g.loss_weights)
+        if hasattr(self.params, 'fc'):
+            self.font_classifier = models.FontClassifier(img_size=self.params.img_size,
+                                                         img_dim=self.params.img_dim,
+                                                         font_embedding_n=self.params.font_embedding_n)
+            # self.font_classifier.compile(optimizer=self.params.fc.opt,
+            #                              loss='categorical_crossentropy',
+            #                              loss_weights=self.params.fc.loss_weights)
+            # self.font_classifier.trainable = False
+            self.generator_to_font_classifier = Model(inputs=self.generator.input, outputs=self.font_classifier(self.generator.output))
+            self.generator_to_font_classifier.compile(optimizer=self.params.fc.opt,
+                                                      loss='categorical_crossentropy',
+                                                      loss_weights=self.params.fc.loss_weights)
 
         if hasattr(self.params, 'c'):
             self.classifier = models.Classifier(img_size=self.params.img_size,
@@ -128,7 +140,6 @@ class TrainingFontDesignGAN():
                 batched_real_imgs, batched_real_labels = self.real_dataset.get_batch(batch_i, self.params.batch_size)
                 # src fonts info
                 batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
-                batched_src_fonts_another = self._make_another_random_array(0, self.params.font_embedding_n, batched_src_fonts)
 
                 # src chars info
                 if self.params.g.arch == 'dcgan':
@@ -139,7 +150,6 @@ class TrainingFontDesignGAN():
 
                 # fake imgs
                 batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
-                batched_fake_imgs_another = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts_another])
 
                 metrics = dict()
 
@@ -163,6 +173,16 @@ class TrainingFontDesignGAN():
                 metrics['g_fake'] *= -1
                 metrics['g'] += metrics['g_fake']
 
+                if hasattr(self.params, 'fc'):
+                    # metrics['d_fc'] = \
+                    #     self.font_classifier.train_on_batch(
+                    #         batched_fake_imgs,
+                    #         to_categorical(batched_src_fonts, self.params.font_embedding_n))
+                    metrics['fc'] = \
+                        self.generator_to_font_classifier.train_on_batch(
+                            [batched_src_chars, batched_src_fonts],
+                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
+
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
                     metrics['g_class'] = \
@@ -180,6 +200,8 @@ class TrainingFontDesignGAN():
                     metrics['g'] += metrics['g_const']
 
                 if hasattr(self.params, 'l1'):
+                    batched_src_fonts_another = self._make_another_random_array(0, self.params.font_embedding_n, batched_src_fonts)
+                    batched_fake_imgs_another = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts_another])
                     metrics['g_l1'] = \
                         self.generator.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
@@ -314,6 +336,10 @@ if __name__ == '__main__':
             'arch': 'pix2pix',
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
+        }),
+        'fc': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [1.]
         }),
         # 'c': Params({
         #     'opt': RMSprop(lr=0.00005),
