@@ -8,6 +8,7 @@ from PIL import Image
 import plotly.offline as py
 import plotly.graph_objs as go
 from scipy.signal import savgol_filter
+import colorlover as cl
 
 import tensorflow as tf
 
@@ -17,7 +18,7 @@ from keras.utils import Progbar, to_categorical
 
 import models
 from dataset import Dataset
-from ops import multiple_loss
+from ops import multiple_loss, mean_absolute_error_inv
 from params import Params
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
@@ -85,7 +86,7 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'l1'):
             self.generator.compile(optimizer=self.params.l1.opt,
-                                   loss='mean_absolute_error',
+                                   loss=mean_absolute_error_inv,
                                    loss_weights=self.params.l1.loss_weights)
 
         if hasattr(self.params, 'e'):
@@ -127,6 +128,8 @@ class TrainingFontDesignGAN():
                 batched_real_imgs, batched_real_labels = self.real_dataset.get_batch(batch_i, self.params.batch_size)
                 # src fonts info
                 batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
+                batched_src_fonts_another = self._make_another_random_array(0, self.params.font_embedding_n, batched_src_fonts)
+
                 # src chars info
                 if self.params.g.arch == 'dcgan':
                     batched_src_labels = [random.choice(CAPS) for i in range(self.params.batch_size)]
@@ -136,6 +139,7 @@ class TrainingFontDesignGAN():
 
                 # fake imgs
                 batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
+                batched_fake_imgs_another = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts_another])
 
                 metrics = dict()
 
@@ -151,8 +155,6 @@ class TrainingFontDesignGAN():
                     metrics['d_wasserstein'] += loss_d_wasserstein_tmp / self.params.critic_n
                 metrics['d_wasserstein'] *= -1
 
-                # metrics['true_wasserstein'] = np.mean(self.discriminator_subtract.predict_on_batch([batched_real_imgs, batched_fake_imgs]))
-
                 metrics['g'] = 0
                 metrics['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
@@ -160,8 +162,6 @@ class TrainingFontDesignGAN():
                         -np.ones((self.params.batch_size, 1), dtype=np.float32))
                 metrics['g_fake'] *= -1
                 metrics['g'] += metrics['g_fake']
-
-                # metrics['true_g_loss'] = np.mean(self.generator_to_discriminator.predict_on_batch([batched_src_chars, batched_src_fonts]))
 
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
@@ -183,7 +183,8 @@ class TrainingFontDesignGAN():
                     metrics['g_l1'] = \
                         self.generator.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
-                            batched_real_imgs)
+                            batched_fake_imgs_another)
+                    metrics['g_l1'] *= -1
                     metrics['g'] += metrics['g_l1']
 
                 # save metrics
@@ -206,6 +207,17 @@ class TrainingFontDesignGAN():
                 continue
             break
         # self._save_metrics_progress_h5()
+
+    def _make_another_random_array(self, from_n, to_n, src_array):
+        dst_array = np.array([], dtype=np.int32)
+        for num in src_array:
+            rand_num = num
+            count = 0
+            while rand_num == num:
+                rand_num = np.random.randint(from_n, to_n, dtype=np.int32)
+                count += 1
+            dst_array = np.append(dst_array, rand_num)
+        return dst_array
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
@@ -234,14 +246,15 @@ class TrainingFontDesignGAN():
 
     def _save_metrics_graph(self):
         all_graphs = list()
-        for k, v in self.y_metrics.items():
-            graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k)
+        metrics_n = len(self.y_metrics)
+        for i, (k, v) in enumerate(self.y_metrics.items()):
+            graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
             graphs = [graph]
             window_length = len(self.x_time) // 4
             if window_length % 2 == 0:
                 window_length += 1
             if window_length > 3:
-                smoothed_graph = go.Scatter(x=self.x_time, y=savgol_filter(v, window_length, 3), mode='lines', name=k, line=dict(dash='dot'))
+                smoothed_graph = go.Scatter(x=self.x_time, y=savgol_filter(v, window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
@@ -302,10 +315,10 @@ if __name__ == '__main__':
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
         }),
-        'c': Params({
-            'opt': RMSprop(lr=0.00005),
-            'loss_weights': [0.5]
-        }),
+        # 'c': Params({
+        #     'opt': RMSprop(lr=0.00005),
+        #     'loss_weights': [0.5]
+        # }),
         # 'l1': Params({
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [100.]
