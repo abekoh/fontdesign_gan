@@ -190,9 +190,7 @@ class TrainingFontDesignGAN():
                 # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
                     self._update_metrics(metrics, count_i)
-                    self._save_metrics_graph(is_smoothing=False)
-                if (batch_i + 1) % self.params.save_metrics_smoothing_graph_interval == 0:
-                    self._save_metrics_graph(is_smoothing=True)
+                    self._save_metrics_graph()
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
@@ -234,21 +232,20 @@ class TrainingFontDesignGAN():
             for k, v in metrics.items():
                 self.y_metrics[k] = np.append(self.y_metrics[k], np.array([v]))
 
-    def _save_metrics_graph(self, is_smoothing=False):
-        if is_smoothing:
-            dst_path = self.paths.dst.metrics_smoothing
-        else:
-            dst_path = self.paths.dst.metrics
-        graphs = list()
+    def _save_metrics_graph(self):
+        all_graphs = list()
         for k, v in self.y_metrics.items():
-            if is_smoothing:
-                y = savgol_filter(v, 7, 3)
-            else:
-                y = v
-            graph = go.Scatter(x=self.x_time, y=y, mode='lines', name=k)
-            py.plot([graph], filename=os.path.join(dst_path, '{}.html'.format(k)), auto_open=False)
-            graphs.append(graph)
-        py.plot(graphs, filename=os.path.join(dst_path, 'all_metrics.html'), auto_open=False)
+            graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k)
+            graphs = [graph]
+            window_length = len(self.x_time) // 4
+            if window_length % 2 == 0:
+                window_length += 1
+            if window_length > 3:
+                smoothed_graph = go.Scatter(x=self.x_time, y=savgol_filter(v, window_length, 3), mode='lines', name=k, line=dict(dash='dot'))
+                graphs.append(smoothed_graph)
+            py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
+            all_graphs.extend(graphs)
+        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=False)
 
     def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
         concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
@@ -287,14 +284,14 @@ if __name__ == '__main__':
         'img_dim': 1,
         'font_embedding_n': 5,
         'char_embedding_n': 26,
-        'epoch_n': 1000,
+        'epoch_n': 50,
         'batch_size': 16,
         'critic_n': 5,
         'early_stopping_n': 10,
         'save_metrics_graph_interval': 1,
         'save_metrics_smoothing_graph_interval': 10,
         'save_imgs_interval': 10,
-        'save_weights_interval': 1,
+        'save_weights_interval': 5,
         'g': Params({
             'arch': 'pix2pix',
             'opt': RMSprop(lr=0.00005),
@@ -334,7 +331,6 @@ if __name__ == '__main__':
             'generated_imgs': '{}/generated_imgs'.format(dst_root),
             'model_weights': '{}/model_weights'.format(dst_root),
             'metrics': '{}/metrics'.format(dst_root),
-            'metrics_smoothing': '{}/metrics_smoothing'.format(dst_root)
         })
     })
     gan = TrainingFontDesignGAN(params, paths)
