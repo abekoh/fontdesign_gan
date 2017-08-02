@@ -86,6 +86,11 @@ class Dataset():
                 keys_list.append(self.keys_queue_train[num])
         return self._get(keys_list)
 
+    def get_all(self, is_test=False):
+        if is_test:
+            return self.get_batch(0, len(self.key_queue_test), is_test)
+        return self.get_batch(0, len(self.keys_queue_train), is_test)
+
     def _get(self, keys_list):
         imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), np.float32)
         labels = list()

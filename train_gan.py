@@ -18,7 +18,7 @@ from keras.utils import Progbar, to_categorical
 
 import models
 from dataset import Dataset
-from ops import multiple_loss, mean_absolute_error_inv
+from ops import multiple_loss, mean_squared_error_inv, mean_absolute_error_inv
 from params import Params
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
@@ -77,6 +77,10 @@ class TrainingFontDesignGAN():
             self.font_classifier = models.FontClassifier(img_size=self.params.img_size,
                                                          img_dim=self.params.img_dim,
                                                          font_embedding_n=self.params.font_embedding_n)
+            self.font_classifier.compile(optimizer=self.params.fc.opt,
+                                         loss='categorical_crossentropy',
+                                         loss_weights=self.params.fc.loss_weights)
+            self.font_classifier.trainable = False
             self.generator_to_font_classifier = Model(inputs=self.generator.input, outputs=self.font_classifier(self.generator.output))
             self.generator_to_font_classifier.compile(optimizer=self.params.fc.opt,
                                                       loss='categorical_crossentropy',
@@ -104,6 +108,11 @@ class TrainingFontDesignGAN():
             self.generator_to_encoder.compile(optimizer=self.params.e.opt,
                                               loss='mean_squared_error',
                                               loss_weights=self.params.e.loss_weights)
+
+        if hasattr(self.params, 'v'):
+            self.generator.compile(optimizer=self.params.v.opt,
+                                   loss=mean_absolute_error_inv,
+                                   loss_weights=self.params.v.loss_weights)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
@@ -170,7 +179,11 @@ class TrainingFontDesignGAN():
                 metrics['g'] += metrics['g_fake']
 
                 if hasattr(self.params, 'fc'):
-                    metrics['fc'] = \
+                    metrics['d_fc'] = \
+                        self.font_classifier.train_on_batch(
+                            batched_fake_imgs,
+                            to_categorical(np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32), self.params.font_embedding_n))
+                    metrics['g_fc'] = \
                         self.generator_to_font_classifier.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
                             to_categorical(batched_src_fonts, self.params.font_embedding_n))
@@ -198,6 +211,18 @@ class TrainingFontDesignGAN():
                             batched_real_imgs)
                     metrics['g'] += metrics['g_l1']
 
+                if hasattr(self.params, 'v'):
+                    src_char, _ = self.src_dataset.get_selected(['A'])
+                    v_src_chars = np.concatenate([src_char] * self.params.font_embedding_n).reshape(-1, 256, 256, 1)
+                    v_src_fonts = np.arange(0, self.params.font_embedding_n, dtype=np.int32)
+                    v_fake_fonts = self.generator.predict_on_batch([v_src_chars, v_src_fonts])
+                    v_mean_fonts = np.array([np.mean(v_fake_fonts, axis=0)] * self.params.font_embedding_n)
+                    metrics['v'] = \
+                        self.generator.train_on_batch(
+                            [v_src_chars, v_src_fonts],
+                            v_mean_fonts)
+                    metrics['v'] *= -1
+
                 # save metrics
                 # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
@@ -206,7 +231,8 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_images(batched_real_imgs, batched_fake_imgs, epoch_i, batch_i)
+                    self._save_images(batched_real_imgs, batched_fake_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1))
+                    self._save_images(v_fake_fonts, v_mean_fonts, 'mean_{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
                 if self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
@@ -271,7 +297,7 @@ class TrainingFontDesignGAN():
             all_graphs.extend(graphs)
         py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=False)
 
-    def _save_images(self, dst_imgs, generated_imgs, epoch_i, batch_i):
+    def _save_images(self, dst_imgs, generated_imgs, filename):
         concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
         for img_i in range(dst_imgs.shape[0]):
             num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
@@ -280,7 +306,7 @@ class TrainingFontDesignGAN():
             concatenated_num_img = np.concatenate((concatenated_num_img, num_img), axis=0)
             concatenated_num_img = np.reshape(concatenated_num_img, (-1, self.params.img_size[1] * 2))
         pil_img = Image.fromarray(np.uint8(concatenated_num_img))
-        pil_img.save(os.path.join(self.paths.dst.generated_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
+        pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
 
     def _is_early_stopping(self, patience):
         for key in self.y_metrics.keys():
@@ -306,7 +332,7 @@ if __name__ == '__main__':
     params = Params(d={
         'img_size': (256, 256),
         'img_dim': 1,
-        'font_embedding_n': 5,
+        'font_embedding_n': 20,
         'char_embedding_n': 26,
         'epoch_n': 50,
         'batch_size': 16,
@@ -326,21 +352,25 @@ if __name__ == '__main__':
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.],
         }),
-        'fc': Params({
-            'opt': RMSprop(lr=0.00005),
-            'loss_weights': [1.]
-        }),
+        # 'fc': Params({
+        #     'opt': RMSprop(lr=0.00005),
+        #     'loss_weights': [1.]
+        # }),
         # 'c': Params({
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [0.5]
         # }),
         # 'l1': Params({
         #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [100.]
+        #     'loss_weights': [10.]
         # }),
+        'v': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [200.]
+        }),
         'e': Params({
             'opt': RMSprop(lr=0.00005),
-            'loss_weights': [15.]
+            'loss_weights': [5.]
         })
     })
 

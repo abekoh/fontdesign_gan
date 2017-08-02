@@ -53,9 +53,9 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
     # -> (:)
-    embedding = Embedding(font_embedding_n, 512, embeddings_initializer=random_normal(stddev=0.02), name='embedding')(embedding_inp)
+    embedding = Embedding(font_embedding_n, 128, embeddings_initializer=random_normal(stddev=0.02), name='embedding')(embedding_inp)
     # -> (:, 1, 128)
-    embedding = Reshape((1, 1, 512))(embedding)
+    embedding = Reshape((1, 1, 128))(embedding)
     # -> (:, 1, 1, 128)
 
     # Decoder
@@ -248,6 +248,27 @@ def DiscriminatorSubtract(discriminator, img_size=(64, 64), img_dim=1):
     x = Subtract()([discriminator(real_inp), discriminator(fake_inp)])
 
     model = Model(inputs=[real_inp, fake_inp], outputs=x)
+
+    return model
+
+
+def L1Variance(generator, img_size=(64, 64), img_dim=1, font_embedding_n=40):
+    char_inp = Input(shape=(img_size[0], img_size[1], img_dim))
+    font_inps = list()
+    for i in range(font_embedding_n):
+        font_inps.append(Input(shape=(1,), dtype='int32'))
+    fake_imgs = list()
+
+    for i in range(font_embedding_n):
+        fake_img = generator([char_inp, font_inps[i]])
+        fake_imgs.append(fake_img)
+    print(fake_img.shape)
+    x = Variance()(fake_imgs)
+
+    inps = [char_inp]
+    inps.extend(font_inps)
+
+    model = Model(inputs=inps, outputs=x)
 
     return model
 
