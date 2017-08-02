@@ -77,10 +77,6 @@ class TrainingFontDesignGAN():
             self.font_classifier = models.FontClassifier(img_size=self.params.img_size,
                                                          img_dim=self.params.img_dim,
                                                          font_embedding_n=self.params.font_embedding_n)
-            # self.font_classifier.compile(optimizer=self.params.fc.opt,
-            #                              loss='categorical_crossentropy',
-            #                              loss_weights=self.params.fc.loss_weights)
-            # self.font_classifier.trainable = False
             self.generator_to_font_classifier = Model(inputs=self.generator.input, outputs=self.font_classifier(self.generator.output))
             self.generator_to_font_classifier.compile(optimizer=self.params.fc.opt,
                                                       loss='categorical_crossentropy',
@@ -98,7 +94,7 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'l1'):
             self.generator.compile(optimizer=self.params.l1.opt,
-                                   loss=mean_absolute_error_inv,
+                                   loss='mean_absolute_error',
                                    loss_weights=self.params.l1.loss_weights)
 
         if hasattr(self.params, 'e'):
@@ -174,10 +170,6 @@ class TrainingFontDesignGAN():
                 metrics['g'] += metrics['g_fake']
 
                 if hasattr(self.params, 'fc'):
-                    # metrics['d_fc'] = \
-                    #     self.font_classifier.train_on_batch(
-                    #         batched_fake_imgs,
-                    #         to_categorical(batched_src_fonts, self.params.font_embedding_n))
                     metrics['fc'] = \
                         self.generator_to_font_classifier.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
@@ -200,13 +192,10 @@ class TrainingFontDesignGAN():
                     metrics['g'] += metrics['g_const']
 
                 if hasattr(self.params, 'l1'):
-                    batched_src_fonts_another = self._make_another_random_array(0, self.params.font_embedding_n, batched_src_fonts)
-                    batched_fake_imgs_another = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts_another])
                     metrics['g_l1'] = \
                         self.generator.train_on_batch(
                             [batched_src_chars, batched_src_fonts],
-                            batched_fake_imgs_another)
-                    metrics['g_l1'] *= -1
+                            batched_real_imgs)
                     metrics['g'] += metrics['g_l1']
 
                 # save metrics

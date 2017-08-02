@@ -53,9 +53,9 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
     # -> (:)
-    embedding = Embedding(font_embedding_n, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
+    embedding = Embedding(font_embedding_n, 512, embeddings_initializer=random_normal(stddev=0.02), name='embedding')(embedding_inp)
     # -> (:, 1, 128)
-    embedding = Reshape((1, 1, 128))(embedding)
+    embedding = Reshape((1, 1, 512))(embedding)
     # -> (:, 1, 1, 128)
 
     # Decoder
