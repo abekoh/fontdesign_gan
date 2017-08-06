@@ -174,7 +174,7 @@ def GeneratorDCGAN(img_size=(64, 64), img_dim=1, font_embedding_n=40, char_embed
     return model
 
 
-def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1):
+def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
     dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
@@ -202,7 +202,9 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1):
     fc_1 = Dense(1, activation=None)(fc_0)
     # -> (:, 1)
 
-    model = Model(inputs=dis_inp, outputs=fc_1)
+    fc_2 = Dense(font_embedding_n, activation='softmax')(fc_0)
+
+    model = Model(inputs=dis_inp, outputs=[fc_1, fc_2])
 
     return model
 
@@ -245,9 +247,12 @@ def DiscriminatorSubtract(discriminator, img_size=(64, 64), img_dim=1):
     real_inp = Input(shape=(img_size[0], img_size[1], img_dim))
     fake_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
-    x = Subtract()([discriminator(real_inp), discriminator(fake_inp)])
+    real_bin, real_cat = discriminator(real_inp)
+    fake_bin, fake_cat = discriminator(fake_inp)
 
-    model = Model(inputs=[real_inp, fake_inp], outputs=x)
+    x = Subtract()([real_bin, fake_bin])
+
+    model = Model(inputs=[real_inp, fake_inp], outputs=[x, real_cat, fake_cat])
 
     return model
 
