@@ -3,7 +3,7 @@ import random
 import numpy as np
 import h5py
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from PIL import Image
 import plotly.offline as py
 import plotly.graph_objs as go
@@ -372,8 +372,8 @@ if __name__ == '__main__':
         })
     })
 
-    tz = timezone(timedelta(hours=+9), 'JST')
-    dst_root = 'output/{}'.format(datetime.now(tz))
+    str_now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    dst_root = 'output/' + str_now
 
     paths = Params({
         'src': Params({
