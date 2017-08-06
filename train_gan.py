@@ -18,7 +18,7 @@ from keras.utils import Progbar, to_categorical
 
 import models
 from dataset import Dataset
-from ops import multiple_loss, mean_squared_error_inv, mean_absolute_error_inv
+from ops import multiple_loss, mean_squared_error_inv
 from params import Params
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
@@ -101,18 +101,18 @@ class TrainingFontDesignGAN():
                                    loss='mean_absolute_error',
                                    loss_weights=self.params.l1.loss_weights)
 
+        if hasattr(self.params, 'v'):
+            self.generator.compile(optimizer=self.params.v.opt,
+                                   loss=mean_squared_error_inv,
+                                   loss_weights=self.params.v.loss_weights)
+
         if hasattr(self.params, 'e'):
             self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
-            self.encoder.trainable = False
             self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
+            self.generator_to_encoder.trainable = False
             self.generator_to_encoder.compile(optimizer=self.params.e.opt,
                                               loss='mean_squared_error',
                                               loss_weights=self.params.e.loss_weights)
-
-        if hasattr(self.params, 'v'):
-            self.generator.compile(optimizer=self.params.v.opt,
-                                   loss=mean_absolute_error_inv,
-                                   loss_weights=self.params.v.loss_weights)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
@@ -212,7 +212,7 @@ class TrainingFontDesignGAN():
                     metrics['g'] += metrics['g_l1']
 
                 if hasattr(self.params, 'v'):
-                    src_char, _ = self.src_dataset.get_selected(['A'])
+                    src_char, _ = self.src_dataset.get_selected([random.choice(CAPS)])
                     v_src_chars = np.concatenate([src_char] * self.params.font_embedding_n).reshape(-1, 256, 256, 1)
                     v_src_fonts = np.arange(0, self.params.font_embedding_n, dtype=np.int32)
                     v_fake_fonts = self.generator.predict_on_batch([v_src_chars, v_src_fonts])
@@ -234,7 +234,7 @@ class TrainingFontDesignGAN():
                     self._save_images(batched_real_imgs, batched_fake_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1))
                     self._save_images(v_fake_fonts, v_mean_fonts, 'mean_{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
-                if self._is_early_stopping(self.params.early_stopping_n):
+                if hasattr(self.params, 'early_stopping_n') and self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
                     break
 
@@ -337,7 +337,7 @@ if __name__ == '__main__':
         'epoch_n': 50,
         'batch_size': 16,
         'critic_n': 5,
-        'early_stopping_n': 10,
+        # 'early_stopping_n': 10,
         'save_metrics_graph_interval': 1,
         'save_metrics_smoothing_graph_interval': 10,
         'save_imgs_interval': 10,
@@ -366,7 +366,7 @@ if __name__ == '__main__':
         # }),
         'v': Params({
             'opt': RMSprop(lr=0.00005),
-            'loss_weights': [200.]
+            'loss_weights': [500.]
         }),
         'e': Params({
             'opt': RMSprop(lr=0.00005),
