@@ -301,7 +301,7 @@ class TrainingFontDesignGAN():
         concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
         for img_i in range(dst_imgs.shape[0]):
             num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
-            num_img = num_img * 255
+            num_img = (num_img + 1.) * 127.5
             num_img = np.reshape(num_img, (self.params.img_size[0], self.params.img_size[1] * 2))
             concatenated_num_img = np.concatenate((concatenated_num_img, num_img), axis=0)
             concatenated_num_img = np.reshape(concatenated_num_img, (-1, self.params.img_size[1] * 2))
@@ -381,7 +381,7 @@ if __name__ == '__main__':
         'src': Params({
             'real_h5': 'src/fonts_200_caps_256x256.h5',
             'src_h5': 'src/arial.h5',
-            'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
+            # 'cls_weight_h5': 'output_classifier/classifier_weights_20(train=0.936397172634403,test=0.9258828996282528).h5'
         }),
         'dst': Params({
             'root': dst_root,

@@ -116,7 +116,7 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
 
     de_8 = Activation('relu')(de_7)
     de_8 = Conv2DTranspose(img_dim, (5, 5), strides=(2, 2), padding='same', kernel_initializer=random_normal(stddev=0.02))(de_8)
-    de_8 = Activation('sigmoid')(de_8)
+    de_8 = Activation('tanh')(de_8)
     # -> (:, 256, 256, img_dim)
 
     model = Model(inputs=[en_inp, embedding_inp], outputs=de_8)
@@ -166,7 +166,7 @@ def GeneratorDCGAN(img_size=(64, 64), img_dim=1, font_embedding_n=40, char_embed
     # -> (:, 32, 32, 128)
 
     x = Conv2DTranspose(img_dim, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
-    x = Activation('sigmoid')(x)
+    x = Activation('tanh')(x)
     # -> (:, 64, 64, img_dim)
 
     model = Model(inputs=[font_embedding_inp, char_embedding_inp, noise_inp], outputs=x)

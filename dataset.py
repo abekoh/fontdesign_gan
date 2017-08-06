@@ -26,7 +26,7 @@ class Dataset():
             for img_path in img_paths:
                 pil_img = Image.open(img_path)
                 np_img = np.asarray(pil_img)
-                np_img = np_img.astype(np.float32) / 255.0
+                np_img = (np_img.astype(np.float32) / 127.5) - 1.
                 np_img = np_img[np.newaxis, :, :, np.newaxis]
                 imgs = np.append(imgs, np_img, axis=0)
                 labels = np.append(labels, os.path.basename(img_path).split('.')[0])
@@ -103,10 +103,7 @@ class Dataset():
 
 
 if __name__ == '__main__':
-    # dataset = Dataset('src/fonts_200new_caps_64x64', 'w', img_size=(64, 64))
-    # dataset.load_imgs('../../font_dataset/png/200new_64x64_maximum/')
-    dataset = Dataset('src/arial.h5', 'r')
-    dataset.set_load_data()
-    for i in range(26):
-        imgs, labels = dataset.get_batch(i, 1)
-        print(labels)
+    # dataset = Dataset('src/fonts_200_caps_256x256_-1,1.h5', 'w', img_size=(256, 256))
+    # dataset.load_imgs('../../font_dataset/png/200_256x256')
+    dataset = Dataset('src/arial.h5', 'w', img_size=(256, 256))
+    dataset.load_imgs('../../font_dataset/png/ariel_256x256')
