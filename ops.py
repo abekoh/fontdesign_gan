@@ -11,9 +11,9 @@ def mean_squared_error_inv(y_true, y_pred):
 
 
 def hamming_error_inv(y_true, y_pred):
-    y_true_clipped = K.clip(y_true, 127, 128) - 127
-    y_pred_clipped = K.clip(y_pred, 127, 128) - 127
-    return K.mean(-K.abs(y_pred_clipped - y_true_clipped), axis=-1)
+    y_true_signed = K.sign(y_true)
+    y_pred_signed = K.sign(y_pred)
+    return K.mean(-K.abs(y_pred_signed - y_true_signed), axis=-1)
 
 
 class Subtract(_Merge):

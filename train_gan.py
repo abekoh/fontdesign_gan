@@ -18,7 +18,7 @@ from keras.utils import Progbar, to_categorical
 
 import models
 from dataset import Dataset
-from ops import multiple_loss, mean_squared_error_inv
+from ops import multiple_loss, hamming_error_inv
 from params import Params
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
@@ -103,7 +103,7 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'v'):
             self.generator.compile(optimizer=self.params.v.opt,
-                                   loss=mean_squared_error_inv,
+                                   loss=hamming_error_inv,
                                    loss_weights=self.params.v.loss_weights)
 
         if hasattr(self.params, 'e'):
@@ -232,7 +232,8 @@ class TrainingFontDesignGAN():
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_images(batched_real_imgs, batched_fake_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1))
-                    # self._save_images(v_fake_fonts, v_mean_fonts, 'mean_{}_{}.png'.format(epoch_i + 1, batch_i + 1))
+                    if hasattr(self.params, 'v'):
+                        self._save_images(v_fake_fonts, v_mean_fonts, 'mean_{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
                 if hasattr(self.params, 'early_stopping_n') and self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
@@ -364,10 +365,10 @@ if __name__ == '__main__':
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [10.]
         # }),
-        # 'v': Params({
-        #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [500.]
-        # }),
+        'v': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [100.]
+        }),
         'e': Params({
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [5.]

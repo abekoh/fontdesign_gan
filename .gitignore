@@ -106,3 +106,4 @@ ENV/
 *.html
 output/
 old*/
+test/
