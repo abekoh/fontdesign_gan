@@ -257,27 +257,6 @@ def DiscriminatorSubtract(discriminator, img_size=(64, 64), img_dim=1):
     return model
 
 
-def L1Variance(generator, img_size=(64, 64), img_dim=1, font_embedding_n=40):
-    char_inp = Input(shape=(img_size[0], img_size[1], img_dim))
-    font_inps = list()
-    for i in range(font_embedding_n):
-        font_inps.append(Input(shape=(1,), dtype='int32'))
-    fake_imgs = list()
-
-    for i in range(font_embedding_n):
-        fake_img = generator([char_inp, font_inps[i]])
-        fake_imgs.append(fake_img)
-    print(fake_img.shape)
-    x = Variance()(fake_imgs)
-
-    inps = [char_inp]
-    inps.extend(font_inps)
-
-    model = Model(inputs=inps, outputs=x)
-
-    return model
-
-
 def FontClassifier(img_size=(64, 64), img_dim=1, font_embedding_n=40):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
