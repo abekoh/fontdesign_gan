@@ -195,13 +195,6 @@ class TrainingFontDesignGAN():
                             [batched_src_chars, batched_real_cats],
                             batched_categorical_src_labels)
 
-                if hasattr(self.params, 'e'):
-                    batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
-                    metrics['g_const'] = \
-                        self.generator_to_encoder.train_on_batch(
-                            [batched_src_chars, batched_real_cats],
-                            batched_src_chars_encoded)
-
                 if hasattr(self.params, 'l1'):
                     metrics['g_l1'] = \
                         self.generator.train_on_batch(
@@ -219,6 +212,13 @@ class TrainingFontDesignGAN():
                             [v_src_chars, v_src_fonts],
                             v_mean_fonts)
                     metrics['v'] *= -1
+
+                if hasattr(self.params, 'e'):
+                    batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
+                    metrics['g_const'] = \
+                        self.generator_to_encoder.train_on_batch(
+                            [batched_src_chars, batched_real_cats],
+                            batched_src_chars_encoded)
 
                 # save metrics
                 # self._update_tensorboard_metrics(metrics, count_i)
@@ -362,10 +362,10 @@ if __name__ == '__main__':
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [10.]
         # }),
-        # 'v': Params({
-        #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [100.]
-        # }),
+        'v': Params({
+            'opt': RMSprop(lr=0.00005),
+            'loss_weights': [1.]
+        }),
         'e': Params({
             'opt': RMSprop(lr=0.00005),
             'loss_weights': [5.]

@@ -59,7 +59,7 @@ if __name__ == '__main__':
     })
 
     paths = Params({
-        'src_model_weight_h5': 'output/2017-08-01 19:05:03.788443+09:00/model_weights/gen_45.h5',
+        'src_model_weight_h5': 'output/2017-08-06_193808/model_weights/gen_5.h5',
         'src_fonts_h5': 'src/arial.h5',
         'dst': 'output/generate'
     })
