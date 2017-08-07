@@ -53,7 +53,7 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     # Embedding
     embedding_inp = Input(shape=(1,), dtype='int32')
     # -> (:)
-    embedding = Embedding(font_embedding_n, 128, embeddings_initializer=random_normal(stddev=0.02), name='embedding')(embedding_inp)
+    embedding = Embedding(font_embedding_n, 128, embeddings_initializer=random_normal(stddev=0.01), name='embedding')(embedding_inp)
     # -> (:, 1, 128)
     embedding = Reshape((1, 1, 128))(embedding)
     # -> (:, 1, 1, 128)
@@ -199,7 +199,7 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     fc_0 = Flatten(name='full_connected')(dis_4)
     # -> (:, 131072)
 
-    fc_1 = Dense(1, activation=None)(fc_0)
+    fc_1 = Dense(1, activation='sigmoid')(fc_0)
     # -> (:, 1)
 
     fc_2 = Dense(font_embedding_n, activation='softmax')(fc_0)
