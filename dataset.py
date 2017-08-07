@@ -19,6 +19,8 @@ class Dataset():
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
         for dir_path in dir_paths:
+            if not os.path.isdir(dir_path):
+                continue
             print('loading {}'.format(dir_path))
             imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), dtype=np.float32)
             img_paths = sorted(glob('{}/*.png'.format(dir_path)))
