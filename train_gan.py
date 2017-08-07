@@ -372,7 +372,7 @@ if __name__ == '__main__':
         })
     })
 
-    str_now = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    str_now = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     dst_root = 'output/' + str_now
 
     paths = Params({
