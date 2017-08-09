@@ -28,10 +28,13 @@ if __name__ == '__main__':
             'opt': Adam(lr=0.0002, beta_1=0.5),
             'loss_weights': [1.]
         }),
-        'fc': Params({
+        'dc': Params({
             'opt': Adam(lr=0.0002, beta_1=0.5),
-            'loss_weights_d': [0.5],
-            'loss_weights_g': [1.]
+            'loss_weights': [0.5],
+        }),
+        'gc': Params({
+            'opt': Adam(lr=0.0002, beta_1=0.5),
+            'loss_weights': [1.],
         }),
         # 'c': Params({
         #     'opt': RMSprop(lr=0.00005),
