@@ -238,16 +238,19 @@ def DiscriminatorDCGAN(img_size=(64, 64), img_dim=1):
     return model
 
 
-def DiscriminatorSubtract(discriminator, img_size=(64, 64), img_dim=1):
+def DiscriminatorBinarizeSubtract(discriminator, img_size=(256, 256), img_dim=1):
     real_inp = Input(shape=(img_size[0], img_size[1], img_dim))
     fake_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
-    real_bin, real_cat = discriminator(real_inp)
-    fake_bin, fake_cat = discriminator(fake_inp)
+    x = discriminator(real_inp)
+    x = Dense(1, activation=None)(x)
 
-    x = Subtract()([real_bin, fake_bin])
+    y = discriminator(fake_inp)
+    y = Dense(1, activation=None)(y)
 
-    model = Model(inputs=[real_inp, fake_inp], outputs=[x, real_cat, fake_cat])
+    z = Subtract()([x, y])
+
+    model = Model(inputs=[real_inp, fake_inp], outputs=z)
 
     return model
 
@@ -256,7 +259,7 @@ def DiscriminatorBinarize(discriminator, img_size=(256, 256), img_dim=1):
     inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
     x = discriminator(inp)
-    x = Dense(1, activation='sigmoid')(x)
+    x = Dense(1, activation=None)(x)
 
     model = Model(inputs=inp, outputs=x)
 

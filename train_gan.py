@@ -16,7 +16,7 @@ from keras.utils import Progbar, to_categorical
 
 import models
 from dataset import Dataset
-from ops import hamming_error_inv
+from ops import hamming_error_inv, multiple_loss
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
 
@@ -58,17 +58,19 @@ class TrainingFontDesignGAN():
             self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
                                                              img_dim=self.params.img_dim,
                                                              font_embedding_n=self.params.font_embedding_n)
+        self.discriminator_bin_sub = models.DiscriminatorBinarizeSubtract(discriminator=self.discriminator,
+                                                                          img_size=self.params.img_size,
+                                                                          img_dim=self.params.img_dim)
+        self.discriminator_bin_sub.compile(optimizer=self.params.d.opt,
+                                           loss=multiple_loss,
+                                           loss_weights=self.params.d.loss_weights)
         self.discriminator_bin = models.DiscriminatorBinarize(discriminator=self.discriminator,
                                                               img_size=self.params.img_size,
                                                               img_dim=self.params.img_dim)
-        self.discriminator_bin.compile(optimizer=self.params.d.opt,
-                                       loss='binary_crossentropy',
-                                       loss_weights=self.params.d.loss_weights)
-
         self.discriminator_bin.trainable = False
         self.generator_to_discriminator_bin = Model(inputs=self.generator.input, outputs=self.discriminator_bin(self.generator.output))
         self.generator_to_discriminator_bin.compile(optimizer=self.params.g.opt,
-                                                    loss='binary_crossentropy',
+                                                    loss=multiple_loss,
                                                     loss_weights=self.params.g.loss_weights)
         self.discriminator_bin.trainable = True
         if hasattr(self.params, 'dc'):
@@ -161,18 +163,17 @@ class TrainingFontDesignGAN():
 
                 metrics = dict()
 
+                metrics['d_wasserstein'] = 0.
                 for i in range(self.params.critic_n):
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
 
-                    metrics['d_real_bin'] = \
-                        self.discriminator_bin.train_on_batch(
-                            batched_real_imgs,
-                            np.ones((self.params.batch_size, 1), dtype=np.float32))
-                    metrics['d_fake_bin'] = \
-                        self.discriminator_bin.train_on_batch(
-                            batched_fake_imgs,
-                            np.zeros((self.params.batch_size, 1), dtype=np.float32))
+                    d_wasserstein_tmp = \
+                        self.discriminator_bin_sub.train_on_batch(
+                            [batched_real_imgs, batched_fake_imgs],
+                            -np.ones((self.params.batch_size, 1), dtype=np.float32))
+                    metrics['d_wasserstein'] += d_wasserstein_tmp / self.params.critic_n
+                metrics['d_wasserstein'] *= -1
 
                 metrics['g_fake_bin'] = \
                     self.generator_to_discriminator_bin.train_on_batch(

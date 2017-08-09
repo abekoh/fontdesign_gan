@@ -1,5 +1,5 @@
 from datetime import datetime
-from keras.optimizers import Adam
+from keras.optimizers import Adam, RMSprop
 
 from train_gan import TrainingFontDesignGAN
 from params import Params
@@ -12,7 +12,7 @@ if __name__ == '__main__':
         'char_embedding_n': 26,
         'epoch_n': 50,
         'batch_size': 16,
-        'critic_n': 1,
+        'critic_n': 5,
         # 'early_stopping_n': 10,
         'save_metrics_graph_interval': 1,
         'save_metrics_smoothing_graph_interval': 10,
@@ -20,12 +20,12 @@ if __name__ == '__main__':
         'save_weights_interval': 5,
         'g': Params({
             'arch': 'pix2pix',
-            'opt': Adam(lr=0.0002, beta_1=0.5),
+            'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.]
         }),
         'd': Params({
             'arch': 'pix2pix',
-            'opt': Adam(lr=0.0002, beta_1=0.5),
+            'opt': RMSprop(lr=0.00005),
             'loss_weights': [1.]
         }),
         'dc': Params({
