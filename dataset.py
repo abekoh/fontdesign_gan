@@ -52,7 +52,6 @@ class Dataset():
     def set_category_arange(self):
         self.category_queue = dict()
         for i, key in enumerate(self.h5file.keys()):
-            print(i, key)
             self.category_queue[key] = i
 
     def set_category_random(self, id_n):
