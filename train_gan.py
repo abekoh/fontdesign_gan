@@ -62,13 +62,13 @@ class TrainingFontDesignGAN():
                                                              img_dim=self.params.img_dim,
                                                              font_embedding_n=self.params.font_embedding_n)
         self.discriminator.compile(optimizer=self.params.d.opt,
-                                   loss=['binary_crossentropy', 'categorical_crossentropy'],
+                                   loss='binary_crossentropy',
                                    loss_weights=self.params.d.loss_weights)
 
         self.discriminator.trainable = False
         self.generator_to_discriminator = Model(inputs=self.generator.input, outputs=self.discriminator(self.generator.output))
         self.generator_to_discriminator.compile(optimizer=self.params.g.opt,
-                                                loss=['binary_crossentropy', 'categorical_crossentropy'],
+                                                loss='binary_crossentropy',
                                                 loss_weights=self.params.g.loss_weights)
         if hasattr(self.params, 'fc'):
             self.font_classifier = models.FontClassifier(img_size=self.params.img_size,
@@ -76,12 +76,12 @@ class TrainingFontDesignGAN():
                                                          font_embedding_n=self.params.font_embedding_n)
             self.font_classifier.compile(optimizer=self.params.fc.opt,
                                          loss='categorical_crossentropy',
-                                         loss_weights=self.params.fc.loss_weights)
+                                         loss_weights=self.params.fc.loss_weights_d)
             self.font_classifier.trainable = False
             self.generator_to_font_classifier = Model(inputs=self.generator.input, outputs=self.font_classifier(self.generator.output))
             self.generator_to_font_classifier.compile(optimizer=self.params.fc.opt,
                                                       loss='categorical_crossentropy',
-                                                      loss_weights=self.params.fc.loss_weights)
+                                                      loss_weights=self.params.fc.loss_weights_g)
 
         if hasattr(self.params, 'c'):
             self.classifier = models.Classifier(img_size=self.params.img_size,
@@ -161,28 +161,30 @@ class TrainingFontDesignGAN():
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
 
-                    _, metrics['d_real_bin'], metrics['d_real_cat'] = \
+                    metrics['d_real_bin'] = \
                         self.discriminator.train_on_batch(
                             batched_real_imgs,
-                            [np.ones((self.params.batch_size, 1), dtype=np.float32), to_categorical(batched_real_cats, self.params.font_embedding_n)])
-                    _, metrics['d_fake_bin'], metrics['d_fake_cat'] = \
+                            np.ones((self.params.batch_size, 1), dtype=np.float32))
+                    metrics['d_fake_bin'] = \
                         self.discriminator.train_on_batch(
                             batched_fake_imgs,
-                            [np.zeros((self.params.batch_size, 1), dtype=np.float32), to_categorical(batched_real_cats, self.params.font_embedding_n)])
-                    metrics['d_real_cat'] *= 0.5
-                    metrics['d_fake_cat'] *= 0.5
+                            np.zeros((self.params.batch_size, 1), dtype=np.float32))
 
-                _, metrics['g_fake'], metrics['g_cat_fake'] = \
+                metrics['g_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
                         [batched_src_chars, batched_real_cats],
-                        [np.ones((self.params.batch_size, 1), dtype=np.float32), to_categorical(batched_real_cats, self.params.font_embedding_n)])
+                        np.ones((self.params.batch_size, 1), dtype=np.float32))
 
                 if hasattr(self.params, 'fc'):
-                    metrics['d_fc'] = \
+                    metrics['d_real_cat'] = \
+                        self.font_classifier.train_on_batch(
+                            batched_real_imgs,
+                            to_categorical(batched_real_cats, self.params.font_embedding_n))
+                    metrics['d_fake_cat'] = \
                         self.font_classifier.train_on_batch(
                             batched_fake_imgs,
-                            to_categorical(np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32), self.params.font_embedding_n))
-                    metrics['g_fc'] = \
+                            to_categorical(batched_real_cats, self.params.font_embedding_n))
+                    metrics['g_fake_cat'] = \
                         self.generator_to_font_classifier.train_on_batch(
                             [batched_src_chars, batched_real_cats],
                             to_categorical(batched_real_cats, self.params.font_embedding_n))
@@ -342,17 +344,18 @@ if __name__ == '__main__':
         'g': Params({
             'arch': 'pix2pix',
             'opt': Adam(lr=0.0002, beta_1=0.5),
-            'loss_weights': [1., 1.]
+            'loss_weights': [1.]
         }),
         'd': Params({
             'arch': 'pix2pix',
             'opt': Adam(lr=0.0002, beta_1=0.5),
-            'loss_weights': [1., 0.5]
+            'loss_weights': [1.]
         }),
-        # 'fc': Params({
-        #     'opt': RMSprop(lr=0.00005),
-        #     'loss_weights': [1.]
-        # }),
+        'fc': Params({
+            'opt': Adam(lr=0.0002, beta_1=0.5),
+            'loss_weights_d': [0.5],
+            'loss_weights_g': [1.]
+        }),
         # 'c': Params({
         #     'opt': RMSprop(lr=0.00005),
         #     'loss_weights': [0.5]
