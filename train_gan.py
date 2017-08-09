@@ -169,6 +169,8 @@ class TrainingFontDesignGAN():
                         self.discriminator.train_on_batch(
                             batched_fake_imgs,
                             [np.zeros((self.params.batch_size, 1), dtype=np.float32), to_categorical(batched_real_cats, self.params.font_embedding_n)])
+                    metrics['d_real_cat'] *= 0.5
+                    metrics['d_fake_cat'] *= 0.5
 
                 _, metrics['g_fake'], metrics['g_cat_fake'] = \
                     self.generator_to_discriminator.train_on_batch(
