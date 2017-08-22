@@ -234,7 +234,7 @@ class TrainingFontDesignGAN():
                 # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
                     self._update_metrics(metrics, count_i)
-                    # self._save_metrics_graph()
+                    self._save_metrics_graph()
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
@@ -277,29 +277,26 @@ class TrainingFontDesignGAN():
             self.tb_writer.flush()
 
     def _init_metrics(self):
-        self.x_time = np.array([])
-        self.y_metrics = dict()
+        self.metrics = dict()
 
     def _update_metrics(self, metrics, count_i):
-        self.x_time = np.append(self.x_time, np.array([count_i]))
-        if self.y_metrics == dict():
-            for k, v in metrics.items():
-                self.y_metrics[k] = np.array([v], dtype=np.float32)
-        else:
-            for k, v in metrics.items():
-                self.y_metrics[k] = np.append(self.y_metrics[k], np.array([v]))
+        for k, v in metrics.items():
+            if k not in self.metrics:
+                self.metrics[k] = np.array([[count_i], [metrics[k]]])
+            else:
+                self.metrics[k] = np.concatenate((self.metrics[k], np.array([[count_i], [metrics[k]]])), axis=1)
 
     def _save_metrics_graph(self):
         all_graphs = list()
-        metrics_n = len(self.y_metrics)
-        for i, (k, v) in enumerate(self.y_metrics.items()):
-            graph = go.Scatter(x=self.x_time, y=v, mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
+        metrics_n = len(self.metrics) + 1
+        for i, (k, v) in enumerate(self.metrics.items()):
+            graph = go.Scatter(x=v[0], y=v[1], mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
             graphs = [graph]
-            window_length = len(self.x_time) // 4
+            window_length = len(v[0]) // 4
             if window_length % 2 == 0:
                 window_length += 1
             if window_length > 3:
-                smoothed_graph = go.Scatter(x=self.x_time, y=savgol_filter(v, window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
+                smoothed_graph = go.Scatter(x=v[0], y=savgol_filter(v, window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
