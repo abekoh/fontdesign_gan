@@ -67,7 +67,7 @@ class TrainingClassifier():
             test_loss_avg = sum(losses) / len(losses)
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}'.format(test_loss_avg, test_acc_avg))
-            if epoch_i + 1 % self.params.save_weights_interval == 0 or epoch_i + 1 == self.params.epoch_n:
+            if (epoch_i + 1) % self.params.save_weights_interval == 0 or epoch_i + 1 == self.params.epoch_n:
                 weights_filename = 'classifier_weights_{}(train={},test={}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
                 self.classifier.save_weights(os.path.join(self.paths.dst.root, weights_filename))
 
