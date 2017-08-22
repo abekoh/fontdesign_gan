@@ -117,13 +117,3 @@ class Dataset():
         if is_cat:
             return imgs, labels, cats
         return imgs, labels
-
-
-if __name__ == '__main__':
-    # dataset = Dataset('src/fonts_200_caps_256x256_-1,1.h5', 'w', img_size=(256, 256))
-    # dataset.load_imgs('../../font_dataset/png/200_256x256')
-    # dataset = Dataset('src/arial.h5', 'w', img_size=(256, 256))
-    # dataset.load_imgs('../../font_dataset/png/ariel_256x256')
-    dataset = Dataset('src/fonts_200_caps_256x256.h5', 'r', img_size=(256, 256))
-    dataset.set_category_random(10)
-    print(dataset.category_queue)

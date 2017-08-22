@@ -104,6 +104,6 @@ ENV/
 *.png
 *.h5
 *.html
-output/
+output*/
 old*/
 test/
