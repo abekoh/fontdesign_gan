@@ -147,9 +147,11 @@ class TrainingFontDesignGAN():
 
                 # real imgs
                 batched_real_imgs, batched_real_labels, batched_real_cats = self.real_dataset.get_batch(batch_i, self.params.batch_size, is_cat=True)
-                batched_real_cats = np.array(batched_real_cats)
                 # src fonts info
-                # batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
+                if hasattr(self.params, 'dc'):
+                    batched_src_fonts = np.array(batched_real_cats)
+                else:
+                    batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
 
                 # src chars info
                 if self.params.g.arch == 'dcgan':
@@ -159,7 +161,7 @@ class TrainingFontDesignGAN():
                     batched_src_chars, batched_src_labels = self.src_dataset.get_selected(batched_real_labels)
 
                 # fake imgs
-                batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_real_cats])
+                batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
 
                 metrics = dict()
 
@@ -177,36 +179,36 @@ class TrainingFontDesignGAN():
 
                 metrics['g_fake_bin'] = \
                     self.generator_to_discriminator_bin.train_on_batch(
-                        [batched_src_chars, batched_real_cats],
+                        [batched_src_chars, batched_src_fonts],
                         np.ones((self.params.batch_size, 1), dtype=np.float32))
 
                 if hasattr(self.params, 'dc'):
                     metrics['d_real_cat'] = \
                         self.discriminator_cat.train_on_batch(
                             batched_real_imgs,
-                            to_categorical(batched_real_cats, self.params.font_embedding_n))
+                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
                     metrics['d_fake_cat'] = \
                         self.discriminator_cat.train_on_batch(
                             batched_fake_imgs,
-                            to_categorical(batched_real_cats, self.params.font_embedding_n))
+                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
 
                 if hasattr(self.params, 'gc'):
                     metrics['g_fake_cat'] = \
                         self.generator_to_discriminator_cat.train_on_batch(
-                            [batched_src_chars, batched_real_cats],
-                            to_categorical(batched_real_cats, self.params.font_embedding_n))
+                            [batched_src_chars, batched_src_fonts],
+                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
 
                 if hasattr(self.params, 'c'):
                     batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
                     metrics['g_class'] = \
                         self.generator_to_classifier.train_on_batch(
-                            [batched_src_chars, batched_real_cats],
+                            [batched_src_chars, batched_src_fonts],
                             batched_categorical_src_labels)
 
                 if hasattr(self.params, 'l1'):
                     metrics['g_l1'] = \
                         self.generator.train_on_batch(
-                            [batched_src_chars, batched_real_cats],
+                            [batched_src_chars, batched_src_fonts],
                             batched_real_imgs)
 
                 if hasattr(self.params, 'v'):
@@ -225,14 +227,14 @@ class TrainingFontDesignGAN():
                     batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
                     metrics['g_const'] = \
                         self.generator_to_encoder.train_on_batch(
-                            [batched_src_chars, batched_real_cats],
+                            [batched_src_chars, batched_src_fonts],
                             batched_src_chars_encoded)
 
                 # save metrics
                 # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
                     self._update_metrics(metrics, count_i)
-                    self._save_metrics_graph()
+                    # self._save_metrics_graph()
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:

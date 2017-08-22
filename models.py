@@ -139,37 +139,44 @@ def GeneratorDCGAN(img_size=(64, 64), img_dim=1, font_embedding_n=40, char_embed
     char_embedding = Reshape((1, 1, 20))(char_embedding)
     # -> (:, 1, 1, 20)
 
-    noise_inp = Input(shape=(50, ), dtype='float32')
-    noise = Reshape((1, 1, 50))(noise_inp)
+    x = concatenate([font_embedding, char_embedding], axis=3)
+    # -> (:, 1, 1, 50)
 
-    x = concatenate([font_embedding, char_embedding, noise], axis=3)
-    # -> (:, 1, 1, 100)
+    x = Conv2DTranspose(1024, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    # -> (:, 2, 2, 1024)
 
-    # x = Conv2DTranspose(1024, (5, 5), strides=(4, 4), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # # -> (:, 4, 4, 1024)
-
-    x = Conv2DTranspose(512, (5, 5), strides=(4, 4), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     # -> (:, 4, 4, 512)
 
-    x = Conv2DTranspose(256, (5, 5), strides=(4, 4), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
-    # -> (:, 16, 16, 256)
+    # -> (:, 8, 8, 256)
 
     x = Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
-    # -> (:, 32, 32, 128)
+    # -> (:, 16, 16, 128)
+
+    x = Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    # -> (:, 32, 32, 64)
+
+    x = Conv2DTranspose(32, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    # -> (:, 64, 64, 32)
 
     x = Conv2DTranspose(img_dim, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = Activation('tanh')(x)
-    # -> (:, 64, 64, img_dim)
+    # -> (:, 128, 128, img_dim)
 
-    model = Model(inputs=[font_embedding_inp, char_embedding_inp, noise_inp], outputs=x)
+    model = Model(inputs=[font_embedding_inp, char_embedding_inp], outputs=x)
 
     return model
 
@@ -204,31 +211,41 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     return model
 
 
-def DiscriminatorDCGAN(img_size=(64, 64), img_dim=1):
+def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
-    # x = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
-    # x = BatchNormalization()(x)
-    # x = LeakyReLU(alpha=0.2)(x)
-    # # -> (:, 32, 32, 64)
+    x = Conv2D(32, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = BatchNormalization()(x)
+    x = LeakyReLU(alpha=0.2)(x)
+    # -> (:, 64, 64, 32)
 
-    x = Conv2D(128, (5, 5), strides=(4, 4), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = BatchNormalization()(x)
+    x = LeakyReLU(alpha=0.2)(x)
+    # -> (:, 32, 32, 64)
+
+    x = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 16, 16, 128)
 
-    x = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 8, 8, 256)
 
-    x = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
+    x = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 4, 4, 512)
 
+    x = Conv2D(1024, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = BatchNormalization()(x)
+    x = LeakyReLU(alpha=0.2)(x)
+    # -> (:, 2, 2, 1024)
+
     x = Flatten()(x)
-    # -> (:, 4 * 4 * 512)
+    # -> (:, 2 * 2 * 512)
 
     x = Dense(1, activation=None)(x)
     # -> (:, 1)
