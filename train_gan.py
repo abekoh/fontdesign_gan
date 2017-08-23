@@ -12,7 +12,7 @@ import colorlover as cl
 import tensorflow as tf
 
 from keras.models import Model
-from keras.utils import Progbar, to_categorical
+from keras.utils import Progbar, to_categorical, plot_model
 
 import models
 from dataset import Dataset
@@ -51,6 +51,7 @@ class TrainingFontDesignGAN():
             self.generator = models.GeneratorPix2Pix(img_size=self.params.img_size,
                                                      img_dim=self.params.img_dim,
                                                      font_embedding_n=self.params.font_embedding_n)
+        plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'))
         if self.params.d.arch == 'dcgan':
             self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
                                                            img_dim=self.params.img_dim)
@@ -58,6 +59,7 @@ class TrainingFontDesignGAN():
             self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
                                                              img_dim=self.params.img_dim,
                                                              font_embedding_n=self.params.font_embedding_n)
+        plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'))
         self.discriminator_bin_sub = models.DiscriminatorBinarizeSubtract(discriminator=self.discriminator,
                                                                           img_size=self.params.img_size,
                                                                           img_dim=self.params.img_dim)
@@ -92,6 +94,7 @@ class TrainingFontDesignGAN():
         if hasattr(self.params, 'c'):
             self.classifier = models.Classifier(img_size=self.params.img_size,
                                                 img_dim=self.params.img_dim, class_n=26)
+            plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'))
             self.classifier.load_weights(self.paths.src.cls_weight_h5)
             self.classifier.trainable = False
             self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
