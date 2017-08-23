@@ -219,27 +219,27 @@ def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1):
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 64, 64, 32)
 
-    x = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 32, 32, 64)
 
-    x = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 16, 16, 128)
 
-    x = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 8, 8, 256)
 
-    x = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 4, 4, 512)
 
-    x = Conv2D(1024, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(dis_inp)
+    x = Conv2D(1024, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.001))(x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
     # -> (:, 2, 2, 1024)
