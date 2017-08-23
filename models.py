@@ -124,30 +124,33 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     return model
 
 
-def GeneratorDCGAN(img_size=(64, 64), img_dim=1, font_embedding_n=40, char_embedding_n=26):
+def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_embedding_n=26, font_embedding_rate=0.5,
+                   k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(),
+                   is_bn=True):
+    unit_size = img_size[0] // (2 ** layer_n)
+    unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
+
+    font_embedding_unit_n = int(unit_n * font_embedding_rate)
+    char_embedding_unit_n = unit_n - font_embedding_unit_n
+
     font_embedding_inp = Input(shape=(1,), dtype='int32')
-    font_embedding = Embedding(font_embedding_n, 16 * 16 * 256)(font_embedding_inp)
-    font_embedding = Reshape((16, 16, 256))(font_embedding)
+    font_embedding = Embedding(font_embedding_n, unit_size * unit_size * font_embedding_unit_n)(font_embedding_inp)
+    font_embedding = Reshape((unit_size, unit_size, font_embedding_unit_n))(font_embedding)
 
     char_embedding_inp = Input(shape=(1,), dtype='int32')
-    char_embedding = Embedding(char_embedding_n, 16 * 16 * 256)(char_embedding_inp)
-    char_embedding = Reshape((16, 16, 256))(char_embedding)
+    char_embedding = Embedding(char_embedding_n, unit_size * unit_size * char_embedding_unit_n)(char_embedding_inp)
+    char_embedding = Reshape((unit_size, unit_size, char_embedding_unit_n))(char_embedding)
 
     x = concatenate([font_embedding, char_embedding], axis=3)
 
-    # x = Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
+    for i in range(layer_n - 1):
+        unit_n = smallest_hidden_unit_n * (2 ** (layer_n - i - 2))
+        x = Conv2DTranspose(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
+        if is_bn:
+            x = BatchNormalization()(x)
+        x = Activation('relu')(x)
 
-    x = Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-
-    x = Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-
-    x = Conv2DTranspose(img_dim, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
+    x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
     x = Activation('tanh')(x)
 
     model = Model(inputs=[font_embedding_inp, char_embedding_inp], outputs=x)
@@ -185,29 +188,20 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     return model
 
 
-def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1):
+def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128,
+                       kernel_initializer=truncated_normal(), is_bn=True):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
 
-    x = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
-    x = BatchNormalization()(x)
-    x = LeakyReLU(alpha=0.2)(x)
-
-    x = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    x = BatchNormalization()(x)
-    x = LeakyReLU(alpha=0.2)(x)
-
-    x = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    x = BatchNormalization()(x)
-    x = LeakyReLU(alpha=0.2)(x)
-
-    # x = Conv2D(1024, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(x)
-    # x = BatchNormalization()(x)
-    # x = LeakyReLU(alpha=0.2)(x)
+    for i in range(layer_n):
+        unit_n = smallest_hidden_unit_n * (2 ** i)
+        x = Conv2D(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(dis_inp)
+        if is_bn:
+            x = BatchNormalization()(x)
+        x = LeakyReLU(alpha=0.2)(x)
 
     x = Flatten()(x)
 
     x = Dense(1, activation=None)(x)
-    # -> (:, 1)
 
     model = Model(inputs=dis_inp, outputs=x)
 
