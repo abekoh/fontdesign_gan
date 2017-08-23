@@ -191,10 +191,11 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
 def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128,
                        kernel_initializer=truncated_normal(), is_bn=True):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
+    x = Activation('linear')(dis_inp)
 
     for i in range(layer_n):
         unit_n = smallest_hidden_unit_n * (2 ** i)
-        x = Conv2D(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(dis_inp)
+        x = Conv2D(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
         if is_bn:
             x = BatchNormalization()(x)
         x = LeakyReLU(alpha=0.2)(x)
