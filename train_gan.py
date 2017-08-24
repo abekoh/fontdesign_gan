@@ -49,6 +49,7 @@ class TrainingFontDesignGAN():
                                                    img_dim=self.params.img_dim,
                                                    font_embedding_n=self.params.font_embedding_n,
                                                    char_embedding_n=self.params.char_embedding_n,
+                                                   font_embedding_rate=self.params.font_embedding_rate,
                                                    layer_n=self.params.g.layer_n,
                                                    smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                    kernel_initializer=self.params.g.kernel_initializer,
