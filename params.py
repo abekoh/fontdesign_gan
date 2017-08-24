@@ -1,4 +1,5 @@
 from keras.optimizers import Optimizer
+from keras.initializers import Initializer
 
 
 class Params():
@@ -16,7 +17,7 @@ class Params():
         for attr, value in self.__dict__.items():
             if hasattr(value, 'to_dict'):
                 d[attr] = value.to_dict()
-            elif isinstance(value, Optimizer):
+            elif isinstance(value, Optimizer) or isinstance(value, Initializer):
                 d[attr] = '{} {}'.format(value, value.get_config())
             else:
                 d[attr] = value

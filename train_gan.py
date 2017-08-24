@@ -39,6 +39,8 @@ class TrainingFontDesignGAN():
     def _save_params(self):
         with open(os.path.join(self.paths.dst.root, 'params.txt'), 'w') as f:
             json.dump(self.params.to_dict(), f, indent=4)
+        with open(os.path.join(self.paths.dst.root, 'paths.txt'), 'w') as f:
+            json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
 
@@ -46,7 +48,11 @@ class TrainingFontDesignGAN():
             self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
                                                    img_dim=self.params.img_dim,
                                                    font_embedding_n=self.params.font_embedding_n,
-                                                   char_embedding_n=self.params.char_embedding_n)
+                                                   char_embedding_n=self.params.char_embedding_n,
+                                                   layer_n=self.params.g.layer_n,
+                                                   smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
+                                                   kernel_initializer=self.params.g.kernel_initializer,
+                                                   is_bn=self.params.g.is_bn)
         elif self.params.g.arch == 'pix2pix':
             self.generator = models.GeneratorPix2Pix(img_size=self.params.img_size,
                                                      img_dim=self.params.img_dim,
@@ -54,7 +60,11 @@ class TrainingFontDesignGAN():
         plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
         if self.params.d.arch == 'dcgan':
             self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
-                                                           img_dim=self.params.img_dim)
+                                                           img_dim=self.params.img_dim,
+                                                           layer_n=self.params.d.layer_n,
+                                                           smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
+                                                           kernel_initializer=self.params.d.kernel_initializer,
+                                                           is_bn=self.params.d.is_bn)
         elif self.params.d.arch == 'pix2pix':
             self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
                                                              img_dim=self.params.img_dim,
