@@ -107,4 +107,4 @@ ENV/
 output*/
 old*/
 test/
-run.py
+/run.py
