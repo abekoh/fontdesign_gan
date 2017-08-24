@@ -345,3 +345,6 @@ class TrainingFontDesignGAN():
         h5file.create_dataset('y_metrics', data=self.y_metrics)
         h5file.flush()
         h5file.close()
+
+    def get_last_metric(self, key):
+        return self.metrics[key][1][-1]

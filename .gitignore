@@ -108,3 +108,4 @@ output*/
 old*/
 test/
 /run.py
+/search_hypper_params.py
