@@ -313,7 +313,8 @@ class TrainingFontDesignGAN():
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
-        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=False)
+        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=self.params.is_auto_open)
+        self.params.is_auto_open = False
 
     def _save_images(self, dst_imgs, generated_imgs, filename):
         concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
