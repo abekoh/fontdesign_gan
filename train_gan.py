@@ -248,6 +248,7 @@ class TrainingFontDesignGAN():
                 # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
                     self._update_metrics(metrics, count_i)
+                    self._update_smoothed_metrics()
                     self._save_metrics_graph()
 
                 # save images
@@ -292,6 +293,7 @@ class TrainingFontDesignGAN():
 
     def _init_metrics(self):
         self.metrics = dict()
+        self.smoothed_metrics = dict()
 
     def _update_metrics(self, metrics, count_i):
         for k, v in metrics.items():
@@ -300,17 +302,24 @@ class TrainingFontDesignGAN():
             else:
                 self.metrics[k] = np.concatenate((self.metrics[k], np.array([[count_i], [metrics[k]]])), axis=1)
 
-    def _save_metrics_graph(self):
-        all_graphs = list()
-        metrics_n = len(self.metrics) + 1
-        for i, (k, v) in enumerate(self.metrics.items()):
-            graph = go.Scatter(x=v[0], y=v[1], mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
-            graphs = [graph]
+    def _update_smoothed_metrics(self):
+        for k, v in self.metrics.items():
             window_length = len(v[0]) // 4
             if window_length % 2 == 0:
                 window_length += 1
-            if window_length > 3:
-                smoothed_graph = go.Scatter(x=v[0], y=savgol_filter(v[1], window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
+            if window_length <= 3:
+                continue
+            filtered = savgol_filter(v[1], window_length, 3)
+            self.smoothed_metrics[k] = np.array([v[0], filtered])
+
+    def _save_metrics_graph(self):
+        all_graphs = list()
+        metrics_n = len(self.metrics) + 1
+        for i, k in enumerate(self.metrics.keys()):
+            graph = go.Scatter(x=self.metrics[k][0], y=self.metrics[k][1], mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
+            graphs = [graph]
+            if k in self.smoothed_metrics:
+                smoothed_graph = go.Scatter(x=self.smoothed_metrics[k][0], y=self.smoothed_metrics[k][1], mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
@@ -351,14 +360,10 @@ class TrainingFontDesignGAN():
         return self.metrics[key][1][-1]
 
     def get_metric_decrease(self, key, n):
-        window_length = len(self.metrics[key][0]) // 4
-        if window_length % 2 == 0:
-            window_length += 1
-        if window_length <= 3:
+        if key not in self.smoothed_metrics or len(self.smoothed_metrics[key][1]) < n:
             return 0
-        filtered = savgol_filter(self.metrics[key][1], window_length, 3)
         decrease_sum = 0
         for i in range(n):
-            decrease_sum += filtered[- (n - i)] - filtered[- (n - i + 1)]
+            decrease_sum += self.smoothed_metrics[key][1][- (n - i)] - self.smoothed_metrics[key][1][- (n - i + 1)]
         decrease_avg = decrease_sum / n
         return decrease_avg
