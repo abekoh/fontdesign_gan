@@ -310,7 +310,7 @@ class TrainingFontDesignGAN():
             if window_length % 2 == 0:
                 window_length += 1
             if window_length > 3:
-                smoothed_graph = go.Scatter(x=v[0], y=savgol_filter(v, window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
+                smoothed_graph = go.Scatter(x=v[0], y=savgol_filter(v[1], window_length, 3), mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
