@@ -349,3 +349,16 @@ class TrainingFontDesignGAN():
 
     def get_last_metric(self, key):
         return self.metrics[key][1][-1]
+
+    def get_metric_decrease(self, key, n):
+        window_length = len(self.metrics[key][0]) // 4
+        if window_length % 2 == 0:
+            window_length += 1
+        if window_length <= 3:
+            return 0
+        filtered = savgol_filter(self.metrics[key][1], window_length, 3)
+        decrease_sum = 0
+        for i in range(n):
+            decrease_sum += filtered[- (n - i)] - filtered[- (n - i + 1)]
+        decrease_avg = decrease_sum / n
+        return decrease_avg
