@@ -10,7 +10,6 @@ from scipy.signal import savgol_filter
 import colorlover as cl
 
 import tensorflow as tf
-
 from keras.models import Model
 from keras.utils import Progbar, to_categorical, plot_model
 
@@ -43,6 +42,29 @@ class TrainingFontDesignGAN():
             json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
+
+        self._build_central()
+
+        if hasattr(self.params, 'dc') and hasattr(self.params, 'gc'):
+            self._build_fontclassifier()
+
+        if hasattr(self.params, 'c'):
+            self._build_classifier()
+
+        if hasattr(self.params, 'l1'):
+            self.generator.compile(optimizer=self.params.l1.opt,
+                                   loss='mean_absolute_error',
+                                   loss_weights=self.params.l1.loss_weights)
+
+        if hasattr(self.params, 'v'):
+            self.generator.compile(optimizer=self.params.v.opt,
+                                   loss=hamming_error_inv,
+                                   loss_weights=self.params.v.loss_weights)
+
+        if hasattr(self.params, 'e'):
+            self._build_encoder()
+
+    def _build_central(self):
 
         if self.params.g.arch == 'dcgan':
             self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
@@ -88,50 +110,40 @@ class TrainingFontDesignGAN():
                                                     loss=multiple_loss,
                                                     loss_weights=self.params.g.loss_weights)
         self.discriminator_bin.trainable = True
-        if hasattr(self.params, 'dc'):
-            self.discriminator_cat = models.DiscriminatorCategorize(discriminator=self.discriminator,
-                                                                    img_size=self.params.img_size,
-                                                                    img_dim=self.params.img_dim,
-                                                                    font_embedding_n=self.params.font_embedding_n)
-            self.discriminator_cat.compile(optimizer=self.params.dc.opt,
-                                           loss='categorical_crossentropy',
-                                           loss_weights=self.params.dc.loss_weights)
 
-        if hasattr(self.params, 'gc'):
-            self.discriminator_cat.trainable = False
-            self.generator_to_discriminator_cat = Model(inputs=self.generator.input, outputs=self.discriminator_cat(self.generator.output))
-            self.generator_to_discriminator_cat.compile(optimizer=self.params.gc.opt,
-                                                        loss='categorical_crossentropy',
-                                                        loss_weights=self.params.gc.loss_weights)
+    def _build_fontclassifier(self):
+        self.discriminator_cat = models.DiscriminatorCategorize(discriminator=self.discriminator,
+                                                                img_size=self.params.img_size,
+                                                                img_dim=self.params.img_dim,
+                                                                font_embedding_n=self.params.font_embedding_n)
+        self.discriminator_cat.compile(optimizer=self.params.dc.opt,
+                                       loss='categorical_crossentropy',
+                                       loss_weights=self.params.dc.loss_weights)
 
-        if hasattr(self.params, 'c'):
-            self.classifier = models.Classifier(img_size=self.params.img_size,
-                                                img_dim=self.params.img_dim, class_n=26)
-            plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
-            self.classifier.load_weights(self.paths.src.cls_weight_h5)
-            self.classifier.trainable = False
-            self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
-            self.generator_to_classifier.compile(optimizer=self.params.c.opt,
-                                                 loss='categorical_crossentropy',
-                                                 loss_weights=self.params.c.loss_weights)
+        self.discriminator_cat.trainable = False
+        self.generator_to_discriminator_cat = Model(inputs=self.generator.input, outputs=self.discriminator_cat(self.generator.output))
+        self.generator_to_discriminator_cat.compile(optimizer=self.params.gc.opt,
+                                                    loss='categorical_crossentropy',
+                                                    loss_weights=self.params.gc.loss_weights)
 
-        if hasattr(self.params, 'l1'):
-            self.generator.compile(optimizer=self.params.l1.opt,
-                                   loss='mean_absolute_error',
-                                   loss_weights=self.params.l1.loss_weights)
+    def _build_classifier(self):
+        self.classifier = models.Classifier(img_size=self.params.img_size,
+                                            img_dim=self.params.img_dim, class_n=26)
+        plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
+        self.classifier.load_weights(self.paths.src.cls_weight_h5)
+        self.classifier.trainable = False
+        self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
+        self.generator_to_classifier.compile(optimizer=self.params.c.opt,
+                                             loss='categorical_crossentropy',
+                                             loss_weights=self.params.c.loss_weights)
 
-        if hasattr(self.params, 'v'):
-            self.generator.compile(optimizer=self.params.v.opt,
-                                   loss=hamming_error_inv,
-                                   loss_weights=self.params.v.loss_weights)
-
-        if hasattr(self.params, 'e'):
-            self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
-            self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
-            self.encoder.trainable = False
-            self.generator_to_encoder.compile(optimizer=self.params.e.opt,
-                                              loss='mean_squared_error',
-                                              loss_weights=self.params.e.loss_weights)
+    def _build_encoder(self):
+        self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
+        self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
+        self.encoder.trainable = False
+        self.generator_to_encoder.compile(optimizer=self.params.e.opt,
+                                          loss='mean_squared_error',
+                                          loss_weights=self.params.e.loss_weights)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
