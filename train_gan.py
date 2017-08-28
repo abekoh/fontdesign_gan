@@ -1,7 +1,6 @@
 import os
 import random
 import numpy as np
-import h5py
 import json
 from PIL import Image
 import plotly.offline as py
@@ -9,7 +8,6 @@ import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 import colorlover as cl
 
-import tensorflow as tf
 from keras.models import Model
 from keras.utils import Progbar, to_categorical, plot_model
 
@@ -42,7 +40,6 @@ class TrainingFontDesignGAN():
             json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
-
         self._build_central()
 
         if hasattr(self.params, 'dc') and hasattr(self.params, 'gc'):
@@ -258,7 +255,6 @@ class TrainingFontDesignGAN():
                             batched_src_chars_encoded)
 
                 # save metrics
-                # self._update_tensorboard_metrics(metrics, count_i)
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
                     self._update_metrics(metrics, count_i)
                     self._update_smoothed_metrics()
@@ -279,7 +275,6 @@ class TrainingFontDesignGAN():
                     self._save_model_weights(epoch_i)
                 continue
             break
-        # self._save_metrics_progress_h5()
 
     def _make_another_random_array(self, from_n, to_n, src_array):
         dst_array = np.array([], dtype=np.int32)
@@ -294,15 +289,6 @@ class TrainingFontDesignGAN():
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
-
-    def _update_tensorboard_metrics(self, metrics, count_i):
-        for name, value in metrics.items():
-            summary = tf.Summary()
-            summary_value = summary.value.add()
-            summary_value.simple_value = value
-            summary_value.tag = name
-            self.tb_writer.add_summary(summary, count_i)
-            self.tb_writer.flush()
 
     def _init_metrics(self):
         self.metrics = dict()
@@ -361,13 +347,6 @@ class TrainingFontDesignGAN():
     def _save_model_weights(self, epoch_i):
         self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
         self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
-
-    def _save_metrics_progress_h5(self):
-        h5file = h5py.File(os.path.join(self.paths.dst.metrics, 'all_metrics.h5'))
-        h5file.create_dataset('x_time', data=self.x_time)
-        h5file.create_dataset('y_metrics', data=self.y_metrics)
-        h5file.flush()
-        h5file.close()
 
     def get_last_metric(self, key):
         return self.metrics[key][1][-1]
