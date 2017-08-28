@@ -153,12 +153,9 @@ class TrainingFontDesignGAN():
             self.src_dataset.set_load_data()
 
     def train(self):
-
         self._init_metrics()
 
         batch_n = self.real_data_n // self.params.batch_size
-
-        # self.tb_writer = tf.summary.FileWriter(self.paths.dst.tensorboard_log)
 
         for epoch_i in range(self.params.epoch_n):
 
