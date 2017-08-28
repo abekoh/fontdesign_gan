@@ -125,7 +125,7 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
 
 
 def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_embedding_n=26, font_embedding_rate=0.5,
-                   k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(),
+                   k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
                    is_bn=True):
     unit_size = img_size[0] // (2 ** layer_n)
     unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
@@ -148,7 +148,10 @@ def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_emb
         x = Conv2DTranspose(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
         if is_bn:
             x = BatchNormalization()(x)
-        x = Activation('relu')(x)
+        if activation == 'leaky_relu':
+            x = LeakyReLU(alpha=0.2)(x)
+        else:
+            x = Activation(activation)(x)
 
     x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
     x = Activation('tanh')(x)
@@ -189,7 +192,7 @@ def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
 
 
 def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128,
-                       kernel_initializer=truncated_normal(), is_bn=True):
+                       kernel_initializer=truncated_normal(), activation='leaky_relu', is_bn=True):
     dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
     x = Activation('linear')(dis_inp)
 
@@ -198,7 +201,10 @@ def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smal
         x = Conv2D(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
         if is_bn:
             x = BatchNormalization()(x)
-        x = LeakyReLU(alpha=0.2)(x)
+        if activation == 'leaky_relu':
+            x = LeakyReLU(alpha=0.2)(x)
+        else:
+            x = Activation(activation)(x)
 
     x = Flatten()(x)
 

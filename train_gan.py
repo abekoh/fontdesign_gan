@@ -53,6 +53,7 @@ class TrainingFontDesignGAN():
                                                    layer_n=self.params.g.layer_n,
                                                    smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                    kernel_initializer=self.params.g.kernel_initializer,
+                                                   activation=self.params.g.activation,
                                                    is_bn=self.params.g.is_bn)
         elif self.params.g.arch == 'pix2pix':
             self.generator = models.GeneratorPix2Pix(img_size=self.params.img_size,
@@ -65,6 +66,7 @@ class TrainingFontDesignGAN():
                                                            layer_n=self.params.d.layer_n,
                                                            smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
                                                            kernel_initializer=self.params.d.kernel_initializer,
+                                                           activation=self.params.d.activation,
                                                            is_bn=self.params.d.is_bn)
         elif self.params.d.arch == 'pix2pix':
             self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
