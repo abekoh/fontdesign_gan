@@ -65,7 +65,6 @@ class TrainingFontDesignGAN():
             self._build_encoder()
 
     def _build_central(self):
-
         if self.params.g.arch == 'dcgan':
             self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
                                                    img_dim=self.params.img_dim,
