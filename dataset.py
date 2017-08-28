@@ -43,11 +43,22 @@ class Dataset():
     def set_load_data(self, train_rate=1.):
         self.keys_queue_train = list()
         for key, value in self.h5file.items():
-            for i in range(value['labels'].len()):
+            for i in range(len(value['labels'])):
                 self.keys_queue_train.append((key, i))
         if train_rate != 1.:
             self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
             self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
+
+    def set_label_ids(self, key=None):
+        self.label_ids = dict()
+        if key is None:
+            max_len = 0
+            for k, v in self.h5file.items():
+                if len(v) > max_len:
+                    key = k
+                    max_len = len(v)
+        for i, label in enumerate(self.h5file[key + '/labels'].value):
+            self.label_ids[label] = i
 
     def set_category_arange(self):
         self.category_queue = dict()
@@ -91,7 +102,7 @@ class Dataset():
     def get_selected(self, labels, is_test=False, is_cat=False):
         keys_list = list()
         for label in labels:
-            num = ord(label) - 65
+            num = self.get_label_id(label)
             if is_test:
                 keys_list.append(self.keys_queue_test[num])
             else:
@@ -117,3 +128,6 @@ class Dataset():
         if is_cat:
             return imgs, labels, cats
         return imgs, labels
+
+    def get_label_id(self, label):
+        return self.label_ids[label]

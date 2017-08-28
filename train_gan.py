@@ -144,6 +144,7 @@ class TrainingFontDesignGAN():
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
         self.real_dataset.set_load_data()
+        self.real_dataset.set_label_ids()
         self.real_dataset.set_category_arange()
         if is_shuffle:
             self.real_dataset.shuffle()
@@ -151,6 +152,7 @@ class TrainingFontDesignGAN():
         if hasattr(self.paths.src, 'src_h5'):
             self.src_dataset = Dataset(self.paths.src.src_h5, 'r', img_size=self.params.img_size)
             self.src_dataset.set_load_data()
+            self.src_dataset.set_label_ids()
 
     def train(self):
         self._init_metrics()
