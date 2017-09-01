@@ -190,8 +190,8 @@ class TrainingFontDesignGAN():
 
                 metrics['d_wasserstein'] = 0.
                 for i in range(self.params.critic_n):
-                    d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
-                    self.discriminator.set_weights(d_weights)
+                    d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator_bin_sub.get_weights()]
+                    self.discriminator_bin_sub.set_weights(d_weights)
 
                     d_wasserstein_tmp = \
                         self.discriminator_bin_sub.train_on_batch(
