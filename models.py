@@ -124,6 +124,36 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
     return model
 
 
+def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
+    dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
+
+    dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
+    dis_1 = LeakyReLU(alpha=0.2)(dis_1)
+    # -> (:, 128, 128, 64)
+
+    dis_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_1)
+    dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
+    dis_2 = LeakyReLU(alpha=0.2)(dis_2)
+    # -> (:, 64, 64, 128)
+
+    dis_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_2)
+    dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
+    dis_3 = LeakyReLU(alpha=0.2)(dis_3)
+    # -> (:, 32, 32, 256)
+
+    dis_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_3)
+    dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
+    dis_4 = LeakyReLU(alpha=0.2)(dis_4)
+    # -> (:, 16, 16, 512)
+
+    fc_0 = Flatten(name='full_connected')(dis_4)
+    # -> (:, 131072)
+
+    model = Model(inputs=dis_inp, outputs=fc_0)
+
+    return model
+
+
 def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_embedding_n=26, font_embedding_rate=0.5,
                    k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
                    output_activation='tanh', is_bn=True):
@@ -160,36 +190,6 @@ def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_emb
         x = Activation(output_activation)(x)
 
     model = Model(inputs=[font_embedding_inp, char_embedding_inp], outputs=x)
-
-    return model
-
-
-def DiscriminatorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
-    dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
-
-    dis_1 = Conv2D(64, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_inp)
-    dis_1 = LeakyReLU(alpha=0.2)(dis_1)
-    # -> (:, 128, 128, 64)
-
-    dis_2 = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_1)
-    dis_2 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_2)
-    dis_2 = LeakyReLU(alpha=0.2)(dis_2)
-    # -> (:, 64, 64, 128)
-
-    dis_3 = Conv2D(256, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_2)
-    dis_3 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_3)
-    dis_3 = LeakyReLU(alpha=0.2)(dis_3)
-    # -> (:, 32, 32, 256)
-
-    dis_4 = Conv2D(512, (5, 5), strides=(2, 2), padding='same', kernel_initializer=truncated_normal(stddev=0.02))(dis_3)
-    dis_4 = BatchNormalization(momentum=0.9, epsilon=0.00001)(dis_4)
-    dis_4 = LeakyReLU(alpha=0.2)(dis_4)
-    # -> (:, 16, 16, 512)
-
-    fc_0 = Flatten(name='full_connected')(dis_4)
-    # -> (:, 131072)
-
-    model = Model(inputs=dis_inp, outputs=fc_0)
 
     return model
 
