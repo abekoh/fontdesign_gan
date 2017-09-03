@@ -4,7 +4,7 @@ from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.normalization import BatchNormalization
 from keras.initializers import random_normal, truncated_normal
-from ops import Subtract
+from ops import Subtract, sign
 
 
 def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
@@ -126,7 +126,7 @@ def GeneratorPix2Pix(img_size=(256, 256), img_dim=1, font_embedding_n=40):
 
 def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_embedding_n=26, font_embedding_rate=0.5,
                    k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
-                   is_bn=True):
+                   output_activation='tanh', is_bn=True):
     unit_size = img_size[0] // (2 ** layer_n)
     unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
 
@@ -154,7 +154,10 @@ def GeneratorDCGAN(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_emb
             x = Activation(activation)(x)
 
     x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-    x = Activation('tanh')(x)
+    if output_activation == 'sign':
+        x = Activation(sign)(x)
+    else:
+        x = Activation(output_activation)(x)
 
     model = Model(inputs=[font_embedding_inp, char_embedding_inp], outputs=x)
 

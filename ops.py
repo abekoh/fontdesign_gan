@@ -24,3 +24,7 @@ class Subtract(_Merge):
         for i in range(1, len(inputs)):
             output = output - inputs[i]
         return output
+
+
+def sign(x):
+    return K.sign(x)

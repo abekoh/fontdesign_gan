@@ -72,6 +72,7 @@ class TrainingFontDesignGAN():
                                                    smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                    kernel_initializer=self.params.g.kernel_initializer,
                                                    activation=self.params.g.activation,
+                                                   output_activation=self.params.g.output_activation,
                                                    is_bn=self.params.g.is_bn)
         elif self.params.g.arch == 'pix2pix':
             self.generator = models.GeneratorPix2Pix(img_size=self.params.img_size,
