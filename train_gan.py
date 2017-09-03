@@ -13,7 +13,7 @@ from keras.utils import Progbar, to_categorical, plot_model
 
 import models
 from dataset import Dataset
-from ops import hamming_error_inv, multiple_loss
+from ops import multiple_loss
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
 
@@ -52,11 +52,6 @@ class TrainingFontDesignGAN():
             self.generator.compile(optimizer=self.params.l1.opt,
                                    loss='mean_absolute_error',
                                    loss_weights=self.params.l1.loss_weights)
-
-        if hasattr(self.params, 'v'):
-            self.generator.compile(optimizer=self.params.v.opt,
-                                   loss=hamming_error_inv,
-                                   loss_weights=self.params.v.loss_weights)
 
         if hasattr(self.params, 'e'):
             self._build_encoder()
@@ -235,18 +230,6 @@ class TrainingFontDesignGAN():
                             [batched_src_chars, batched_src_fonts],
                             batched_real_imgs)
 
-                if hasattr(self.params, 'v'):
-                    src_char, _ = self.src_dataset.get_selected([random.choice(CAPS)])
-                    v_src_chars = np.concatenate([src_char] * self.params.font_embedding_n).reshape(-1, 256, 256, 1)
-                    v_src_fonts = np.arange(0, self.params.font_embedding_n, dtype=np.int32)
-                    v_fake_fonts = self.generator.predict_on_batch([v_src_chars, v_src_fonts])
-                    v_mean_fonts = np.array([np.mean(v_fake_fonts, axis=0)] * self.params.font_embedding_n)
-                    metrics['v'] = \
-                        self.generator.train_on_batch(
-                            [v_src_chars, v_src_fonts],
-                            v_mean_fonts)
-                    metrics['v'] *= -1
-
                 if hasattr(self.params, 'e'):
                     batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
                     metrics['g_const'] = \
@@ -263,8 +246,6 @@ class TrainingFontDesignGAN():
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_images(batched_real_imgs, batched_fake_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1))
-                    if hasattr(self.params, 'v'):
-                        self._save_images(v_fake_fonts, v_mean_fonts, 'mean_{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
                 if hasattr(self.params, 'early_stopping_n') and self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
