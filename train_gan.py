@@ -14,6 +14,7 @@ from keras.utils import Progbar, to_categorical, plot_model
 import models
 from dataset import Dataset
 from ops import multiple_loss
+from utils import concat_imgs
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
 
@@ -245,7 +246,7 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_images(batched_real_imgs, batched_fake_imgs, '{}_{}.png'.format(epoch_i + 1, batch_i + 1))
+                    self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
                 if hasattr(self.params, 'early_stopping_n') and self._is_early_stopping(self.params.early_stopping_n):
                     print('early stop')
@@ -306,15 +307,20 @@ class TrainingFontDesignGAN():
         py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=self.params.is_auto_open)
         self.params.is_auto_open = False
 
-    def _save_images(self, dst_imgs, generated_imgs, filename):
-        concatenated_num_img = np.empty((0, self.params.img_size[1] * 2))
-        for img_i in range(dst_imgs.shape[0]):
-            num_img = np.concatenate((dst_imgs[img_i], generated_imgs[img_i]), axis=1)
-            num_img = (num_img + 1.) * 127.5
-            num_img = np.reshape(num_img, (self.params.img_size[0], self.params.img_size[1] * 2))
-            concatenated_num_img = np.concatenate((concatenated_num_img, num_img), axis=0)
-            concatenated_num_img = np.reshape(concatenated_num_img, (-1, self.params.img_size[1] * 2))
-        pil_img = Image.fromarray(np.uint8(concatenated_num_img))
+    def _init_temp_imgs_inputs(self):
+        self.temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.temp_imgs_n, dtype=np.int32)
+        self.temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.temp_imgs_n, dtype=np.int32)
+
+    def _save_temp_imgs(self, filename):
+        if not hasattr(self, 'temp_batched_src_fonts'):
+            self._init_temp_imgs_inputs()
+        batched_generated_imgs = self.generator.predict_on_batch([self.temp_batched_src_fonts, self.temp_batched_src_chars])
+        row_n = self.params.temp_imgs_n // self.params.temp_col_n
+        concated_img = concat_imgs(batched_generated_imgs, row_n, self.params.temp_col_n)
+        concated_img = (concated_img + 1.) * 127.5
+        # concated_img = np.reshape((self.params.img_size[0] * self.params.temp_col_n))
+        concated_img = np.reshape(concated_img, (-1, self.params.temp_col_n * self.params.img_size[1]))
+        pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
 
     def _is_early_stopping(self, patience):
