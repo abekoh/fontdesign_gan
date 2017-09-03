@@ -8,9 +8,10 @@ import random
 
 class Dataset():
 
-    def __init__(self, h5_path, mode, img_size=(256, 256)):
+    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False):
         self.mode = mode
         self.img_size = img_size
+        self.is_binary = is_binary
         self.h5file = h5py.File(h5_path, mode)
 
     # def __del__(self):
@@ -28,7 +29,10 @@ class Dataset():
             for img_path in img_paths:
                 pil_img = Image.open(img_path)
                 np_img = np.asarray(pil_img)
-                np_img = (np_img.astype(np.float32) / 127.5) - 1.
+                if self.is_binary:
+                    np_img = (np_img.astype(np.float32) * 2.) - 1.
+                else:
+                    np_img = (np_img.astype(np.float32) / 127.5) - 1.
                 np_img = np_img[np.newaxis, :, :, np.newaxis]
                 imgs = np.append(imgs, np_img, axis=0)
                 labels = np.append(labels, os.path.basename(img_path).split('.')[0])
