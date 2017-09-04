@@ -1,5 +1,4 @@
 import os
-import random
 import numpy as np
 import json
 from PIL import Image
@@ -8,12 +7,12 @@ import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 import colorlover as cl
 
-from keras.models import Model
+import tensorflow as tf
+from keras import backend as K
 from keras.utils import Progbar, to_categorical, plot_model
 
 import models
 from dataset import Dataset
-from ops import multiple_loss
 from utils import concat_imgs
 
 CAPS = [chr(i) for i in range(65, 65 + 26)]
@@ -27,6 +26,7 @@ class TrainingFontDesignGAN():
         self._set_dsts()
         self._build_models()
         self._load_dataset()
+        self._prepare_training()
         self._save_params()
 
     def _set_dsts(self):
@@ -43,20 +43,6 @@ class TrainingFontDesignGAN():
     def _build_models(self):
         self._build_central()
 
-        if hasattr(self.params, 'dc') and hasattr(self.params, 'gc'):
-            self._build_fontclassifier()
-
-        if hasattr(self.params, 'c'):
-            self._build_classifier()
-
-        if hasattr(self.params, 'l1'):
-            self.generator.compile(optimizer=self.params.l1.opt,
-                                   loss='mean_absolute_error',
-                                   loss_weights=self.params.l1.loss_weights)
-
-        if hasattr(self.params, 'e'):
-            self._build_encoder()
-
     def _build_central(self):
         if self.params.g.arch == 'dcgan':
             self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
@@ -70,10 +56,6 @@ class TrainingFontDesignGAN():
                                                    activation=self.params.g.activation,
                                                    output_activation=self.params.g.output_activation,
                                                    is_bn=self.params.g.is_bn)
-        elif self.params.g.arch == 'pix2pix':
-            self.generator = models.GeneratorPix2Pix(img_size=self.params.img_size,
-                                                     img_dim=self.params.img_dim,
-                                                     font_embedding_n=self.params.font_embedding_n)
         plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
         if self.params.d.arch == 'dcgan':
             self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
@@ -83,60 +65,7 @@ class TrainingFontDesignGAN():
                                                            kernel_initializer=self.params.d.kernel_initializer,
                                                            activation=self.params.d.activation,
                                                            is_bn=self.params.d.is_bn)
-        elif self.params.d.arch == 'pix2pix':
-            self.discriminator = models.DiscriminatorPix2Pix(img_size=self.params.img_size,
-                                                             img_dim=self.params.img_dim,
-                                                             font_embedding_n=self.params.font_embedding_n)
         plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
-        self.discriminator_bin_sub = models.DiscriminatorBinarizeSubtract(discriminator=self.discriminator,
-                                                                          img_size=self.params.img_size,
-                                                                          img_dim=self.params.img_dim)
-        self.discriminator_bin_sub.compile(optimizer=self.params.d.opt,
-                                           loss=multiple_loss,
-                                           loss_weights=self.params.d.loss_weights)
-        self.discriminator_bin = models.DiscriminatorBinarize(discriminator=self.discriminator,
-                                                              img_size=self.params.img_size,
-                                                              img_dim=self.params.img_dim)
-        self.discriminator_bin.trainable = False
-        self.generator_to_discriminator_bin = Model(inputs=self.generator.input, outputs=self.discriminator_bin(self.generator.output))
-        self.generator_to_discriminator_bin.compile(optimizer=self.params.g.opt,
-                                                    loss=multiple_loss,
-                                                    loss_weights=self.params.g.loss_weights)
-        self.discriminator_bin.trainable = True
-
-    def _build_fontclassifier(self):
-        self.discriminator_cat = models.DiscriminatorCategorize(discriminator=self.discriminator,
-                                                                img_size=self.params.img_size,
-                                                                img_dim=self.params.img_dim,
-                                                                font_embedding_n=self.params.font_embedding_n)
-        self.discriminator_cat.compile(optimizer=self.params.dc.opt,
-                                       loss='categorical_crossentropy',
-                                       loss_weights=self.params.dc.loss_weights)
-
-        self.discriminator_cat.trainable = False
-        self.generator_to_discriminator_cat = Model(inputs=self.generator.input, outputs=self.discriminator_cat(self.generator.output))
-        self.generator_to_discriminator_cat.compile(optimizer=self.params.gc.opt,
-                                                    loss='categorical_crossentropy',
-                                                    loss_weights=self.params.gc.loss_weights)
-
-    def _build_classifier(self):
-        self.classifier = models.Classifier(img_size=self.params.img_size,
-                                            img_dim=self.params.img_dim, class_n=26)
-        plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
-        self.classifier.load_weights(self.paths.src.cls_weight_h5)
-        self.classifier.trainable = False
-        self.generator_to_classifier = Model(inputs=self.generator.input, outputs=self.classifier(self.generator.output))
-        self.generator_to_classifier.compile(optimizer=self.params.c.opt,
-                                             loss='categorical_crossentropy',
-                                             loss_weights=self.params.c.loss_weights)
-
-    def _build_encoder(self):
-        self.encoder = Model(inputs=self.generator.input[0], outputs=self.generator.get_layer('en_last').output)
-        self.generator_to_encoder = Model(inputs=self.generator.input, outputs=self.encoder(self.generator.output))
-        self.encoder.trainable = False
-        self.generator_to_encoder.compile(optimizer=self.params.e.opt,
-                                          loss='mean_squared_error',
-                                          loss_weights=self.params.e.loss_weights)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
@@ -146,10 +75,24 @@ class TrainingFontDesignGAN():
         if is_shuffle:
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
-        if hasattr(self.paths.src, 'src_h5'):
-            self.src_dataset = Dataset(self.paths.src.src_h5, 'r', img_size=self.params.img_size)
-            self.src_dataset.set_load_data()
-            self.src_dataset.set_label_ids()
+
+    def _prepare_training(self):
+        self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
+        self.src_chars = tf.placeholder(tf.int32, (None,), name='src_chars')
+        self.src_fonts = tf.placeholder(tf.int32, (None,), name='src_fonts')
+        self.fake_imgs = self.generator([self.src_chars, self.src_fonts])
+
+        self.d_real = self.discriminator(self.real_imgs)
+        self.d_fake = self.discriminator(self.fake_imgs)
+
+        self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
+        self.g_loss = - tf.reduce_mean(self.d_fake)
+
+        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+
+        self.sess = tf.Session()
+        K.set_session(self.sess)
 
     def train(self):
         self._init_metrics()
@@ -165,78 +108,41 @@ class TrainingFontDesignGAN():
                 progbar.update(batch_i + 1)
                 count_i = epoch_i * batch_n + batch_i
 
-                # real imgs
-                batched_real_imgs, batched_real_labels, batched_real_cats = self.real_dataset.get_batch(batch_i, self.params.batch_size, is_cat=True)
-                # src fonts info
-                if hasattr(self.params, 'dc'):
-                    batched_src_fonts = np.array(batched_real_cats)
-                else:
-                    batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
-
-                # src chars info
-                if self.params.g.arch == 'dcgan':
-                    batched_src_labels = [random.choice(CAPS) for i in range(self.params.batch_size)]
-                    batched_src_chars = np.array([ord(i) - 65 for i in batched_src_labels], dtype=np.int32)
-                elif self.params.g.arch == 'pix2pix':
-                    batched_src_chars, batched_src_labels = self.src_dataset.get_selected(batched_real_labels)
-
-                # fake imgs
-                batched_fake_imgs = self.generator.predict_on_batch([batched_src_chars, batched_src_fonts])
-
                 metrics = dict()
 
-                metrics['d_wasserstein'] = 0.
                 for i in range(self.params.critic_n):
-                    d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator_bin_sub.get_weights()]
-                    self.discriminator_bin_sub.set_weights(d_weights)
+                    d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
+                    self.discriminator.set_weights(d_weights)
 
-                    d_wasserstein_tmp = \
-                        self.discriminator_bin_sub.train_on_batch(
-                            [batched_real_imgs, batched_fake_imgs],
-                            -np.ones((self.params.batch_size, 1), dtype=np.float32))
-                    metrics['d_wasserstein'] += d_wasserstein_tmp / self.params.critic_n
-                metrics['d_wasserstein'] *= -1
+                    # real imgs
+                    batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
 
-                metrics['g_fake_bin'] = \
-                    self.generator_to_discriminator_bin.train_on_batch(
-                        [batched_src_chars, batched_src_fonts],
-                        np.ones((self.params.batch_size, 1), dtype=np.float32))
+                    # src chars info
+                    batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.batch_size, dtype=np.int32)
 
-                if hasattr(self.params, 'dc'):
-                    metrics['d_real_cat'] = \
-                        self.discriminator_cat.train_on_batch(
-                            batched_real_imgs,
-                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
-                    metrics['d_fake_cat'] = \
-                        self.discriminator_cat.train_on_batch(
-                            batched_fake_imgs,
-                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
+                    # src fonts info
+                    batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
 
-                if hasattr(self.params, 'gc'):
-                    metrics['g_fake_cat'] = \
-                        self.generator_to_discriminator_cat.train_on_batch(
-                            [batched_src_chars, batched_src_fonts],
-                            to_categorical(batched_src_fonts, self.params.font_embedding_n))
+                    self.sess.run(self.d_opt, feed_dict={self.real_imgs: batched_real_imgs,
+                                                         self.src_chars: batched_src_chars,
+                                                         self.src_fonts: batched_src_fonts,
+                                                         K.learning_phase(): 1})
 
-                if hasattr(self.params, 'c'):
-                    batched_categorical_src_labels = self._labels_to_categorical(batched_src_labels)
-                    metrics['g_class'] = \
-                        self.generator_to_classifier.train_on_batch(
-                            [batched_src_chars, batched_src_fonts],
-                            batched_categorical_src_labels)
+                # src chars info
+                batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.batch_size, dtype=np.int32)
 
-                if hasattr(self.params, 'l1'):
-                    metrics['g_l1'] = \
-                        self.generator.train_on_batch(
-                            [batched_src_chars, batched_src_fonts],
-                            batched_real_imgs)
+                # src fonts info
+                batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
 
-                if hasattr(self.params, 'e'):
-                    batched_src_chars_encoded = self.encoder.predict_on_batch(batched_src_chars)
-                    metrics['g_const'] = \
-                        self.generator_to_encoder.train_on_batch(
-                            [batched_src_chars, batched_src_fonts],
-                            batched_src_chars_encoded)
+                self.sess.run(self.g_opt, feed_dict={self.src_chars: batched_src_chars,
+                                                     self.src_fonts: batched_src_fonts,
+                                                     K.learning_phase(): 1})
+
+                metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
+                                                                     feed_dict={self.real_imgs: batched_real_imgs,
+                                                                                self.src_chars: batched_src_chars,
+                                                                                self.src_fonts: batched_src_fonts,
+                                                                                K.learning_phase(): 1})
 
                 # save metrics
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
@@ -245,12 +151,8 @@ class TrainingFontDesignGAN():
                     self._save_metrics_graph()
 
                 # save images
-                if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
-
-                if hasattr(self.params, 'early_stopping_n') and self._is_early_stopping(self.params.early_stopping_n):
-                    print('early stop')
-                    break
+                # if (batch_i + 1) % self.params.save_imgs_interval == 0:
+                #     self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
             else:
                 if (epoch_i + 1) % self.params.save_weights_interval == 0:
