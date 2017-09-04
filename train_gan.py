@@ -45,17 +45,17 @@ class TrainingFontDesignGAN():
 
     def _build_central(self):
         if self.params.g.arch == 'dcgan':
-            self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
-                                                   img_dim=self.params.img_dim,
-                                                   font_embedding_n=self.params.font_embedding_n,
-                                                   char_embedding_n=self.params.char_embedding_n,
-                                                   font_embedding_rate=self.params.font_embedding_rate,
-                                                   layer_n=self.params.g.layer_n,
-                                                   smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
-                                                   kernel_initializer=self.params.g.kernel_initializer,
-                                                   activation=self.params.g.activation,
-                                                   output_activation=self.params.g.output_activation,
-                                                   is_bn=self.params.g.is_bn)
+            self.generator = models.GeneratorDCGAN_NoEmbedding(img_size=self.params.img_size,
+                                                               img_dim=self.params.img_dim,
+                                                               # font_embedding_n=self.params.font_embedding_n,
+                                                               # char_embedding_n=self.params.char_embedding_n,
+                                                               # font_embedding_rate=self.params.font_embedding_rate,
+                                                               layer_n=self.params.g.layer_n,
+                                                               smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
+                                                               kernel_initializer=self.params.g.kernel_initializer,
+                                                               activation=self.params.g.activation,
+                                                               output_activation=self.params.g.output_activation,
+                                                               is_bn=self.params.g.is_bn)
         plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
         if self.params.d.arch == 'dcgan':
             self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
@@ -78,9 +78,11 @@ class TrainingFontDesignGAN():
 
     def _prepare_training(self):
         self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
-        self.src_chars = tf.placeholder(tf.int32, (None,), name='src_chars')
-        self.src_fonts = tf.placeholder(tf.int32, (None,), name='src_fonts')
-        self.fake_imgs = self.generator([self.src_chars, self.src_fonts])
+        # self.src_chars = tf.placeholder(tf.int32, (None,), name='src_chars')
+        # self.src_fonts = tf.placeholder(tf.int32, (None,), name='src_fonts')
+        # self.fake_imgs = self.generator([self.src_chars, self.src_fonts])
+        self.z = tf.placeholder(tf.float32, (None, 100), name='z')
+        self.fake_imgs = self.generator(self.z)
 
         self.d_real = self.discriminator(self.real_imgs)
         self.d_fake = self.discriminator(self.fake_imgs)
@@ -114,35 +116,24 @@ class TrainingFontDesignGAN():
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
 
-                    # real imgs
+                    batched_z = np.random.uniform(-1, 1, (self.params.batch_size, 100))
+
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
 
-                    # src chars info
-                    batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.batch_size, dtype=np.int32)
-
-                    # src fonts info
-                    batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
-
-                    self.sess.run(self.d_opt, feed_dict={self.real_imgs: batched_real_imgs,
-                                                         self.src_chars: batched_src_chars,
-                                                         self.src_fonts: batched_src_fonts,
+                    self.sess.run(self.d_opt, feed_dict={self.z: batched_z,
+                                                         self.real_imgs: batched_real_imgs,
                                                          K.learning_phase(): 1})
 
-                # src chars info
-                batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.batch_size, dtype=np.int32)
+                batched_z = np.random.uniform(-1, 1, (self.params.batch_size, 100))
 
-                # src fonts info
-                batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.batch_size, dtype=np.int32)
-
-                self.sess.run(self.g_opt, feed_dict={self.src_chars: batched_src_chars,
-                                                     self.src_fonts: batched_src_fonts,
+                self.sess.run(self.g_opt, feed_dict={self.z: batched_z,
                                                      K.learning_phase(): 1})
 
                 metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
-                                                                     feed_dict={self.real_imgs: batched_real_imgs,
-                                                                                self.src_chars: batched_src_chars,
-                                                                                self.src_fonts: batched_src_fonts,
+                                                                     feed_dict={self.z: batched_z,
+                                                                                self.real_imgs: batched_real_imgs,
                                                                                 K.learning_phase(): 1})
+                metrics['d_loss'] *= -1
 
                 # save metrics
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
@@ -151,8 +142,8 @@ class TrainingFontDesignGAN():
                     self._save_metrics_graph()
 
                 # save images
-                # if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                #     self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
+                if (batch_i + 1) % self.params.save_imgs_interval == 0:
+                    self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
             else:
                 if (epoch_i + 1) % self.params.save_weights_interval == 0:
@@ -212,11 +203,13 @@ class TrainingFontDesignGAN():
     def _init_temp_imgs_inputs(self):
         self.temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, self.params.temp_imgs_n, dtype=np.int32)
         self.temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, self.params.temp_imgs_n, dtype=np.int32)
+        self.temp_batched_z = np.random.uniform(-1, 1, (self.params.batch_size, 100))
 
     def _save_temp_imgs(self, filename):
         if not hasattr(self, 'temp_batched_src_fonts'):
             self._init_temp_imgs_inputs()
-        batched_generated_imgs = self.generator.predict_on_batch([self.temp_batched_src_fonts, self.temp_batched_src_chars])
+        batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: self.temp_batched_z,
+                                                                          K.learning_phase(): 1})
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = concat_imgs(batched_generated_imgs, row_n, self.params.temp_col_n)
         concated_img = (concated_img + 1.) * 127.5

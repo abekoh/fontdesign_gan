@@ -218,6 +218,43 @@ def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smal
     return model
 
 
+def GeneratorDCGAN_NoEmbedding(img_size=(128, 128), img_dim=1,
+                               k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
+                               output_activation='tanh', is_bn=True):
+    unit_size = img_size[0] // (2 ** layer_n)
+    unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
+
+    z_inp = Input(shape=(100,))
+    x = Dense(unit_size * unit_size * unit_n)(z_inp)
+    if is_bn:
+        x = BatchNormalization()(x)
+    if activation == 'leaky_relu':
+        x = LeakyReLU(alpha=0.2)(x)
+    else:
+        x = Activation(activation)(x)
+    x = Reshape((unit_size, unit_size, unit_n))(x)
+
+    for i in range(layer_n - 1):
+        unit_n = smallest_hidden_unit_n * (2 ** (layer_n - i - 2))
+        x = Conv2DTranspose(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
+        if is_bn:
+            x = BatchNormalization()(x)
+        if activation == 'leaky_relu':
+            x = LeakyReLU(alpha=0.2)(x)
+        else:
+            x = Activation(activation)(x)
+
+    x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
+    if output_activation == 'sign':
+        x = Activation(sign)(x)
+    else:
+        x = Activation(output_activation)(x)
+
+    model = Model(inputs=z_inp, outputs=x)
+
+    return model
+
+
 def DiscriminatorBinarizeSubtract(discriminator, img_size=(256, 256), img_dim=1):
     real_inp = Input(shape=(img_size[0], img_size[1], img_dim))
     fake_inp = Input(shape=(img_size[0], img_size[1], img_dim))
