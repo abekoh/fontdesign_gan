@@ -232,7 +232,7 @@ class TrainingFontDesignGAN():
         self.temp_batched_z = self._get_embedded(temp_batched_src_fonts, temp_batched_src_chars)
 
     def _save_temp_imgs(self, filename):
-        if not hasattr(self, 'temp_batched_src_fonts'):
+        if not hasattr(self, 'temp_batched_z'):
             self._init_temp_imgs_inputs()
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: self.temp_batched_z,
                                                                           K.learning_phase(): 1})
