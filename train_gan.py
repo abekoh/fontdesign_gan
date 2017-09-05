@@ -21,6 +21,9 @@ CAPS = [chr(i) for i in range(65, 65 + 26)]
 class TrainingFontDesignGAN():
 
     def __init__(self, params, paths):
+        self.sess = tf.Session()
+        K.set_session(self.sess)
+
         self.params = params
         self.paths = paths
         self._set_dsts()
@@ -66,6 +69,11 @@ class TrainingFontDesignGAN():
                                                            activation=self.params.d.activation,
                                                            is_bn=self.params.d.is_bn)
         plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
+        if hasattr(self.params, 'c'):
+            self.classifier = models.Classifier(img_size=self.params.img_size,
+                                                img_dim=self.params.img_dim)
+            self.classifier.load_weights(self.paths.src.cls_weight_h5)
+            plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
@@ -77,9 +85,6 @@ class TrainingFontDesignGAN():
         self.real_data_n = self.real_dataset.get_img_len()
 
     def _prepare_training(self):
-        self.sess = tf.Session()
-        K.set_session(self.sess)
-
         self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, 50))
         self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, 50))
 
@@ -94,7 +99,14 @@ class TrainingFontDesignGAN():
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+
+        if hasattr(self.params, 'c'):
+            self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
+            self.c_fake = self.classifier(self.fake_imgs)
+            self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
     def _get_embedded(self, font_ids, char_ids):
         font_embedded = np.take(self.font_embedding, font_ids, axis=0)
@@ -138,10 +150,15 @@ class TrainingFontDesignGAN():
                 self.sess.run(self.g_opt, feed_dict={self.z: batched_z,
                                                      K.learning_phase(): 1})
 
-                metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
-                                                                     feed_dict={self.z: batched_z,
-                                                                                self.real_imgs: batched_real_imgs,
-                                                                                K.learning_phase(): 1})
+                self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
+                                                     self.labels: to_categorical(batched_src_chars, 26),
+                                                     K.learning_phase(): 1})
+
+                metrics['d_loss'], metrics['g_loss'], metrics['c_loss'] = self.sess.run([self.d_loss, self.g_loss, self.c_loss],
+                                                                                        feed_dict={self.z: batched_z,
+                                                                                                   self.real_imgs: batched_real_imgs,
+                                                                                                   self.labels: to_categorical(batched_src_chars, 26),
+                                                                                                   K.learning_phase(): 1})
                 metrics['d_loss'] *= -1
 
                 # save metrics
