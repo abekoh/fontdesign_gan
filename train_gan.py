@@ -100,14 +100,14 @@ class TrainingFontDesignGAN():
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
             self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
 
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_opt = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
     def _get_embedded(self, font_ids, char_ids):
         font_embedded = np.take(self.font_embedding, font_ids, axis=0)
@@ -243,8 +243,7 @@ class TrainingFontDesignGAN():
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = concat_imgs(batched_generated_imgs, row_n, self.params.temp_col_n)
         concated_img = (concated_img + 1.) * 127.5
-        # concated_img = np.reshape((self.params.img_size[0] * self.params.temp_col_n))
-        concated_img = np.reshape(concated_img, (-1, self.params.temp_col_n * self.params.img_size[1]))
+        concated_img = np.reshape(concated_img, (-1, self.params.temp_col_n * self.params.img_size[0]))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
 
