@@ -6,10 +6,11 @@ import plotly.offline as py
 import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 import colorlover as cl
+from tqdm import tqdm
 
 import tensorflow as tf
 from keras import backend as K
-from keras.utils import Progbar, to_categorical, plot_model
+from keras.utils import to_categorical, plot_model
 
 import models
 from dataset import Dataset
@@ -119,13 +120,10 @@ class TrainingFontDesignGAN():
 
         batch_n = self.real_data_n // self.params.batch_size
 
-        for epoch_i in range(self.params.epoch_n):
+        for epoch_i in tqdm(range(self.params.epoch_n)):
 
-            progbar = Progbar(batch_n)
+            for batch_i in tqdm(range(batch_n)):
 
-            for batch_i in range(batch_n):
-
-                progbar.update(batch_i + 1)
                 count_i = epoch_i * batch_n + batch_i
 
                 metrics = dict()
