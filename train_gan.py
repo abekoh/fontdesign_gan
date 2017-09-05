@@ -225,8 +225,14 @@ class TrainingFontDesignGAN():
         self.params.is_auto_open = False
 
     def _init_temp_imgs_inputs(self):
-        temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
-        temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
+        if self.params.is_all_temp:
+            self.params.temp_imgs_n = self.params.font_embedding_n * self.params.char_embedding_n
+            self.params.temp_col_n = self.params.char_embedding_n
+            temp_batched_src_fonts = np.repeat(np.arange(0, self.params.font_embedding_n, dtype=np.int32), self.params.char_embedding_n)
+            temp_batched_src_chars = np.tile(np.arange(0, self.params.char_embedding_n, dtype=np.int32), self.params.font_embedding_n)
+        else:
+            temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
+            temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
         self.temp_batched_z = self._get_embedded(temp_batched_src_fonts, temp_batched_src_chars)
 
     def _save_temp_imgs(self, filename):
