@@ -155,12 +155,13 @@ class TrainingFontDesignGAN():
                 metrics['d_loss'] *= -1
 
                 if hasattr(self.params, 'c'):
+                    batched_labels = to_categorical(batched_src_chars, self.params.char_embedding_n)
                     self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
-                                                         self.labels: to_categorical(batched_src_chars, 26),
+                                                         self.labels: batched_labels,
                                                          K.learning_phase(): 1})
                     metrics['c_loss'] = self.sess.run(self.c_loss,
                                                       feed_dict={self.z: batched_z,
-                                                                 self.labels: to_categorical(batched_src_chars, 26),
+                                                                 self.labels: batched_labels,
                                                                  K.learning_phase(): 1})
 
                 # save metrics
