@@ -100,14 +100,14 @@ class TrainingFontDesignGAN():
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
             self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
 
-            self.c_opt = tf.train.GradientDescentOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
     def _get_embedded(self, font_ids, char_ids):
         font_embedded = np.take(self.font_embedding, font_ids, axis=0)
@@ -148,16 +148,20 @@ class TrainingFontDesignGAN():
                 self.sess.run(self.g_opt, feed_dict={self.z: batched_z,
                                                      K.learning_phase(): 1})
 
-                self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
-                                                     self.labels: to_categorical(batched_src_chars, 26),
-                                                     K.learning_phase(): 1})
-
-                metrics['d_loss'], metrics['g_loss'], metrics['c_loss'] = self.sess.run([self.d_loss, self.g_loss, self.c_loss],
-                                                                                        feed_dict={self.z: batched_z,
-                                                                                                   self.real_imgs: batched_real_imgs,
-                                                                                                   self.labels: to_categorical(batched_src_chars, 26),
-                                                                                                   K.learning_phase(): 1})
+                metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
+                                                                     feed_dict={self.z: batched_z,
+                                                                                self.real_imgs: batched_real_imgs,
+                                                                                K.learning_phase(): 1})
                 metrics['d_loss'] *= -1
+
+                if hasattr(self.params, 'c'):
+                    self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
+                                                         self.labels: to_categorical(batched_src_chars, 26),
+                                                         K.learning_phase(): 1})
+                    metrics['c_loss'] = self.sess.run(self.c_loss,
+                                                      feed_dict={self.z: batched_z,
+                                                                 self.labels: to_categorical(batched_src_chars, 26),
+                                                                 K.learning_phase(): 1})
 
                 # save metrics
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
