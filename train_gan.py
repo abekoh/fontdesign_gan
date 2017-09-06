@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import json
+import h5py
 from PIL import Image
 import plotly.offline as py
 import plotly.graph_objs as go
@@ -85,9 +86,16 @@ class TrainingFontDesignGAN():
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
 
-    def _prepare_training(self):
+    def _set_embeddings(self):
         self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, 50))
         self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, 50))
+
+        embedding_h5file = h5py.File(os.path.join(self.paths.dst.root, 'embeddings.h5'), 'w')
+        embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
+        embedding_h5file.create_dataset('char_embedding', data=self.char_embedding)
+
+    def _prepare_training(self):
+        self._set_embeddings()
 
         self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
         self.z = tf.placeholder(tf.float32, (None, 100), name='z')
