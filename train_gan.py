@@ -182,11 +182,8 @@ class TrainingFontDesignGAN():
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
-            else:
-                if (epoch_i + 1) % self.params.save_weights_interval == 0:
-                    self._save_model_weights(epoch_i)
-                continue
-            break
+            if (epoch_i + 1) % self.params.save_weights_interval == 0:
+                self._save_model_weights(epoch_i)
 
     def _make_another_random_array(self, from_n, to_n, src_array):
         dst_array = np.array([], dtype=np.int32)
