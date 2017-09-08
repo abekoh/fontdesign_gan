@@ -327,3 +327,33 @@ def Classifier(img_size=(256, 256), img_dim=1, class_n=26):
     model = Model(inputs=cl_inp, outputs=cl_8)
 
     return model
+
+
+def ClassifierMin(img_size=(64, 64), img_dim=1, class_n=26):
+    inp = Input(shape=(img_size[0], img_size[0], img_dim))
+
+    x = Conv2D(96, (5, 5), strides=(2, 2), padding='same')(inp)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Conv2D(256, (5, 5), padding='same')(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Conv2D(384, (3, 3), padding='same')(x)
+    x = Activation('relu')(x)
+
+    x = Conv2D(256, (3, 3), padding='same')(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Flatten()(x)
+
+    x = Dense(4096)(x)
+    x = Dropout(0.5)(x)
+
+    x = Dense(class_n, activation='softmax')(x)
+
+    model = Model(inputs=inp, outputs=x)
+
+    return model
