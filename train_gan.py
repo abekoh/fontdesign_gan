@@ -136,6 +136,7 @@ class TrainingFontDesignGAN():
 
                 metrics = dict()
 
+                metrics['d_loss'] = 0
                 for i in range(self.params.critic_n):
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
@@ -145,32 +146,27 @@ class TrainingFontDesignGAN():
                     batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
                     batched_z = self._get_embedded(batched_src_fonts, batched_src_chars)
 
-                    self.sess.run(self.d_opt, feed_dict={self.z: batched_z,
-                                                         self.real_imgs: batched_real_imgs,
-                                                         K.learning_phase(): 1})
+                    _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
+                                                   feed_dict={self.z: batched_z,
+                                                              self.real_imgs: batched_real_imgs,
+                                                              K.learning_phase(): 1})
+                    metrics['d_loss'] += d_loss_temp / self.params.critic_n
+                metrics['d_loss'] *= -1
 
                 batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
                 batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
                 batched_z = self._get_embedded(batched_src_fonts, batched_src_chars)
 
-                self.sess.run(self.g_opt, feed_dict={self.z: batched_z,
-                                                     K.learning_phase(): 1})
-
-                metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
-                                                                     feed_dict={self.z: batched_z,
-                                                                                self.real_imgs: batched_real_imgs,
-                                                                                K.learning_phase(): 1})
-                metrics['d_loss'] *= -1
+                _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
+                                                     feed_dict={self.z: batched_z,
+                                                                K.learning_phase(): 1})
 
                 if hasattr(self.params, 'c'):
                     batched_labels = to_categorical(batched_src_chars, self.params.char_embedding_n)
-                    self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
-                                                         self.labels: batched_labels,
-                                                         K.learning_phase(): 1})
-                    metrics['c_loss'] = self.sess.run(self.c_loss,
-                                                      feed_dict={self.z: batched_z,
-                                                                 self.labels: batched_labels,
-                                                                 K.learning_phase(): 1})
+                    _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
+                                                         feed_dict={self.z: batched_z,
+                                                                    self.labels: batched_labels,
+                                                                    K.learning_phase(): 1})
 
                 # save metrics
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
@@ -249,7 +245,7 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'temp_batched_z'):
             self._init_temp_imgs_inputs()
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: self.temp_batched_z,
-                                                                          K.learning_phase(): 1})
+                                                                          K.learning_phase(): 0})
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = concat_imgs(batched_generated_imgs, row_n, self.params.temp_col_n)
         concated_img = (concated_img + 1.) * 127.5
