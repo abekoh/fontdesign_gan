@@ -55,6 +55,7 @@ class TrainingFontDesignGAN():
                                                                # font_embedding_n=self.params.font_embedding_n,
                                                                # char_embedding_n=self.params.char_embedding_n,
                                                                # font_embedding_rate=self.params.font_embedding_rate,
+                                                               z_size=self.params.z_size,
                                                                layer_n=self.params.g.layer_n,
                                                                smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                                kernel_initializer=self.params.g.kernel_initializer,
@@ -72,8 +73,8 @@ class TrainingFontDesignGAN():
                                                            is_bn=self.params.d.is_bn)
         plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
         if hasattr(self.params, 'c'):
-            self.classifier = models.Classifier(img_size=self.params.img_size,
-                                                img_dim=self.params.img_dim)
+            self.classifier = models.ClassifierMin(img_size=self.params.img_size,
+                                                   img_dim=self.params.img_dim)
             self.classifier.load_weights(self.paths.src.cls_weight_h5)
             plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
 
@@ -87,8 +88,8 @@ class TrainingFontDesignGAN():
         self.real_data_n = self.real_dataset.get_img_len()
 
     def _set_embeddings(self):
-        self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, 50))
-        self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, 50))
+        self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, self.params.z_size // 2))
+        self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, self.params.z_size // 2))
 
         embedding_h5file = h5py.File(os.path.join(self.paths.dst.root, 'embeddings.h5'), 'w')
         embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
@@ -98,7 +99,7 @@ class TrainingFontDesignGAN():
         self._set_embeddings()
 
         self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
-        self.z = tf.placeholder(tf.float32, (None, 100), name='z')
+        self.z = tf.placeholder(tf.float32, (None, self.params.z_size), name='z')
         self.fake_imgs = self.generator(self.z)
 
         self.d_real = self.discriminator(self.real_imgs)
@@ -107,15 +108,15 @@ class TrainingFontDesignGAN():
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
-        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.d.lr).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.g.lr).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_loss = - self.params.c.penalty * tf.reduce_sum(self.labels * tf.log(self.c_fake))
 
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
     def _get_embedded(self, font_ids, char_ids):
         font_embedded = np.take(self.font_embedding, font_ids, axis=0)

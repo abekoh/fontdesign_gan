@@ -218,13 +218,13 @@ def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smal
     return model
 
 
-def GeneratorDCGAN_NoEmbedding(img_size=(128, 128), img_dim=1,
+def GeneratorDCGAN_NoEmbedding(img_size=(128, 128), img_dim=1, z_size=100,
                                k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
                                output_activation='tanh', is_bn=True):
     unit_size = img_size[0] // (2 ** layer_n)
     unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
 
-    z_inp = Input(shape=(100,))
+    z_inp = Input(shape=(z_size,))
     x = Dense(unit_size * unit_size * unit_n)(z_inp)
     if is_bn:
         x = BatchNormalization()(x)
