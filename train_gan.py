@@ -118,8 +118,7 @@ class TrainingFontDesignGAN():
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
             self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
-
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
     def _get_z(self, font_ids=None, char_ids=None):
         if font_ids is not None:
@@ -256,7 +255,7 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'temp_batched_z'):
             self._init_temp_imgs_inputs()
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: self.temp_batched_z,
-                                                                          K.learning_phase(): 1})
+                                                                          K.learning_phase(): 0})
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = concat_imgs(batched_generated_imgs, row_n, self.params.temp_col_n)
         concated_img = (concated_img + 1.) * 127.5
