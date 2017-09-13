@@ -55,6 +55,7 @@ class TrainingFontDesignGAN():
                                                                # font_embedding_n=self.params.font_embedding_n,
                                                                # char_embedding_n=self.params.char_embedding_n,
                                                                # font_embedding_rate=self.params.font_embedding_rate,
+                                                               z_size=self.params.z_size,
                                                                layer_n=self.params.g.layer_n,
                                                                smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                                kernel_initializer=self.params.g.kernel_initializer,
@@ -87,8 +88,11 @@ class TrainingFontDesignGAN():
         self.real_data_n = self.real_dataset.get_img_len()
 
     def _set_embeddings(self):
-        self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, 50))
-        self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, 50))
+        self.font_z_size = int(self.params.z_size * self.params.font_embedding_rate)
+        self.char_z_size = self.params.z_size - self.font_z_size
+
+        self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, self.font_z_size))
+        self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, self.char_z_size))
 
         embedding_h5file = h5py.File(os.path.join(self.paths.dst.root, 'embeddings.h5'), 'w')
         embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
@@ -98,7 +102,7 @@ class TrainingFontDesignGAN():
         self._set_embeddings()
 
         self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
-        self.z = tf.placeholder(tf.float32, (None, 100), name='z')
+        self.z = tf.placeholder(tf.float32, (None, self.params.z_size), name='z')
         self.fake_imgs = self.generator(self.z)
 
         self.d_real = self.discriminator(self.real_imgs)
@@ -113,7 +117,7 @@ class TrainingFontDesignGAN():
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - self.params.c.penalty * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
 
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
@@ -121,11 +125,11 @@ class TrainingFontDesignGAN():
         if font_ids is not None:
             font_z = np.take(self.font_embedding, font_ids, axis=0)
         else:
-            font_z = np.random.uniform(-1, 1, (self.params.batch_size, 50))
+            font_z = np.random.randint(-1, 1, (self.params.batch_size, self.font_z_size))
         if char_ids is not None:
             char_z = np.take(self.char_embedding, char_ids, axis=0)
         else:
-            char_z = np.random.uniform(-1, 1, (self.params.batch_size, 50))
+            char_z = np.random.randint(-1, 1, (self.params.batch_size, self.char_z_size))
         z = np.concatenate((font_z, char_z), axis=1)
         return z
 
@@ -142,41 +146,38 @@ class TrainingFontDesignGAN():
 
                 metrics = dict()
 
+                metrics['d_loss'] = 0
                 for i in range(self.params.critic_n):
                     d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
                     self.discriminator.set_weights(d_weights)
 
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
-                    batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
-                    batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                    batched_z = self._get_z(batched_src_fonts, batched_src_chars)
+                    # font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    # char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z()
 
-                    self.sess.run(self.d_opt, feed_dict={self.z: batched_z,
-                                                         self.real_imgs: batched_real_imgs,
-                                                         K.learning_phase(): 1})
-
-                batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
-                batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                batched_z = self._get_z(batched_src_fonts, batched_src_chars)
-
-                self.sess.run(self.g_opt, feed_dict={self.z: batched_z,
-                                                     K.learning_phase(): 1})
-
-                metrics['d_loss'], metrics['g_loss'] = self.sess.run([self.d_loss, self.g_loss],
-                                                                     feed_dict={self.z: batched_z,
-                                                                                self.real_imgs: batched_real_imgs,
-                                                                                K.learning_phase(): 1})
+                    _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
+                                                   feed_dict={self.z: batched_z,
+                                                              self.real_imgs: batched_real_imgs,
+                                                              K.learning_phase(): 1})
+                    metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 metrics['d_loss'] *= -1
+                # font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
+                # char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                batched_z = self._get_z()
+
+                _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
+                                                     feed_dict={self.z: batched_z,
+                                                                K.learning_phase(): 1})
 
                 if hasattr(self.params, 'c'):
-                    batched_labels = to_categorical(batched_src_chars, self.params.char_embedding_n)
-                    self.sess.run(self.c_opt, feed_dict={self.z: batched_z,
-                                                         self.labels: batched_labels,
-                                                         K.learning_phase(): 1})
-                    metrics['c_loss'] = self.sess.run(self.c_loss,
-                                                      feed_dict={self.z: batched_z,
-                                                                 self.labels: batched_labels,
-                                                                 K.learning_phase(): 1})
+                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z(char_ids=char_ids)
+                    batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
+                    _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
+                                                         feed_dict={self.z: batched_z,
+                                                                    self.labels: batched_labels,
+                                                                    K.learning_phase(): 1})
 
                 # save metrics
                 if (batch_i + 1) % self.params.save_metrics_graph_interval == 0:
@@ -188,11 +189,8 @@ class TrainingFontDesignGAN():
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
-            else:
-                if (epoch_i + 1) % self.params.save_weights_interval == 0:
-                    self._save_model_weights(epoch_i)
-                continue
-            break
+            if (epoch_i + 1) % self.params.save_weights_interval == 0:
+                self._save_model_weights(epoch_i)
 
     def _make_another_random_array(self, from_n, to_n, src_array):
         dst_array = np.array([], dtype=np.int32)
@@ -252,7 +250,7 @@ class TrainingFontDesignGAN():
         else:
             temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
             temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
-        self.temp_batched_z = self._get_z(temp_batched_src_fonts, temp_batched_src_chars)
+        self.temp_batched_z = self._get_z(font_ids=temp_batched_src_fonts, char_ids=temp_batched_src_chars)
 
     def _save_temp_imgs(self, filename):
         if not hasattr(self, 'temp_batched_z'):

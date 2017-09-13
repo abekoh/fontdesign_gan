@@ -218,13 +218,13 @@ def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smal
     return model
 
 
-def GeneratorDCGAN_NoEmbedding(img_size=(128, 128), img_dim=1,
+def GeneratorDCGAN_NoEmbedding(img_size=(128, 128), img_dim=1, z_size=100,
                                k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
                                output_activation='tanh', is_bn=True):
     unit_size = img_size[0] // (2 ** layer_n)
     unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
 
-    z_inp = Input(shape=(100,))
+    z_inp = Input(shape=(z_size,))
     x = Dense(unit_size * unit_size * unit_n)(z_inp)
     if is_bn:
         x = BatchNormalization()(x)
@@ -325,5 +325,35 @@ def Classifier(img_size=(256, 256), img_dim=1, class_n=26):
     cl_8 = Dense(class_n, activation='softmax')(cl_7)
 
     model = Model(inputs=cl_inp, outputs=cl_8)
+
+    return model
+
+
+def ClassifierMin(img_size=(64, 64), img_dim=1, class_n=26):
+    inp = Input(shape=(img_size[0], img_size[0], img_dim))
+
+    x = Conv2D(96, (5, 5), strides=(2, 2), padding='same')(inp)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Conv2D(256, (5, 5), padding='same')(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Conv2D(384, (3, 3), padding='same')(x)
+    x = Activation('relu')(x)
+
+    x = Conv2D(256, (3, 3), padding='same')(x)
+    x = Activation('relu')(x)
+    x = MaxPool2D((3, 3), strides=(2, 2))(x)
+
+    x = Flatten()(x)
+
+    x = Dense(4096)(x)
+    x = Dropout(0.5)(x)
+
+    x = Dense(class_n, activation='softmax')(x)
+
+    model = Model(inputs=inp, outputs=x)
 
     return model

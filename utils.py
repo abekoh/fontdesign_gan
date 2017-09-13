@@ -7,7 +7,7 @@ def concat_imgs(src_imgs, row_n, col_n):
     for row_i in range(row_n):
         concated_row_img = np.empty((src_imgs.shape[1], 0, 1))
         for col_i in range(col_n):
-            count = row_i * row_n + col_i
+            count = row_i * col_n + col_i
             if count < len(src_imgs):
                 concated_row_img = np.concatenate((concated_row_img, src_imgs[count]), axis=1)
             else:
