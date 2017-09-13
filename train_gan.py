@@ -23,8 +23,6 @@ CAPS = [chr(i) for i in range(65, 65 + 26)]
 class TrainingFontDesignGAN():
 
     def __init__(self, params, paths):
-        self.sess = tf.Session()
-        K.set_session(self.sess)
 
         self.params = params
         self.paths = paths
@@ -94,6 +92,9 @@ class TrainingFontDesignGAN():
         self.font_embedding = np.random.uniform(-1, 1, (self.params.font_embedding_n, self.font_z_size))
         self.char_embedding = np.random.uniform(-1, 1, (self.params.char_embedding_n, self.char_z_size))
 
+        self.font_embedding = tf.Variable(self.font_embedding, name='font_embedding')
+        self.char_embedding = tf.Variable(self.char_embedding, name='char_embedding')
+
         embedding_h5file = h5py.File(os.path.join(self.paths.dst.root, 'embeddings.h5'), 'w')
         embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
         embedding_h5file.create_dataset('char_embedding', data=self.char_embedding)
@@ -119,6 +120,11 @@ class TrainingFontDesignGAN():
             self.c_fake = self.classifier(self.fake_imgs)
             self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+
+        self.saver = tf.train.Saver()
+
+        self.sess = tf.Session()
+        K.set_session(self.sess)
 
     def _get_z(self, font_ids=None, char_ids=None):
         if font_ids is not None:
@@ -272,8 +278,9 @@ class TrainingFontDesignGAN():
         return False
 
     def _save_model_weights(self, epoch_i):
-        self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
-        self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
+        self.saver.save(self.sess, os.path.join(self.paths.dst.tensorboard, 'result_{}.ckpt'.format(epoch_i)))
+        # self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
+        # self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
 
     def get_last_metric(self, key):
         return self.metrics[key][1][-1]
