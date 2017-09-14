@@ -18,8 +18,6 @@ import models
 from dataset import Dataset
 from utils import concat_imgs
 
-CAPS = [chr(i) for i in range(65, 65 + 26)]
-
 
 class TrainingFontDesignGAN():
 
@@ -50,28 +48,23 @@ class TrainingFontDesignGAN():
         self._build_central()
 
     def _build_central(self):
-        if self.params.g.arch == 'dcgan':
-            self.generator = models.GeneratorDCGAN_NoEmbedding(img_size=self.params.img_size,
-                                                               img_dim=self.params.img_dim,
-                                                               # font_embedding_n=self.params.font_embedding_n,
-                                                               # char_embedding_n=self.params.char_embedding_n,
-                                                               # font_embedding_rate=self.params.font_embedding_rate,
-                                                               z_size=self.params.z_size,
-                                                               layer_n=self.params.g.layer_n,
-                                                               smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
-                                                               kernel_initializer=self.params.g.kernel_initializer,
-                                                               activation=self.params.g.activation,
-                                                               output_activation=self.params.g.output_activation,
-                                                               is_bn=self.params.g.is_bn)
+        self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
+                                               img_dim=self.params.img_dim,
+                                               z_size=self.params.z_size,
+                                               layer_n=self.params.g.layer_n,
+                                               smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
+                                               kernel_initializer=self.params.g.kernel_initializer,
+                                               activation=self.params.g.activation,
+                                               output_activation=self.params.g.output_activation,
+                                               is_bn=self.params.g.is_bn)
+        self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
+                                                       img_dim=self.params.img_dim,
+                                                       layer_n=self.params.d.layer_n,
+                                                       smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
+                                                       kernel_initializer=self.params.d.kernel_initializer,
+                                                       activation=self.params.d.activation,
+                                                       is_bn=self.params.d.is_bn)
         plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
-        if self.params.d.arch == 'dcgan':
-            self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
-                                                           img_dim=self.params.img_dim,
-                                                           layer_n=self.params.d.layer_n,
-                                                           smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
-                                                           kernel_initializer=self.params.d.kernel_initializer,
-                                                           activation=self.params.d.activation,
-                                                           is_bn=self.params.d.is_bn)
         plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
         if hasattr(self.params, 'c'):
             self.classifier = models.Classifier(img_size=self.params.img_size,
@@ -82,8 +75,6 @@ class TrainingFontDesignGAN():
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
         self.real_dataset.set_load_data()
-        self.real_dataset.set_label_ids()
-        self.real_dataset.set_category_arange()
         if is_shuffle:
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
