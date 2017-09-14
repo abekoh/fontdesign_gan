@@ -7,6 +7,7 @@ import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 import colorlover as cl
 from tqdm import tqdm
+import subprocess
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
@@ -78,15 +79,12 @@ class TrainingFontDesignGAN():
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
 
-    def _set_embeddings(self):
+    def _prepare_training(self):
         self.font_z_size = int(self.params.z_size * self.params.font_embedding_rate)
         self.char_z_size = self.params.z_size - self.font_z_size
 
-        self.font_embedding = tf.random_uniform((self.params.font_embedding_n, self.font_z_size), -1, 1)
-        self.char_embedding = tf.random_uniform((self.params.char_embedding_n, self.char_z_size), -1, 1)
-
-    def _prepare_training(self):
-        self._set_embeddings()
+        self.font_embedding = tf.Variable(tf.random_uniform((self.params.font_embedding_n, self.font_z_size), -1, 1), name='font_embedding')
+        self.char_embedding = tf.Variable(tf.random_uniform((self.params.char_embedding_n, self.char_z_size), -1, 1), name='char_embedding')
 
         self.font_ids = tf.placeholder(tf.int32, (None,), name='font_ids')
         self.char_ids = tf.placeholder(tf.int32, (None,), name='char_ids')
@@ -119,6 +117,7 @@ class TrainingFontDesignGAN():
             self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
+        self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
 
     def train(self):
@@ -224,17 +223,18 @@ class TrainingFontDesignGAN():
                 graphs.append(smoothed_graph)
             py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
             all_graphs.extend(graphs)
-        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=self.params.is_auto_open)
-        self.params.is_auto_open = False
+        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=self.params.is_auto_open_graph)
+        self.params.is_auto_open_graph = False
 
-    def _generate_img(self, font_ids, char_ids, row_n, col_n):
+    def _save_concated_img(self, font_ids, char_ids, row_n, col_n, filepath):
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.font_ids: font_ids,
                                                                           self.char_ids: char_ids,
                                                                           K.learning_phase(): 1})
         concated_img = concat_imgs(batched_generated_imgs, row_n, col_n)
         concated_img = (concated_img + 1.) * 127.5
         concated_img = np.reshape(concated_img, (-1, col_n * self.params.img_size[0]))
-        return concated_img
+        pil_img = Image.fromarray(np.uint8(concated_img))
+        pil_img.save(os.path.join(filepath))
 
     def _init_temp_imgs_inputs(self):
         self.temp_font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
@@ -244,45 +244,41 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'temp_font_ids'):
             self._init_temp_imgs_inputs()
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
-        concated_img = self._generate_img(self.temp_font_ids, self.temp_char_ids, row_n, self.params.temp_col_n)
-        pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
+        path = os.path.join(self.paths.dst.generated_imgs, filename)
+        self._save_concated_img(self.temp_font_ids, self.temp_char_ids, row_n, self.params.temp_col_n, path)
+        if self.params.is_auto_open_imgs:
+            subprocess.Popen(['xdg-open', self.paths.dst.generated_imgs])
+            self.params.is_auto_open_imgs = False
 
     def _init_visualize_imgs_inputs(self):
         self.font_vis_font_ids = np.arange(0, self.params.font_embedding_n, dtype=np.int32)
         self.font_vis_char_ids = np.repeat(np.array([0], dtype=np.int32), self.params.font_embedding_n)
-
         self.char_vis_font_ids = np.repeat(np.array([0], dtype=np.int32), self.params.char_embedding_n)
         self.char_vis_char_ids = np.arange(0, self.params.char_embedding_n, dtype=np.int32)
 
     def _visualize_embedding(self, epoch_i):
         if not hasattr(self, 'font_vis_z'):
             self._init_visualize_imgs_inputs()
-        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.generated_imgs, 'font_vis_{}.png'.format(epoch_i)))
-        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.generated_imgs, 'char_vis_{}.png'.format(epoch_i)))
+        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'font_vis_{}.png'.format(epoch_i)))
+        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'char_vis_{}.png'.format(epoch_i)))
 
-        font_vis_img = self._generate_img(self.font_vis_z, 8, 8)
-        font_vis_img = Image.fromarray(np.uint8(font_vis_img))
-        font_vis_img.save(font_vis_img_path)
+        self._save_concated_img(self.font_vis_font_ids, self.font_vis_char_ids, 16, 16, font_vis_img_path)
+        self._save_concated_img(self.char_vis_font_ids, self.char_vis_char_ids, 6, 6, char_vis_img_path)
 
-        char_vis_img = self._generate_img(self.char_vis_z, 6, 6)
-        char_vis_img = Image.fromarray(np.uint8(char_vis_img))
-        char_vis_img.save(char_vis_img_path)
-
-        summary_writer = tf.summary.FileWriter(self.paths.dst.tensorboard)
-        config = projector.ProjectorConfig()
-        font_embedding = config.embeddings.add()
-        font_embedding.tensor_name = self.font_embedding_tf.name
+        summary_writer = tf.summary.FileWriter(self.paths.dst.log)
+        project_config = projector.ProjectorConfig()
+        font_embedding = project_config.embeddings.add()
+        font_embedding.tensor_name = self.font_embedding.name
         font_embedding.sprite.image_path = font_vis_img_path
         font_embedding.sprite.single_image_dim.extend([128, 128])
-        char_embedding = config.embeddings.add()
-        char_embedding.tensor_name = self.char_embedding_tf.name
+        char_embedding = project_config.embeddings.add()
+        char_embedding.tensor_name = self.char_embedding.name
         char_embedding.sprite.image_path = char_vis_img_path
         char_embedding.sprite.single_image_dim.extend([128, 128])
-        projector.visualize_embeddings(summary_writer, config)
+        projector.visualize_embeddings(summary_writer, project_config)
 
     def _save_model_weights(self, epoch_i):
-        self.saver.save(self.sess, os.path.join(self.paths.dst.tensorboard, 'result_{}.ckpt'.format(epoch_i)))
+        self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
 
     def get_metric_decrease(self, key, n):
         if key not in self.smoothed_metrics or len(self.smoothed_metrics[key][1]) < n:

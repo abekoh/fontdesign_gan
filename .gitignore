@@ -105,6 +105,7 @@ ENV/
 *.h5
 *.html
 output*/
+result*/
 old*/
 test/
 /run.py
