@@ -106,14 +106,14 @@ class TrainingFontDesignGAN():
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
-        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.d.lr).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.g.lr).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
         self.saver = tf.train.Saver()
 
@@ -148,7 +148,9 @@ class TrainingFontDesignGAN():
                     self.discriminator.set_weights(d_weights)
 
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
-                    batched_z = self._get_z()
+                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z(font_ids, char_ids)
 
                     _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
                                                    feed_dict={self.z: batched_z,
@@ -158,7 +160,8 @@ class TrainingFontDesignGAN():
                 metrics['d_loss'] *= -1
 
                 char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                batched_z = self._get_z(char_ids=char_ids)
+                font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
+                batched_z = self._get_z(font_ids, char_ids)
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
                                                      feed_dict={self.z: batched_z,
@@ -286,10 +289,10 @@ class TrainingFontDesignGAN():
     def _visualize_embedding(self, epoch_i):
         if not hasattr(self, 'font_vis_z'):
             self._init_visualize_imgs_inputs()
-        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.generated_imgs, 'font_vis_{}.png'.format(epoch_i)))
-        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.generated_imgs, 'char_vis_{}.png'.format(epoch_i)))
+        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.tensorboard, 'font_vis_{}.png'.format(epoch_i)))
+        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.tensorboard, 'char_vis_{}.png'.format(epoch_i)))
 
-        font_vis_img = self._generate_img(self.font_vis_z, 8, 8)
+        font_vis_img = self._generate_img(self.font_vis_z, 16, 16)
         font_vis_img = Image.fromarray(np.uint8(font_vis_img))
         font_vis_img.save(font_vis_img_path)
 
