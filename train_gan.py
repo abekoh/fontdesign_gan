@@ -12,7 +12,7 @@ import subprocess
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 from keras import backend as K
-from keras.utils import to_categorical, plot_model
+from keras.utils import plot_model
 
 import models
 from dataset import Dataset
@@ -22,9 +22,6 @@ from utils import concat_imgs
 class TrainingFontDesignGAN():
 
     def __init__(self, params, paths):
-        self.sess = tf.Session()
-        K.set_session(self.sess)
-
         self.params = params
         self.paths = paths
         self._set_dsts()
@@ -83,19 +80,21 @@ class TrainingFontDesignGAN():
         self.font_z_size = int(self.params.z_size * self.params.font_embedding_rate)
         self.char_z_size = self.params.z_size - self.font_z_size
 
-        self.font_embedding = tf.Variable(tf.random_uniform((self.params.font_embedding_n, self.font_z_size), -1, 1), name='font_embedding')
-        self.char_embedding = tf.Variable(tf.random_uniform((self.params.char_embedding_n, self.char_z_size), -1, 1), name='char_embedding')
+        self.font_embedding = tf.Variable(tf.random_uniform((self.params.font_embedding_n, self.font_z_size), -1, 1))
+        self.char_embedding = tf.Variable(tf.random_uniform((self.params.char_embedding_n, self.char_z_size), -1, 1))
 
         self.font_ids = tf.placeholder(tf.int32, (None,), name='font_ids')
         self.char_ids = tf.placeholder(tf.int32, (None,), name='char_ids')
 
-        font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids), 0),
-                         lambda: tf.random_uniform((self.params.batch_size, self.font_z_size), -1, 1),
-                         lambda: tf.nn.embedding_lookup(self.font_embedding, self.font_ids))
+        # font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids), 0),
+        #                  lambda: tf.random_uniform((self.params.batch_size, self.font_z_size), -1, 1),
+        #                  lambda: tf.nn.embedding_lookup(self.font_embedding, self.font_ids))
 
-        char_z = tf.cond(tf.less(tf.reduce_sum(self.char_ids), 0),
-                         lambda: tf.random_uniform((self.params.batch_size, self.char_z_size), -1, 1),
-                         lambda: tf.nn.embedding_lookup(self.char_embedding, self.char_ids))
+        # char_z = tf.cond(tf.less(tf.reduce_sum(self.char_ids), 0),
+        #                  lambda: tf.random_uniform((self.params.batch_size, self.char_z_size), -1, 1),
+        #                  lambda: tf.nn.embedding_lookup(self.char_embedding, self.char_ids))
+        font_z = tf.nn.embedding_lookup(self.font_embedding, self.font_ids)
+        char_z = tf.nn.embedding_lookup(self.char_embedding, self.char_ids)
 
         z = tf.concat([font_z, char_z], axis=1)
 
@@ -108,14 +107,17 @@ class TrainingFontDesignGAN():
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
-        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.d.lr).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.g.lr).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
-            self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
+            self.one_hot_char_ids = tf.one_hot(self.char_ids, 26)
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            self.c_loss = - 0.1 * tf.reduce_sum(self.one_hot_char_ids * tf.log(self.c_fake))
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+
+        self.sess = tf.Session()
+        K.set_session(self.sess)
 
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
@@ -139,8 +141,7 @@ class TrainingFontDesignGAN():
                     self.discriminator.set_weights(d_weights)
 
                     real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
-                    font_ids, char_ids = self._get_ids(self.params.is_train_with_embedding_font_ids,
-                                                       self.params.is_train_with_embedding_char_ids)
+                    font_ids, char_ids = self._get_ids(True, True)
 
                     _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
                                                    feed_dict={self.font_ids: font_ids,
@@ -150,8 +151,7 @@ class TrainingFontDesignGAN():
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 metrics['d_loss'] *= -1
 
-                font_ids, char_ids = self._get_ids(self.params.is_train_with_embedding_font_ids,
-                                                   self.params.is_train_with_embedding_char_ids)
+                font_ids, char_ids = self._get_ids(True, True)
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
                                                      feed_dict={self.font_ids: font_ids,
@@ -159,11 +159,9 @@ class TrainingFontDesignGAN():
                                                                 K.learning_phase(): 1})
 
                 if hasattr(self.params, 'c'):
-                    labels = to_categorical(char_ids, self.params.char_embedding_n)
                     _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
                                                          feed_dict={self.font_ids: font_ids,
                                                                     self.char_ids: char_ids,
-                                                                    self.labels: labels,
                                                                     K.learning_phase(): 1})
 
                 # save metrics
@@ -262,7 +260,7 @@ class TrainingFontDesignGAN():
         font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'font_vis_{}.png'.format(epoch_i)))
         char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'char_vis_{}.png'.format(epoch_i)))
 
-        self._save_concated_img(self.font_vis_font_ids, self.font_vis_char_ids, 16, 16, font_vis_img_path)
+        self._save_concated_img(self.font_vis_font_ids, self.font_vis_char_ids, 8, 8, font_vis_img_path)
         self._save_concated_img(self.char_vis_font_ids, self.char_vis_char_ids, 6, 6, char_vis_img_path)
 
         summary_writer = tf.summary.FileWriter(self.paths.dst.log)
