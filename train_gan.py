@@ -273,7 +273,7 @@ class TrainingFontDesignGAN():
         return False
 
     def _save_model_weights(self, epoch_i):
-        self.saver.save(self.sess, os.path.join(self.paths.dst.tensorboard, 'result_{}.ckpt'.format(epoch_i)))
+        self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
         # self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
         # self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
 
@@ -289,8 +289,8 @@ class TrainingFontDesignGAN():
     def _visualize_embedding(self, epoch_i):
         if not hasattr(self, 'font_vis_z'):
             self._init_visualize_imgs_inputs()
-        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.tensorboard, 'font_vis_{}.png'.format(epoch_i)))
-        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.tensorboard, 'char_vis_{}.png'.format(epoch_i)))
+        font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'font_vis_{}.png'.format(epoch_i)))
+        char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'char_vis_{}.png'.format(epoch_i)))
 
         font_vis_img = self._generate_img(self.font_vis_z, 16, 16)
         font_vis_img = Image.fromarray(np.uint8(font_vis_img))
@@ -300,7 +300,7 @@ class TrainingFontDesignGAN():
         char_vis_img = Image.fromarray(np.uint8(char_vis_img))
         char_vis_img.save(char_vis_img_path)
 
-        summary_writer = tf.summary.FileWriter(self.paths.dst.tensorboard)
+        summary_writer = tf.summary.FileWriter(self.paths.dst.log)
         config = projector.ProjectorConfig()
         font_embedding = config.embeddings.add()
         font_embedding.tensor_name = self.font_embedding_tf.name
