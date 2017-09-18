@@ -7,7 +7,6 @@ import plotly.graph_objs as go
 from scipy.signal import savgol_filter
 import colorlover as cl
 from tqdm import tqdm
-import subprocess
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
@@ -16,7 +15,7 @@ from keras.utils import plot_model
 
 import models
 from dataset import Dataset
-from utils import concat_imgs
+from utils import to_categorical, concat_imgs
 
 
 class TrainingFontDesignGAN():
@@ -106,11 +105,13 @@ class TrainingFontDesignGAN():
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
-        self.c_fake = self.classifier(self.fake_imgs)
-        self.c_loss = - 0.1 * tf.reduce_sum(tf.one_hot(self.char_ids, 26) * tf.log(self.c_fake))
-        self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+        if hasattr(self.params, 'c'):
+            self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
+            self.c_fake = self.classifier(self.fake_imgs)
+            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
         self.sess = tf.Session()
         K.set_session(self.sess)
@@ -147,18 +148,21 @@ class TrainingFontDesignGAN():
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 metrics['d_loss'] *= -1
 
-                font_ids, char_ids = self._get_ids(True, True)
+                batched_z = self._get_z()
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
                                                      feed_dict={self.font_ids: font_ids,
                                                                 self.char_ids: char_ids,
                                                                 K.learning_phase(): 1})
 
-                _, metrics['c_loss'] =\
-                    self.sess.run([self.c_opt, self.c_loss],
-                                  feed_dict={self.font_ids: font_ids,
-                                             self.char_ids: char_ids,
-                                             K.learning_phase(): 1})
+                if hasattr(self.params, 'c'):
+                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z(char_ids=char_ids)
+                    batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
+                    _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
+                                                         feed_dict={self.z: batched_z,
+                                                                    self.labels: batched_labels,
+                                                                    K.learning_phase(): 1})
 
                 # save metrics
                 if count_i % self.params.save_metrics_graph_interval == 0:
@@ -238,11 +242,17 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'temp_font_ids'):
             self._init_temp_imgs_inputs()
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
-        path = os.path.join(self.paths.dst.generated_imgs, filename)
-        self._save_concated_img(self.temp_font_ids, self.temp_char_ids, row_n, self.params.temp_col_n, path)
-        if self.params.is_auto_open_imgs:
-            subprocess.Popen(['xdg-open', self.paths.dst.generated_imgs])
-            self.params.is_auto_open_imgs = False
+        concated_img = self._generate_img(self.temp_batched_z, row_n, self.params.temp_col_n)
+        pil_img = Image.fromarray(np.uint8(concated_img))
+        pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
+
+    def _is_early_stopping(self, patience):
+        for key in self.y_metrics.keys():
+            if self.y_metrics[key].shape[0] > patience:
+                recent_metrics = self.y_metrics[key][-patience:]
+                if False not in (recent_metrics[:] == recent_metrics[0]):
+                    return True
+        return False
 
     def _init_visualize_imgs_inputs(self):
         self.font_vis_font_ids = np.arange(0, self.params.font_embedding_n, dtype=np.int32)
@@ -256,13 +266,17 @@ class TrainingFontDesignGAN():
         font_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'font_vis_{}.png'.format(epoch_i)))
         char_vis_img_path = os.path.realpath(os.path.join(self.paths.dst.log, 'char_vis_{}.png'.format(epoch_i)))
 
+        font_vis_img = self._generate_img(self.font_vis_z, 16, 16)
+        font_vis_img = Image.fromarray(np.uint8(font_vis_img))
+        font_vis_img.save(font_vis_img_path)
+
         self._save_concated_img(self.font_vis_font_ids, self.font_vis_char_ids, 8, 8, font_vis_img_path)
         self._save_concated_img(self.char_vis_font_ids, self.char_vis_char_ids, 6, 6, char_vis_img_path)
 
         summary_writer = tf.summary.FileWriter(self.paths.dst.log)
         project_config = projector.ProjectorConfig()
         font_embedding = project_config.embeddings.add()
-        font_embedding.tensor_name = self.font_embedding.name
+        font_embedding.tensor_name = self.font_embedding_tf.name
         font_embedding.sprite.image_path = font_vis_img_path
         font_embedding.sprite.single_image_dim.extend([128, 128])
         char_embedding = project_config.embeddings.add()
