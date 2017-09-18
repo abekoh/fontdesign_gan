@@ -112,7 +112,7 @@ class TrainingFontDesignGAN():
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
         self.saver = tf.train.Saver()
@@ -148,9 +148,7 @@ class TrainingFontDesignGAN():
                     self.discriminator.set_weights(d_weights)
 
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
-                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                    font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
-                    batched_z = self._get_z(font_ids, char_ids)
+                    batched_z = self._get_z()
 
                     _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
                                                    feed_dict={self.z: batched_z,
@@ -159,15 +157,15 @@ class TrainingFontDesignGAN():
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 metrics['d_loss'] *= -1
 
-                char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                font_ids = np.random.randint(0, self.params.font_embedding_n, (self.params.batch_size), dtype=np.int32)
-                batched_z = self._get_z(font_ids, char_ids)
+                batched_z = self._get_z()
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
                                                      feed_dict={self.z: batched_z,
                                                                 K.learning_phase(): 1})
 
                 if hasattr(self.params, 'c'):
+                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z(char_ids=char_ids)
                     batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
                     _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
                                                          feed_dict={self.z: batched_z,
