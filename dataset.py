@@ -8,14 +8,12 @@ import random
 
 class Dataset():
 
-    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False):
+    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False, img_dim=1):
         self.mode = mode
         self.img_size = img_size
         self.is_binary = is_binary
+        self.img_dim = img_dim
         self.h5file = h5py.File(h5_path, mode)
-
-    # def __del__(self):
-    #     self.h5file.close()
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
@@ -23,7 +21,7 @@ class Dataset():
             if not os.path.isdir(dir_path):
                 continue
             print('loading {}'.format(dir_path))
-            imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), dtype=np.float32)
+            imgs = np.empty((0, self.img_size[0], self.img_size[1], self.img_dim), dtype=np.float32)
             img_paths = sorted(glob('{}/*.png'.format(dir_path)))
             labels = np.array([], dtype=object)
             for img_path in img_paths:
@@ -34,6 +32,8 @@ class Dataset():
                 else:
                     np_img = (np_img.astype(np.float32) / 127.5) - 1.
                 np_img = np_img[np.newaxis, :, :, np.newaxis]
+                if self.img_dim == 3:
+                    np_img = np.repeat(np_img, 3, axis=3)
                 imgs = np.append(imgs, np_img, axis=0)
                 labels = np.append(labels, os.path.basename(img_path).split('.')[0])
             self._save(os.path.basename(dir_path), imgs, labels)
