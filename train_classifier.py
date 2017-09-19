@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from models import ClassifierMin
 from dataset import Dataset
+from utils import make_parallel
 
 
 class TrainingClassifier():
