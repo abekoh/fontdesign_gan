@@ -119,7 +119,7 @@ class Dataset():
         return self.get_batch(0, len(self.keys_queue_train), is_test, is_cat)
 
     def _get(self, keys_list, is_cat=False):
-        imgs = np.empty((0, self.img_size[0], self.img_size[1], 1), np.float32)
+        imgs = np.empty((0, self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
         cats = list()
         for keys in keys_list:

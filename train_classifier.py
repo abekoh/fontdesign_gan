@@ -1,7 +1,7 @@
 import os
+import json
 
-from keras.optimizers import SGD
-from keras.utils import to_categorical
+from keras.utils import to_categorical, plot_model
 from tqdm import tqdm
 
 from models import ClassifierMin
@@ -14,24 +14,31 @@ class TrainingClassifier():
         self.params = params
         self.paths = paths
         self._set_outputs()
+        self._save_params()
         self._build_models()
         self._load_dataset()
 
     def _set_outputs(self):
         if not os.path.exists(self.paths.dst.root):
-            os.mkdir(self.paths.dst.root)
+            os.makedirs(self.paths.dst.root)
+
+    def _save_params(self):
+        with open(os.path.join(self.paths.dst.root, 'params.txt'), 'w') as f:
+            json.dump(self.params.to_dict(), f, indent=4)
+        with open(os.path.join(self.paths.dst.root, 'paths.txt'), 'w') as f:
+            json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
-        self.classifier = ClassifierMin(img_dim=self.params.img_dim, img_size=self.params.img_size, class_n=26)
-        self.classifier.compile(optimizer=SGD(lr=0.01, decay=0.0005),
+        self.classifier = ClassifierMin(img_size=(self.params.img_size[0], self.params.img_size[1]), img_dim=self.params.img_dim, class_n=26)
+        self.classifier.compile(optimizer=self.params.opt,
                                 loss='categorical_crossentropy', metrics=['accuracy'])
-        # classifier_json = json.loads(self.classifier.to_json())
-        # with open(os.path.join(self.paths.dst.root, 'classifier.json'), 'w') as f:
-        #     json.dump(classifier_json, f, indent=2)
-        # plot_model(self.classifier, to_file=os.path.join(self.paths.dst.root, 'classifier.png'), show_shapes=True)
+        plot_model(self.classifier, to_file=os.path.join(self.paths.dst.root, 'model.png'), show_shapes=True)
+        with open(os.path.join(self.paths.dst.root, 'model.json'), 'w') as json_file:
+            json_dict = self.classifier.to_json()
+            json.dump(json_dict, json_file)
 
     def _load_dataset(self):
-        self.dataset = Dataset(self.paths.src.fonts, 'r', self.params.img_size)
+        self.dataset = Dataset(self.paths.src.fonts, 'r', self.params.img_size, img_dim=self.params.img_dim)
         self.dataset.set_load_data(train_rate=self.params.train_rate)
         if self.params.is_shuffle:
             self.dataset.shuffle()
@@ -65,7 +72,7 @@ class TrainingClassifier():
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
             if (epoch_i + 1) % self.params.save_weights_interval == 0 or epoch_i + 1 == self.params.epoch_n:
-                weights_filename = 'classifier_weights_{}(train={},test={}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
+                weights_filename = 'classifier_weights_{0}(train={1:03.3f},test={2:03.3f}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
                 self.classifier.save_weights(os.path.join(self.paths.dst.root, weights_filename))
 
     def _labels_to_categorical(self, labels):
