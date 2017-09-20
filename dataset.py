@@ -5,6 +5,8 @@ import h5py
 from glob import glob
 import random
 
+from utils import concat_imgs
+
 
 class Dataset():
 
@@ -135,3 +137,11 @@ class Dataset():
 
     def get_label_id(self, label):
         return self.label_ids[label]
+
+    def show_random(self):
+        imgs, _ = self.get_random(64)
+        concated_img = concat_imgs(imgs, 8, 8)
+        concated_img = (concated_img + 1.) * 127.5
+        concated_img = np.reshape(concated_img, (self.img_size[0] * 8, -1))
+        pil_img = Image.fromarray(np.uint8(concated_img))
+        pil_img.show()
