@@ -4,9 +4,8 @@ import json
 from keras.utils import to_categorical, plot_model
 from tqdm import tqdm
 
-from models import ClassifierMin
+from models import ClassifierMin, Classifier
 from dataset import Dataset
-from utils import make_parallel
 
 
 class TrainingClassifier():
@@ -30,7 +29,7 @@ class TrainingClassifier():
             json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
-        self.classifier = ClassifierMin(img_size=(self.params.img_size[0], self.params.img_size[1]), img_dim=self.params.img_dim, class_n=26)
+        self.classifier = Classifier(img_size=(self.params.img_size[0], self.params.img_size[1]), img_dim=self.params.img_dim, class_n=26)
         self.classifier.compile(optimizer=self.params.opt,
                                 loss='categorical_crossentropy', metrics=['accuracy'])
         plot_model(self.classifier, to_file=os.path.join(self.paths.dst.root, 'model.png'), show_shapes=True)

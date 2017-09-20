@@ -75,7 +75,7 @@ class TrainingFontDesignGAN():
             plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
 
     def _load_dataset(self, is_shuffle=True):
-        self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size)
+        self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size, img_dim=self.params.img_dim)
         self.real_dataset.set_load_data()
         if is_shuffle:
             self.real_dataset.shuffle()
@@ -123,11 +123,11 @@ class TrainingFontDesignGAN():
         if font_ids is not None:
             font_z = np.take(self.font_embedding, font_ids, axis=0)
         else:
-            font_z = np.random.uniform(-1, 1, (self.params.batch_size, self.font_z_size))
+            font_z = np.random.randint(-1, 1, (self.params.batch_size, self.font_z_size))
         if char_ids is not None:
             char_z = np.take(self.char_embedding, char_ids, axis=0)
         else:
-            char_z = np.random.uniform(-1, 1, (self.params.batch_size, self.char_z_size))
+            char_z = np.random.randint(-1, 1, (self.params.batch_size, self.char_z_size))
         z = np.concatenate((font_z, char_z), axis=1)
         return z
 
