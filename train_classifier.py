@@ -73,7 +73,9 @@ class TrainingClassifier():
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
             if (epoch_i + 1) % self.params.save_weights_interval == 0 or epoch_i + 1 == self.params.epoch_n:
                 weights_filename = 'classifier_weights_{0}(train={1:03.3f},test={2:03.3f}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
+                model_filename = 'classifier_model_{0}(train={1:03.3f},test={2:03.3f}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
                 self.classifier.save_weights(os.path.join(self.paths.dst.root, weights_filename))
+                self.classifier.save(os.path.join(self.paths.dst.root, model_filename))
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
