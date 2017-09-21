@@ -114,7 +114,7 @@ class TrainingFontDesignGAN():
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 0.01 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
 
         self.saver = tf.train.Saver()
@@ -123,11 +123,11 @@ class TrainingFontDesignGAN():
         if font_ids is not None:
             font_z = np.take(self.font_embedding, font_ids, axis=0)
         else:
-            font_z = np.random.randint(-1, 1, (self.params.batch_size, self.font_z_size))
+            font_z = np.random.uniform(-1, 1, (self.params.batch_size, self.font_z_size))
         if char_ids is not None:
             char_z = np.take(self.char_embedding, char_ids, axis=0)
         else:
-            char_z = np.random.randint(-1, 1, (self.params.batch_size, self.char_z_size))
+            char_z = np.random.uniform(-1, 1, (self.params.batch_size, self.char_z_size))
         z = np.concatenate((font_z, char_z), axis=1)
         return z
 
@@ -150,7 +150,8 @@ class TrainingFontDesignGAN():
                     self.discriminator.set_weights(d_weights)
 
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
-                    batched_z = self._get_z()
+                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                    batched_z = self._get_z(char_ids=char_ids)
 
                     _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
                                                    feed_dict={self.z: batched_z,
@@ -159,15 +160,14 @@ class TrainingFontDesignGAN():
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 metrics['d_loss'] *= -1
 
-                batched_z = self._get_z()
+                char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
+                batched_z = self._get_z(char_ids=char_ids)
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
                                                      feed_dict={self.z: batched_z,
                                                                 K.learning_phase(): 1})
 
                 if hasattr(self.params, 'c'):
-                    char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
-                    batched_z = self._get_z(char_ids=char_ids)
                     batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
                     _, metrics['c_loss'] = self.sess.run([self.c_opt, self.c_loss],
                                                          feed_dict={self.z: batched_z,
@@ -182,7 +182,7 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    # self._save_temp_imgs('0_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 0)
+                    self._save_temp_imgs('0_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 0)
                     self._save_temp_imgs('1_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 1)
 
             if (epoch_i + 1) % self.params.save_weights_interval == 0:
@@ -306,11 +306,11 @@ class TrainingFontDesignGAN():
         font_embedding = config.embeddings.add()
         font_embedding.tensor_name = self.font_embedding_tf.name
         font_embedding.sprite.image_path = font_vis_img_path
-        font_embedding.sprite.single_image_dim.extend([64, 64])
+        font_embedding.sprite.single_image_dim.extend([128, 128])
         char_embedding = config.embeddings.add()
         char_embedding.tensor_name = self.char_embedding_tf.name
         char_embedding.sprite.image_path = char_vis_img_path
-        char_embedding.sprite.single_image_dim.extend([64, 64])
+        char_embedding.sprite.single_image_dim.extend([128, 128])
         projector.visualize_embeddings(summary_writer, config)
 
     def get_last_metric(self, key):
