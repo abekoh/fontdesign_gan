@@ -107,14 +107,14 @@ class TrainingFontDesignGAN():
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         epsilon = tf.random_uniform((self.params.batch_size, 1, 1, 1), minval=0., maxval=1.)
-        interp = self.fake_imgs + epsilon * (self.real_imgs - self.fake_imgs)
+        interp = self.fake_imgs + epsilon * (self.fake_imgs - self.real_imgs)
         grads = tf.gradients(self.discriminator(interp), [interp])[0]
         slopes = tf.sqrt(tf.reduce_mean(tf.square(grads), reduction_indices=[3]))
         grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
         self.d_loss += 10 * grad_penalty
 
-        self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
@@ -155,6 +155,7 @@ class TrainingFontDesignGAN():
                 metrics = dict()
 
                 metrics['d_loss'] = 0
+
                 for i in range(self.params.critic_n):
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
                     batched_z = self._get_z()
@@ -189,11 +190,14 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_temp_imgs('0_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 0)
+                    # self._save_temp_imgs('0_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 0)
                     self._save_temp_imgs('1_{}_{}.png'.format(epoch_i + 1, batch_i + 1), 1)
 
+                # if (batch_i + 1) % 10 == 0:
+                #     self._save_weights(epoch_i, batch_i)
+
             if (epoch_i + 1) % self.params.save_weights_interval == 0:
-                self._save_model_weights(epoch_i)
+                self._save_model(epoch_i)
                 self._visualize_embedding(epoch_i)
 
     def _make_another_random_array(self, from_n, to_n, src_array):
@@ -250,7 +254,10 @@ class TrainingFontDesignGAN():
                                                                           K.learning_phase(): 0})
         concated_img = concat_imgs(batched_generated_imgs, row_n, col_n)
         concated_img = (concated_img + 1.) * 127.5
-        concated_img = np.reshape(concated_img, (-1, col_n * self.params.img_size[0]))
+        if self.params.img_dim == 1:
+            concated_img = np.reshape(concated_img, (-1, col_n * self.params.img_size[0]))
+        else:
+            concated_img = np.reshape(concated_img, (-1, col_n * self.params.img_size[0], self.params.img_dim))
         return concated_img
 
     def _init_temp_imgs_inputs(self):
@@ -280,10 +287,14 @@ class TrainingFontDesignGAN():
                     return True
         return False
 
-    def _save_model_weights(self, epoch_i):
+    def _save_model(self, epoch_i):
         self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
         # self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}.h5'.format(epoch_i + 1)))
         # self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}.h5'.format(epoch_i + 1)))
+
+    def _save_weights(self, epoch_i, batch_i):
+        self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}_{}.h5'.format(epoch_i + 1, batch_i + 1)))
+        self.discriminator.save_weights(os.path.join(self.paths.dst.model_weights, 'dis_{}_{}.h5'.format(epoch_i + 1, batch_i + 1)))
 
     def _init_visualize_imgs_inputs(self):
         font_vis_font_ids = np.arange(0, self.params.font_embedding_n, dtype=np.int32)

@@ -6,10 +6,10 @@ import tensorflow as tf
 
 
 def concat_imgs(src_imgs, row_n, col_n):
-    concated_img = np.empty((0, src_imgs.shape[1] * col_n, 1))
-    white_img = np.ones((src_imgs.shape[1], src_imgs.shape[2], 1))
+    concated_img = np.empty((0, src_imgs.shape[1] * col_n, src_imgs.shape[3]))
+    white_img = np.ones((src_imgs.shape[1], src_imgs.shape[2], src_imgs.shape[3]))
     for row_i in range(row_n):
-        concated_row_img = np.empty((src_imgs.shape[1], 0, 1))
+        concated_row_img = np.empty((src_imgs.shape[1], 0, src_imgs.shape[3]))
         for col_i in range(col_n):
             count = row_i * col_n + col_i
             if count < len(src_imgs):
