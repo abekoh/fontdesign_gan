@@ -23,8 +23,6 @@ from utils import concat_imgs
 class TrainingFontDesignGAN():
 
     def __init__(self, params, paths):
-        self.sess = tf.Session()
-        K.set_session(self.sess)
 
         self.params = params
         self.paths = paths
@@ -108,14 +106,24 @@ class TrainingFontDesignGAN():
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
-        self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00005).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-        self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+        epsilon = tf.random_uniform((self.params.batch_size, 1, 1, 1), minval=0., maxval=1.)
+        interp = self.fake_imgs + epsilon * (self.real_imgs - self.fake_imgs)
+        grads = tf.gradients(self.discriminator(interp), [interp])[0]
+        slopes = tf.sqrt(tf.reduce_mean(tf.square(grads), reduction_indices=[3]))
+        grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
+        self.d_loss += 10 * grad_penalty
+
+        self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
+        self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9).minimize(self.g_loss, var_list=self.generator.trainable_weights)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
             self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+
+        self.sess = tf.Session()
+        K.set_session(self.sess)
 
         self.saver = tf.train.Saver()
 
@@ -132,6 +140,8 @@ class TrainingFontDesignGAN():
         return z
 
     def train(self):
+        self.sess.run(tf.global_variables_initializer())
+
         self._init_metrics()
 
         batch_n = self.real_data_n // self.params.batch_size
@@ -146,9 +156,6 @@ class TrainingFontDesignGAN():
 
                 metrics['d_loss'] = 0
                 for i in range(self.params.critic_n):
-                    d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
-                    self.discriminator.set_weights(d_weights)
-
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
                     batched_z = self._get_z()
 
