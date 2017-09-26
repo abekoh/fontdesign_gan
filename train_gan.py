@@ -11,9 +11,9 @@ from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
-from keras import backend as K
-from keras.utils import to_categorical, plot_model
-from keras.models import model_from_json
+# from keras import backend as K
+from keras.utils import to_categorical
+# from keras.models import model_from_json
 
 import models
 from dataset import Dataset
@@ -47,32 +47,29 @@ class TrainingFontDesignGAN():
         self._build_central()
 
     def _build_central(self):
-        self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
-                                               img_dim=self.params.img_dim,
-                                               z_size=self.params.z_size,
-                                               layer_n=self.params.g.layer_n,
-                                               k_size=self.params.g.k_size,
-                                               smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
-                                               kernel_initializer=self.params.g.kernel_initializer,
-                                               activation=self.params.g.activation,
-                                               output_activation=self.params.g.output_activation,
-                                               is_bn=self.params.g.is_bn)
-        self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
-                                                       img_dim=self.params.img_dim,
-                                                       layer_n=self.params.d.layer_n,
-                                                       k_size=self.params.d.k_size,
-                                                       smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
-                                                       kernel_initializer=self.params.d.kernel_initializer,
-                                                       activation=self.params.d.activation,
-                                                       is_bn=self.params.d.is_bn)
-        plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
-        plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
-        if hasattr(self.params, 'c'):
-            with open(self.paths.src.classifier_json) as f:
-                model_json = json.load(f)
-                self.classifier = model_from_json(model_json)
-            self.classifier.load_weights(self.paths.src.classifier_h5)
-            plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
+        self.generator = models.Generator(img_size=self.params.img_size,
+                                          img_dim=self.params.img_dim,
+                                          z_size=self.params.z_size,
+                                          layer_n=self.params.g.layer_n,
+                                          k_size=self.params.g.k_size,
+                                          smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
+                                          is_bn=self.params.g.is_bn,
+                                          batch_size=self.params.batch_size)
+        self.discriminator = models.Discriminator(img_size=self.params.img_size,
+                                                  img_dim=self.params.img_dim,
+                                                  layer_n=self.params.d.layer_n,
+                                                  k_size=self.params.d.k_size,
+                                                  smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
+                                                  is_bn=self.params.d.is_bn,
+                                                  batch_size=self.params.batch_size)
+        # plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
+        # plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
+        # if hasattr(self.params, 'c'):
+        #     with open(self.paths.src.classifier_json) as f:
+        #         model_json = json.load(f)
+        #         self.classifier = model_from_json(model_json)
+        #     self.classifier.load_weights(self.paths.src.classifier_h5)
+        #     plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(self.paths.src.real_h5, 'r', img_size=self.params.img_size, img_dim=self.params.img_dim)
@@ -98,12 +95,12 @@ class TrainingFontDesignGAN():
     def _prepare_training(self):
         self._set_embeddings()
 
-        self.real_imgs = tf.placeholder(tf.float32, (None, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
-        self.z = tf.placeholder(tf.float32, (None, self.params.z_size), name='z')
+        self.real_imgs = tf.placeholder(tf.float32, (self.params.batch_size, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
+        self.z = tf.placeholder(tf.float32, (self.params.batch_size, self.params.z_size), name='z')
         self.fake_imgs = self.generator(self.z)
 
         self.d_real = self.discriminator(self.real_imgs)
-        self.d_fake = self.discriminator(self.fake_imgs)
+        self.d_fake = self.discriminator(self.fake_imgs, is_reuse=True)
 
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
@@ -111,17 +108,20 @@ class TrainingFontDesignGAN():
         if self.params.arch == 'wgan_gp':
             epsilon = tf.random_uniform((self.params.batch_size, 1, 1, 1), minval=0., maxval=1.)
             interp = self.real_imgs + epsilon * (self.fake_imgs - self.real_imgs)
-            d_interp = self.discriminator(interp)
+            d_interp = self.discriminator(interp, is_reuse=True)
             grads = tf.gradients(d_interp, [interp])[0]
             slopes = tf.sqrt(tf.reduce_sum(tf.square(grads), reduction_indices=[-1]))
             self.grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
             self.d_loss += 10 * self.grad_penalty
 
-            self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-            self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.g_loss, var_list=self.generator.trainable_weights)
-        if self.params.arch == 'wgan':
-            self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.d_loss, var_list=self.discriminator.trainable_weights)
-            self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.trainable_weights)
+            d_vars = self.discriminator.get_trainable_variables()
+            g_vars = self.generator.get_trainable_variables()
+
+            self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.d_loss, var_list=d_vars)
+            self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.g_loss, var_list=g_vars)
+        # if self.params.arch == 'wgan':
+        #     self.d_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.d_loss, var_list=self.discriminator.vars)
+        #     self.g_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.g_loss, var_list=self.generator.vars)
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
@@ -129,13 +129,13 @@ class TrainingFontDesignGAN():
             self.c_loss = - 0.1 * tf.reduce_sum(self.labels * tf.log(self.c_fake))
             if self.params.arch == 'wgan_gp':
                 self.c_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=self.generator.trainable_weights)
-            if self.params.arch == 'wgan':
-                self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
+            # if self.params.arch == 'wgan':
+            #     self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
             self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
         self.sess = tf.Session()
-        K.set_session(self.sess)
+        # K.set_session(self.sess)
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -178,16 +178,14 @@ class TrainingFontDesignGAN():
 
                     _, d_loss_temp = self.sess.run([self.d_opt, self.d_loss],
                                                    feed_dict={self.z: batched_z,
-                                                              self.real_imgs: batched_real_imgs,
-                                                              K.learning_phase(): 1})
+                                                              self.real_imgs: batched_real_imgs})
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
                 # metrics['d_loss'] *= -1
 
                 batched_z = self._get_z()
 
                 _, metrics['g_loss'] = self.sess.run([self.g_opt, self.g_loss],
-                                                     feed_dict={self.z: batched_z,
-                                                                K.learning_phase(): 1})
+                                                     feed_dict={self.z: batched_z})
 
                 if hasattr(self.params, 'c'):
                     char_ids = np.random.randint(0, self.params.char_embedding_n, (self.params.batch_size), dtype=np.int32)
@@ -195,8 +193,7 @@ class TrainingFontDesignGAN():
                     batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
                     _, metrics['c_loss'], metrics['c_acc'] = self.sess.run([self.c_opt, self.c_loss, self.c_acc],
                                                                            feed_dict={self.z: batched_z,
-                                                                                      self.labels: batched_labels,
-                                                                                      K.learning_phase(): 1})
+                                                                                      self.labels: batched_labels})
 
                 # save metrics
                 if count_i % self.params.save_metrics_graph_interval == 0:
@@ -213,7 +210,7 @@ class TrainingFontDesignGAN():
 
             if (epoch_i + 1) % self.params.save_weights_interval == 0:
                 self._save_model(epoch_i)
-                self._visualize_embedding(epoch_i)
+                # self._visualize_embedding(epoch_i)
 
     def _make_another_random_array(self, from_n, to_n, src_array):
         dst_array = np.array([], dtype=np.int32)
@@ -265,8 +262,7 @@ class TrainingFontDesignGAN():
         self.params.is_auto_open = False
 
     def _generate_img(self, z, row_n, col_n):
-        batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: z,
-                                                                          K.learning_phase(): 0})
+        batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: z})
         concated_img = concat_imgs(batched_generated_imgs, row_n, col_n)
         concated_img = (concated_img + 1.) * 127.5
         if self.params.img_dim == 1:

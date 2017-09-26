@@ -1,111 +1,111 @@
-from keras.models import Model
-from keras.layers import Input, Activation, Dropout, Embedding, Reshape, Flatten, Dense, concatenate, MaxPool2D
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.layers.advanced_activations import LeakyReLU
+from keras.layers import Input, Activation, Dropout, Flatten, Dense, MaxPool2D
+from keras.layers.convolutional import Conv2D
 from keras.layers.normalization import BatchNormalization
-from keras.initializers import truncated_normal
-from ops import sign
+
+import tensorflow as tf
+import ops
 
 
-def GeneratorDCGAN(img_size=(128, 128), img_dim=1, z_size=100,
-                   k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
-                   output_activation='tanh', is_bn=True):
-    unit_size = img_size[0] // (2 ** layer_n)
-    unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
+class Model(object):
 
-    z_inp = Input(shape=(z_size,))
-    x = Dense(unit_size * unit_size * unit_n)(z_inp)
-    x = Reshape((unit_size, unit_size, unit_n))(x)
-    if is_bn:
-        x = BatchNormalization()(x)
-    if activation == 'leaky_relu':
-        x = LeakyReLU(alpha=0.2)(x)
-    else:
-        x = Activation(activation)(x)
+    def __init__(self, name):
+        self.name = name
 
-    for i in range(layer_n - 1):
-        unit_n = smallest_hidden_unit_n * (2 ** (layer_n - i - 2))
-        x = Conv2DTranspose(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-        if is_bn:
-            x = BatchNormalization()(x)
-        if activation == 'leaky_relu':
-            x = LeakyReLU(alpha=0.2)(x)
-        else:
-            x = Activation(activation)(x)
-
-    x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-    if output_activation == 'sign':
-        x = Activation(sign)(x)
-    else:
-        x = Activation(output_activation)(x)
-
-    model = Model(inputs=z_inp, outputs=x)
-
-    return model
+    def get_trainable_variables(self):
+        t_vars = tf.trainable_variables()
+        t_vars_model = {v.name: v for v in t_vars if self.name in v.name}
+        return t_vars_model
 
 
-def GeneratorDCGANWithEmbedding(img_size=(128, 128), img_dim=1, font_embedding_n=40, char_embedding_n=26, font_embedding_rate=0.5,
-                                k_size=5, layer_n=3, smallest_hidden_unit_n=128, kernel_initializer=truncated_normal(), activation='relu',
-                                output_activation='tanh', is_bn=True):
-    unit_size = img_size[0] // (2 ** layer_n)
-    unit_n = smallest_hidden_unit_n * (2 ** (layer_n - 1))
+class Generator(Model):
 
-    font_embedding_unit_n = int(unit_n * font_embedding_rate)
-    char_embedding_unit_n = unit_n - font_embedding_unit_n
+    def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='generator',
+                 is_bn=True, batch_size=256):
 
-    font_embedding_inp = Input(shape=(1,), dtype='int32')
-    font_embedding = Embedding(font_embedding_n, unit_size * unit_size * font_embedding_unit_n)(font_embedding_inp)
-    font_embedding = Reshape((unit_size, unit_size, font_embedding_unit_n))(font_embedding)
+        super(Generator, self).__init__(name)
 
-    char_embedding_inp = Input(shape=(1,), dtype='int32')
-    char_embedding = Embedding(char_embedding_n, unit_size * unit_size * char_embedding_unit_n)(char_embedding_inp)
-    char_embedding = Reshape((unit_size, unit_size, char_embedding_unit_n))(char_embedding)
+        self.img_size = img_size
+        self.img_dim = img_dim
+        self.z_size = z_size
+        self.k_size = k_size
+        self.layer_n = layer_n
+        self.smallest_hidden_unit_n = smallest_hidden_unit_n
+        self.name = name
+        self.is_bn = is_bn
+        self.batch_size = batch_size
 
-    x = concatenate([font_embedding, char_embedding], axis=3)
+    def __call__(self, x, is_reuse=False):
 
-    for i in range(layer_n - 1):
-        unit_n = smallest_hidden_unit_n * (2 ** (layer_n - i - 2))
-        x = Conv2DTranspose(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-        if is_bn:
-            x = BatchNormalization()(x)
-        if activation == 'leaky_relu':
-            x = LeakyReLU(alpha=0.2)(x)
-        else:
-            x = Activation(activation)(x)
+        with tf.variable_scope(self.name) as scope:
 
-    x = Conv2DTranspose(img_dim, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-    if output_activation == 'sign':
-        x = Activation(sign)(x)
-    else:
-        x = Activation(output_activation)(x)
+            if is_reuse:
+                scope.reuse_variables()
 
-    model = Model(inputs=[font_embedding_inp, char_embedding_inp], outputs=x)
+            unit_size = self.img_size[0] // (2 ** self.layer_n)
+            unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - 1))
 
-    return model
+            x = ops.linear(x, unit_size * unit_size * unit_n)
+            x = tf.reshape(x, (self.batch_size, unit_size, unit_size, unit_n))
+            x = tf.contrib.layers.batch_norm(x, fused=True)
+            x = tf.nn.relu(x)
+
+            for i in range(self.layer_n):
+                with tf.variable_scope('layer{}'.format(i)):
+                    unit_n_prev = unit_n
+                    if i == self.layer_n - 1:
+                        unit_n = self.img_dim
+                    else:
+                        unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - i - 2))
+                    x_shape = x.get_shape().as_list()
+                    new_height = 2 * x_shape[1]
+                    new_width = 2 * x_shape[2]
+                    x = tf.image.resize_nearest_neighbor(x, (new_height, new_width))
+                    x = ops.conv2d(x, unit_n_prev, unit_n, self.k_size, 1, 'SAME')
+                    if i != self.layer_n - 1:
+                        x = tf.contrib.layers.batch_norm(x, fused=True)
+                        x = tf.nn.relu(x)
+            x = tf.nn.tanh(x)
+
+            return x
 
 
-def DiscriminatorDCGAN(img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128,
-                       kernel_initializer=truncated_normal(), activation='leaky_relu', is_bn=True):
-    dis_inp = Input(shape=(img_size[0], img_size[1], img_dim))
-    x = Activation('linear')(dis_inp)
+class Discriminator(Model):
 
-    for i in range(layer_n):
-        unit_n = smallest_hidden_unit_n * (2 ** i)
-        x = Conv2D(unit_n, (k_size, k_size), strides=(2, 2), padding='same', kernel_initializer=kernel_initializer)(x)
-        if is_bn:
-            x = BatchNormalization()(x)
-        if activation == 'leaky_relu':
-            x = LeakyReLU(alpha=0.2)(x)
-        else:
-            x = Activation(activation)(x)
+    def __init__(self, img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='discriminator',
+                 is_bn=True, batch_size=256):
+        super(Discriminator, self).__init__(name)
 
-    x = Flatten()(x)
+        self.img_size = img_size
+        self.img_dim = img_dim
+        self.k_size = k_size
+        self.layer_n = layer_n
+        self.smallest_hidden_unit_n = smallest_hidden_unit_n
+        self.name = name
+        self.is_bn = is_bn
+        self.batch_size = batch_size
 
-    x = Dense(1, activation=None)(x)
+    def __call__(self, x, is_reuse=False):
+        with tf.variable_scope(self.name) as scope:
 
-    model = Model(inputs=dis_inp, outputs=x)
+            if is_reuse:
+                scope.reuse_variables()
 
-    return model
+            unit_n_prev = self.img_dim
+            unit_n = self.smallest_hidden_unit_n
+
+            for i in range(self.layer_n):
+                with tf.variable_scope('layer{}'.format(i + 1)):
+                    x = ops.conv2d(x, unit_n_prev, unit_n, self.k_size, 2, 'SAME')
+                    if self.is_bn and i != 0:
+                        tf.contrib.layers.batch_norm(x, fused=False, scope='bn')
+                    x = ops.lrelu(x)
+                    unit_n_prev = unit_n
+                    unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
+
+            x = tf.reshape(x, (self.batch_size, -1))
+            x = ops.linear(x, 1, bias=False)
+
+            return x
 
 
 def Classifier(img_size=(256, 256), img_dim=1, class_n=26):
