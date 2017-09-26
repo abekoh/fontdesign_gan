@@ -51,6 +51,7 @@ class TrainingFontDesignGAN():
                                                img_dim=self.params.img_dim,
                                                z_size=self.params.z_size,
                                                layer_n=self.params.g.layer_n,
+                                               k_size=self.params.g.k_size,
                                                smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
                                                kernel_initializer=self.params.g.kernel_initializer,
                                                activation=self.params.g.activation,
@@ -59,6 +60,7 @@ class TrainingFontDesignGAN():
         self.discriminator = models.DiscriminatorDCGAN(img_size=self.params.img_size,
                                                        img_dim=self.params.img_dim,
                                                        layer_n=self.params.d.layer_n,
+                                                       k_size=self.params.d.k_size,
                                                        smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
                                                        kernel_initializer=self.params.d.kernel_initializer,
                                                        activation=self.params.d.activation,
@@ -179,7 +181,7 @@ class TrainingFontDesignGAN():
                                                               self.real_imgs: batched_real_imgs,
                                                               K.learning_phase(): 1})
                     metrics['d_loss'] += d_loss_temp / self.params.critic_n
-                metrics['d_loss'] *= -1
+                # metrics['d_loss'] *= -1
 
                 batched_z = self._get_z()
 

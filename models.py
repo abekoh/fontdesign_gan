@@ -15,13 +15,13 @@ def GeneratorDCGAN(img_size=(128, 128), img_dim=1, z_size=100,
 
     z_inp = Input(shape=(z_size,))
     x = Dense(unit_size * unit_size * unit_n)(z_inp)
+    x = Reshape((unit_size, unit_size, unit_n))(x)
     if is_bn:
         x = BatchNormalization()(x)
     if activation == 'leaky_relu':
         x = LeakyReLU(alpha=0.2)(x)
     else:
         x = Activation(activation)(x)
-    x = Reshape((unit_size, unit_size, unit_n))(x)
 
     for i in range(layer_n - 1):
         unit_n = smallest_hidden_unit_n * (2 ** (layer_n - i - 2))
