@@ -1,10 +1,11 @@
 import os
 import json
 
-from keras.utils import to_categorical, plot_model
+import tensorflow as tf
+from keras.utils import to_categorical
 from tqdm import tqdm
 
-from models import ClassifierMin, Classifier
+from models import Classifier
 from dataset import Dataset
 
 
@@ -15,7 +16,7 @@ class TrainingClassifier():
         self.paths = paths
         self._set_outputs()
         self._save_params()
-        self._build_models()
+        self._prepare_training()
         self._load_dataset()
 
     def _set_outputs(self):
@@ -28,14 +29,26 @@ class TrainingClassifier():
         with open(os.path.join(self.paths.dst.root, 'paths.txt'), 'w') as f:
             json.dump(self.paths.to_dict(), f, indent=4)
 
-    def _build_models(self):
-        self.classifier = Classifier(img_size=(self.params.img_size[0], self.params.img_size[1]), img_dim=self.params.img_dim, class_n=26)
-        self.classifier.compile(optimizer=self.params.opt,
-                                loss='categorical_crossentropy', metrics=['accuracy'])
-        plot_model(self.classifier, to_file=os.path.join(self.paths.dst.root, 'model.png'), show_shapes=True)
-        with open(os.path.join(self.paths.dst.root, 'model.json'), 'w') as json_file:
-            json_dict = self.classifier.to_json()
-            json.dump(json_dict, json_file)
+    def _prepare_training(self):
+        self.classifier = Classifier(img_size=self.params.img_size,
+                                     img_dim=self.params.img_dim,
+                                     k_size=self.params.k_size,
+                                     class_n=self.params.class_n,
+                                     smallest_unit_n=self.params.smallest_unit_n)
+        self.imgs = tf.placeholder(tf.float32, (self.params.batch_size, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='imgs')
+        self.labels = tf.placeholder(tf.float32, (self.params.batch_size, self.params.class_n), name='labels')
+        classified = self.classifier(self.imgs)
+        classified_test = self.classifier(self.imgs, is_reuse=True)
+        self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=classified))
+        c_vars = self.classifier.get_trainable_variables()
+        self.c_opt = tf.train.AdadeltaOptimizer().minimize(self.c_loss, var_list=c_vars)
+        correct_pred = tf.equal(tf.argmax(classified_test, 1), tf.argmax(self.labels, 1))
+        self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+        self.sess = tf.Session()
+        self.sess.run(tf.global_variables_initializer())
+
+        self.saver = tf.train.Saver()
 
     def _load_dataset(self):
         self.dataset = Dataset(self.paths.src.fonts, 'r', self.params.img_size, img_dim=self.params.img_dim)
@@ -46,6 +59,7 @@ class TrainingClassifier():
         self.test_data_n = self.dataset.get_img_len(is_test=True)
 
     def train(self):
+
         train_batch_n = self.train_data_n // self.params.batch_size
         test_batch_n = self.test_data_n // self.params.batch_size
         for epoch_i in tqdm(range(self.params.epoch_n)):
@@ -54,28 +68,28 @@ class TrainingClassifier():
             for batch_i in tqdm(range(train_batch_n)):
                 batched_imgs, batched_labels = self.dataset.get_batch(batch_i, self.params.batch_size)
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
-                loss, acc = self.classifier.train_on_batch(batched_imgs, batched_categorical_labels)
+                _, loss, acc = self.sess.run([self.c_opt, self.c_loss, self.c_acc],
+                                             feed_dict={self.imgs: batched_imgs,
+                                                        self.labels: batched_categorical_labels})
                 losses.append(loss)
                 accs.append(acc)
             train_loss_avg = sum(losses) / len(losses)
             train_acc_avg = sum(accs) / len(accs)
-            print('[train] loss: {}, acc: {}'.format(train_loss_avg, train_acc_avg))
+            print('[train] loss: {}, acc: {}\n'.format(train_loss_avg, train_acc_avg))
             # test
-            losses, accs = list(), list()
+            accs = list()
             for batch_i in tqdm(range(test_batch_n)):
                 batched_imgs, batched_labels = self.dataset.get_batch(batch_i, self.params.batch_size, is_test=True)
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
-                loss, acc = self.classifier.test_on_batch(batched_imgs, batched_categorical_labels)
+                loss, acc = self.sess.run([self.c_loss, self.c_acc],
+                                          feed_dict={self.imgs: batched_imgs,
+                                                     self.labels: batched_categorical_labels})
                 losses.append(loss)
                 accs.append(acc)
             test_loss_avg = sum(losses) / len(losses)
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
-            if (epoch_i + 1) % self.params.save_weights_interval == 0 or epoch_i + 1 == self.params.epoch_n:
-                weights_filename = 'classifier_weights_{0}(train={1:03.3f},test={2:03.3f}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
-                model_filename = 'classifier_model_{0}(train={1:03.3f},test={2:03.3f}).h5'.format(epoch_i + 1, train_acc_avg, test_acc_avg)
-                self.classifier.save_weights(os.path.join(self.paths.dst.root, weights_filename))
-                self.classifier.save(os.path.join(self.paths.dst.root, model_filename))
+            self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)

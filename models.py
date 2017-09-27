@@ -1,7 +1,3 @@
-from keras.layers import Input, Activation, Dropout, Flatten, Dense, MaxPool2D
-from keras.layers.convolutional import Conv2D
-from keras.layers.normalization import BatchNormalization
-
 import tensorflow as tf
 import ops
 
@@ -51,7 +47,6 @@ class Generator(Model):
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i)):
-                    unit_n_prev = unit_n
                     if i == self.layer_n - 1:
                         unit_n = self.img_dim
                     else:
@@ -60,7 +55,7 @@ class Generator(Model):
                     new_height = 2 * x_shape[1]
                     new_width = 2 * x_shape[2]
                     x = tf.image.resize_nearest_neighbor(x, (new_height, new_width))
-                    x = ops.conv2d(x, unit_n_prev, unit_n, self.k_size, 1, 'SAME')
+                    x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
                         x = tf.contrib.layers.batch_norm(x, fused=True)
                         x = tf.nn.relu(x)
@@ -90,16 +85,14 @@ class Discriminator(Model):
             if is_reuse:
                 scope.reuse_variables()
 
-            unit_n_prev = self.img_dim
             unit_n = self.smallest_hidden_unit_n
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i + 1)):
-                    x = ops.conv2d(x, unit_n_prev, unit_n, self.k_size, 2, 'SAME')
+                    x = ops.conv2d(x, unit_n, self.k_size, 2, 'SAME')
                     if self.is_bn and i != 0:
                         tf.contrib.layers.batch_norm(x, fused=False, scope='bn')
                     x = ops.lrelu(x)
-                    unit_n_prev = unit_n
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
             x = tf.reshape(x, (self.batch_size, -1))
@@ -108,69 +101,42 @@ class Discriminator(Model):
             return x
 
 
-def Classifier(img_size=(256, 256), img_dim=1, class_n=26):
-    cl_inp = Input(shape=(img_size[0], img_size[0], img_dim))
+class Classifier(Model):
 
-    cl_1 = Conv2D(96, (8, 8), strides=(4, 4), padding='same')(cl_inp)
-    cl_1 = Activation('relu')(cl_1)
-    cl_1 = MaxPool2D((3, 3), strides=(2, 2))(cl_1)
+    def __init__(self, img_size, img_dim, k_size, class_n, smallest_unit_n=64, name='classifier'):
+        super(Classifier, self).__init__(name)
 
-    cl_2 = Conv2D(256, (5, 5), padding='same')(cl_1)
-    cl_2 = Activation('relu')(cl_2)
-    cl_2 = MaxPool2D((3, 3), strides=(2, 2))(cl_2)
+        self.img_size = img_size
+        self.img_dim = img_dim
+        self.k_size = k_size
+        self.class_n = class_n
+        self.smallest_unit_n = smallest_unit_n
+        self.name = name
 
-    cl_3 = Conv2D(384, (3, 3), padding='same')(cl_2)
-    cl_3 = Activation('relu')(cl_3)
+    def __call__(self, x, is_reuse=False):
+        with tf.variable_scope(self.name) as scope:
 
-    cl_4 = Conv2D(384, (3, 3), padding='same')(cl_3)
-    cl_4 = Activation('relu')(cl_4)
+            if is_reuse:
+                scope.reuse_variables()
 
-    cl_5 = Conv2D(256, (3, 3), padding='same')(cl_4)
-    cl_5 = Activation('relu')(cl_5)
-    cl_5 = MaxPool2D((3, 3), strides=(2, 2))(cl_5)
+            unit_n = self.smallest_unit_n
+            conv_ns = [2, 2, 3, 3, 3]
 
-    cl_6 = Flatten()(cl_5)
-    cl_6 = Dense(4096)(cl_6)
-    cl_6 = Dropout(0.5)(cl_6)
+            for layer_i, conv_n in enumerate(conv_ns):
+                with tf.variable_scope('layer{}'.format(layer_i)):
+                    for conv_i in range(conv_n):
+                        x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME', name='conv2d_{}'.format(conv_i))
+                        x = tf.nn.relu(x)
+                    x = ops.maxpool2d(x, self.k_size, 2, 'SAME')
+                unit_n *= 2
 
-    cl_7 = Dense(4096)(cl_6)
-    cl_7 = Dropout(0.5)(cl_7)
+            unit_n = 4096
 
-    cl_8 = Dense(class_n, activation='softmax')(cl_7)
+            for layer_i in range(5, 8):
+                if layer_i == 7:
+                    unit_n = self.class_n
+                with tf.variable_scope('layer{}'.format(layer_i)):
+                    x = ops.fc(x, unit_n)
+                    x = tf.nn.relu(x)
 
-    model = Model(inputs=cl_inp, outputs=cl_8)
-
-    return model
-
-
-def ClassifierMin(img_size=(64, 64), img_dim=1, class_n=26):
-    inp = Input(shape=(img_size[0], img_size[0], img_dim))
-
-    x = Conv2D(128, (5, 5), strides=(2, 2), padding='same')(inp)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPool2D((3, 3), strides=(2, 2))(x)
-    x = Dropout(0.5)(x)
-
-    x = Conv2D(256, (5, 5), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPool2D((3, 3), strides=(2, 2))(x)
-    x = Dropout(0.5)(x)
-
-    x = Conv2D(256, (3, 3), padding='same')(x)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = MaxPool2D((3, 3), strides=(2, 2))(x)
-    x = Dropout(0.5)(x)
-
-    x = Flatten()(x)
-
-    x = Dense(2048)(x)
-    x = Dropout(0.5)(x)
-
-    x = Dense(class_n, activation='softmax')(x)
-
-    model = Model(inputs=inp, outputs=x)
-
-    return model
+            return x

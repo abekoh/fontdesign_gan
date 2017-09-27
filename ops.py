@@ -33,10 +33,11 @@ def linear(x, n_out, bias=True, name='linear'):
         return x
 
 
-def conv2d(x, n_in, n_out, k, s, p, bias=True, name='conv2d', stddev=0.02):
+def conv2d(x, n_out, k, s, p, bias=True, name='conv2d', stddev=0.02):
 
     with tf.variable_scope(name):
 
+        n_in = x.shape[-1]
         strides = [1, s, s, 1]
 
         # Initialize weigth
@@ -55,3 +56,26 @@ def conv2d(x, n_in, n_out, k, s, p, bias=True, name='conv2d', stddev=0.02):
             conv = tf.reshape(tf.nn.bias_add(conv, b), conv.get_shape())
 
         return conv
+
+
+def maxpool2d(x, k, s, p, name='maxpool2d'):
+    strides = [1, s, s, 1]
+    ksize = [1, k, k, 1]
+    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=p, name=name)
+
+
+def fc(x, n_out, stddev=0.02, name='fc'):
+    with tf.variable_scope(name):
+        shape = x.shape.as_list()
+        dim = 1
+        for d in shape[1:]:
+            dim *= d
+        x = tf.reshape(x, [-1, dim])
+
+        w_init = tf.random_normal_initializer(stddev=stddev)
+        w = tf.get_variable('w', [x.shape[-1], n_out], initializer=w_init)
+
+        b_init = tf.constant_initializer(0.0)
+        b = tf.get_variable('b', [n_out], initializer=b_init)
+
+        return tf.matmul(x, w) + b
