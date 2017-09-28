@@ -38,11 +38,9 @@ class TrainingClassifier():
         self.imgs = tf.placeholder(tf.float32, (self.params.batch_size, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='imgs')
         self.labels = tf.placeholder(tf.float32, (self.params.batch_size, self.params.class_n), name='labels')
         classified = self.classifier(self.imgs)
-        classified_test = self.classifier(self.imgs, is_reuse=True)
         self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=classified))
-        c_vars = self.classifier.get_trainable_variables()
-        self.c_opt = tf.train.AdadeltaOptimizer().minimize(self.c_loss, var_list=c_vars)
-        correct_pred = tf.equal(tf.argmax(classified_test, 1), tf.argmax(self.labels, 1))
+        self.c_opt = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.c_loss)
+        correct_pred = tf.equal(tf.argmax(classified, 1), tf.argmax(self.labels, 1))
         self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
         self.sess = tf.Session()

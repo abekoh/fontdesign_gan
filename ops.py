@@ -72,7 +72,7 @@ def fc(x, n_out, stddev=0.02, name='fc'):
             dim *= d
         x = tf.reshape(x, [-1, dim])
 
-        w_init = tf.random_normal_initializer(stddev=stddev)
+        w_init = tf.truncated_normal_initializer(stddev=stddev)
         w = tf.get_variable('w', [x.shape[-1], n_out], initializer=w_init)
 
         b_init = tf.constant_initializer(0.0)
