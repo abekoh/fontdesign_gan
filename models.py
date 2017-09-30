@@ -120,7 +120,7 @@ class Classifier(Model):
                 scope.reuse_variables()
 
             unit_n = self.smallest_unit_n
-            conv_ns = [2, 2, 3, 3, 3]
+            conv_ns = [2, 2]
 
             for layer_i, conv_n in enumerate(conv_ns):
                 with tf.variable_scope('layer{}'.format(layer_i)):
@@ -130,13 +130,17 @@ class Classifier(Model):
                     x = ops.maxpool2d(x, self.k_size, 2, 'SAME')
                 unit_n *= 2
 
-            unit_n = 4096
+            unit_n = 256
+            fc_n = 1
 
-            for layer_i in range(5, 8):
-                if layer_i == 7:
-                    unit_n = self.class_n
+            for layer_i in range(len(conv_ns), len(conv_ns) + fc_n):
                 with tf.variable_scope('layer{}'.format(layer_i)):
                     x = ops.fc(x, unit_n)
                     x = tf.nn.relu(x)
+                    x = tf.contrib.layers.batch_norm(x)
+                    x = tf.nn.dropout(x, 0.5)
+
+            with tf.variable_scope('output'.format(layer_i)):
+                x = ops.fc(x, self.class_n)
 
             return x
