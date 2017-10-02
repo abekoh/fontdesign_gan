@@ -96,7 +96,7 @@ class Discriminator(Model):
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
             x = tf.reshape(x, (self.batch_size, -1))
-            x = ops.linear(x, 1, bias=False)
+            x = ops.linear(x, 1)
 
             return x
 

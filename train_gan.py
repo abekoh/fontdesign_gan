@@ -11,9 +11,9 @@ from tqdm import tqdm
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
-from keras import backend as K
+# from keras import backend as K
 from keras.utils import to_categorical
-from keras.models import model_from_json
+# from keras.models import model_from_json
 
 import models
 from dataset import Dataset
@@ -65,10 +65,15 @@ class TrainingFontDesignGAN():
         # plot_model(self.generator, to_file=os.path.join(self.paths.dst.model_visualization, 'generator.png'), show_shapes=True)
         # plot_model(self.discriminator, to_file=os.path.join(self.paths.dst.model_visualization, 'discriminator.png'), show_shapes=True)
         if hasattr(self.params, 'c'):
-            with open(self.paths.src.classifier_json) as f:
-                model_json = json.load(f)
-                self.classifier = model_from_json(model_json)
-            self.classifier.load_weights(self.paths.src.classifier_h5)
+            self.classifier = models.Classifier(img_size=self.params.img_size,
+                                                img_dim=self.params.img_dim,
+                                                k_size=self.params.c.k_size,
+                                                class_n=26,
+                                                smallest_unit_n=self.params.c.smallest_unit_n)
+            # with open(self.paths.src.classifier_json) as f:
+            #     model_json = json.load(f)
+            #     self.classifier = model_from_json(model_json)
+            # self.classifier.load_weights(self.paths.src.classifier_h5)
             # plot_model(self.classifier, to_file=os.path.join(self.paths.dst.model_visualization, 'classifier.png'), show_shapes=True)
 
     def _load_dataset(self, is_shuffle=True):
@@ -126,20 +131,23 @@ class TrainingFontDesignGAN():
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = self.classifier(self.fake_imgs)
-            self.c_loss = - 1. * tf.reduce_sum(self.labels * tf.log(self.c_fake))
+            self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
             if self.params.arch == 'wgan_gp':
                 self.c_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
             # if self.params.arch == 'wgan':
             #     self.c_opt = tf.train.RMSPropOptimizer(learning_rate=0.00001).minimize(self.c_loss, var_list=self.generator.trainable_weights)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
             self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+            c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
 
         self.sess = tf.Session()
-        K.set_session(self.sess)
+        # K.set_session(self.sess)
 
         self.sess.run(tf.global_variables_initializer())
 
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(var_list=c_vars)
+
+        self.saver.restore(self.sess, self.paths.src.classifier_ckpt)
 
     def _get_z(self, font_ids=None, char_ids=None):
         if font_ids is not None:
@@ -193,8 +201,7 @@ class TrainingFontDesignGAN():
                     batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
                     _, metrics['c_loss'], metrics['c_acc'] = self.sess.run([self.c_opt, self.c_loss, self.c_acc],
                                                                            feed_dict={self.z: batched_z,
-                                                                                      self.labels: batched_labels,
-                                                                                      K.learning_phase(): 1})
+                                                                                      self.labels: batched_labels})
 
                 # save metrics
                 if count_i % self.params.save_metrics_graph_interval == 0:
