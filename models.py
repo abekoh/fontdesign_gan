@@ -15,8 +15,7 @@ class Model(object):
 
 class Generator(Model):
 
-    def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='generator',
-                 is_bn=True, batch_size=256):
+    def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='generator', is_bn=True):
 
         super(Generator, self).__init__(name)
 
@@ -28,7 +27,6 @@ class Generator(Model):
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.name = name
         self.is_bn = is_bn
-        self.batch_size = batch_size
 
     def __call__(self, x, is_reuse=False):
 
@@ -39,9 +37,10 @@ class Generator(Model):
 
             unit_size = self.img_size[0] // (2 ** self.layer_n)
             unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - 1))
+            batch_size = int(x.shape[0])
 
             x = ops.linear(x, unit_size * unit_size * unit_n)
-            x = tf.reshape(x, (self.batch_size, unit_size, unit_size, unit_n))
+            x = tf.reshape(x, (batch_size, unit_size, unit_size, unit_n))
             x = tf.contrib.layers.batch_norm(x, fused=True)
             x = tf.nn.relu(x)
 
@@ -66,8 +65,7 @@ class Generator(Model):
 
 class Discriminator(Model):
 
-    def __init__(self, img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='discriminator',
-                 is_bn=True, batch_size=256):
+    def __init__(self, img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='discriminator', is_bn=True):
         super(Discriminator, self).__init__(name)
 
         self.img_size = img_size
@@ -77,7 +75,6 @@ class Discriminator(Model):
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.name = name
         self.is_bn = is_bn
-        self.batch_size = batch_size
 
     def __call__(self, x, is_reuse=False):
         with tf.variable_scope(self.name) as scope:
@@ -86,6 +83,7 @@ class Discriminator(Model):
                 scope.reuse_variables()
 
             unit_n = self.smallest_hidden_unit_n
+            batch_size = int(x.shape[0])
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i + 1)):
@@ -95,7 +93,7 @@ class Discriminator(Model):
                     x = ops.lrelu(x)
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
-            x = tf.reshape(x, (self.batch_size, -1))
+            x = tf.reshape(x, (batch_size, -1))
             x = ops.linear(x, 1)
 
             return x

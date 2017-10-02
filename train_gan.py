@@ -51,15 +51,13 @@ class TrainingFontDesignGAN():
                                           layer_n=self.params.g.layer_n,
                                           k_size=self.params.g.k_size,
                                           smallest_hidden_unit_n=self.params.g.smallest_hidden_unit_n,
-                                          is_bn=self.params.g.is_bn,
-                                          batch_size=self.params.batch_size)
+                                          is_bn=self.params.g.is_bn)
         self.discriminator = models.Discriminator(img_size=self.params.img_size,
                                                   img_dim=self.params.img_dim,
                                                   layer_n=self.params.d.layer_n,
                                                   k_size=self.params.d.k_size,
                                                   smallest_hidden_unit_n=self.params.d.smallest_hidden_unit_n,
-                                                  is_bn=self.params.d.is_bn,
-                                                  batch_size=self.params.batch_size)
+                                                  is_bn=self.params.d.is_bn)
         if hasattr(self.params, 'c'):
             self.classifier = models.Classifier(img_size=self.params.img_size,
                                                 img_dim=self.params.img_dim,
@@ -125,7 +123,6 @@ class TrainingFontDesignGAN():
             c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
 
         self.sess = tf.Session()
-        # K.set_session(self.sess)
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -161,9 +158,6 @@ class TrainingFontDesignGAN():
                 metrics['d_loss'] = 0
 
                 for i in range(self.params.critic_n):
-                    if self.params.arch == 'wgan':
-                        d_weights = [np.clip(w, -0.01, 0.01) for w in self.discriminator.get_weights()]
-                        self.discriminator.set_weights(d_weights)
 
                     batched_real_imgs, _ = self.real_dataset.get_random(self.params.batch_size)
                     batched_z = self._get_z()
