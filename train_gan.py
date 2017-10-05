@@ -115,7 +115,7 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
-            self.c_fake = self.classifier(self.fake_imgs)
+            self.c_fake = 0.001 * self.classifier(self.fake_imgs)
             self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
             self.c_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
@@ -255,10 +255,8 @@ class TrainingFontDesignGAN():
 
     def _init_temp_imgs_inputs(self):
         if self.params.is_all_temp:
-            self.params.temp_imgs_n = self.params.font_embedding_n * self.params.char_embedding_n
-            self.params.temp_col_n = self.params.char_embedding_n
-            temp_batched_src_fonts = np.repeat(np.arange(0, self.params.font_embedding_n, dtype=np.int32), self.params.char_embedding_n)
-            temp_batched_src_chars = np.tile(np.arange(0, self.params.char_embedding_n, dtype=np.int32), self.params.font_embedding_n)
+            temp_batched_src_fonts = np.concatenate((np.repeat(0, 26), np.random.randint(1, 256, (256 - 26))))
+            temp_batched_src_chars = np.concatenate((np.arange(0, 26), np.repeat(0, 128 - 26), np.random.randint(1, 26, (128))))
         else:
             temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
             temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
