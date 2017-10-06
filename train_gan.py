@@ -115,9 +115,9 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
-            self.c_fake = 0.001 * self.classifier(self.fake_imgs)
+            self.c_fake = 0.0001 * self.classifier(self.fake_imgs)
             self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
-            self.c_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
+            self.c_opt = tf.train.AdamOptimizer(learning_rate=0.00001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
             self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
             c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
