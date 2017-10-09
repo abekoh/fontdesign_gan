@@ -233,7 +233,7 @@ class TrainingFontDesignGAN():
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = self._generate_img(self.temp_batched_z, row_n, self.params.temp_col_n)
         pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.paths.dst.generated_imgs, filename))
+        pil_img.save(os.path.join(self.paths.dst.sample, filename))
 
     def _is_early_stopping(self, patience):
         for key in self.y_metrics.keys():
