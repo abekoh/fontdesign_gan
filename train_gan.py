@@ -4,6 +4,7 @@ import json
 import h5py
 from PIL import Image
 from tqdm import tqdm
+from subprocess import Popen, PIPE
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
@@ -147,6 +148,8 @@ class TrainingFontDesignGAN():
 
     def train(self):
 
+        self._run_tensorboard()
+
         batch_n = self.real_data_n // self.params.batch_size
 
         for epoch_i in tqdm(range(self.params.epoch_n)):
@@ -186,6 +189,9 @@ class TrainingFontDesignGAN():
             if (epoch_i + 1) % self.params.save_weights_interval == 0:
                 self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
                 # self._visualize_embedding(epoch_i)
+
+    def _run_tensorboard(self):
+        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.paths.dst.log))], stdout=PIPE)
 
     def _generate_img(self, z, row_n, col_n):
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: z})
