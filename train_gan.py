@@ -3,10 +3,6 @@ import numpy as np
 import json
 import h5py
 from PIL import Image
-import plotly.offline as py
-import plotly.graph_objs as go
-from scipy.signal import savgol_filter
-import colorlover as cl
 from tqdm import tqdm
 
 import tensorflow as tf
@@ -42,9 +38,6 @@ class TrainingFontDesignGAN():
             json.dump(self.paths.to_dict(), f, indent=4)
 
     def _build_models(self):
-        self._build_central()
-
-    def _build_central(self):
         self.generator = models.Generator(img_size=self.params.img_size,
                                           img_dim=self.params.img_dim,
                                           z_size=self.params.z_size,
@@ -107,6 +100,9 @@ class TrainingFontDesignGAN():
         self.grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
         self.d_loss += 10 * self.grad_penalty
 
+        tf.summary.scalar('d_loss', self.d_loss)
+        tf.summary.scalar('g_loss', self.g_loss)
+
         d_vars = self.discriminator.get_trainable_variables()
         g_vars = self.generator.get_trainable_variables()
 
@@ -117,18 +113,22 @@ class TrainingFontDesignGAN():
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
             self.c_fake = 0.0001 * self.classifier(self.fake_imgs)
             self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
+            tf.summary.scalar('c_loss', self.c_loss)
             self.c_opt = tf.train.AdamOptimizer(learning_rate=0.00001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
             self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+            tf.summary.scalar('c_acc', self.c_acc)
             c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
 
-        self.sess = tf.Session()
+        self.summary = tf.summary.merge_all()
 
+        self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
         self.saver = tf.train.Saver(var_list=c_vars)
-
         self.saver.restore(self.sess, self.paths.src.classifier_ckpt)
+
+        self.writer = tf.summary.FileWriter(self.paths.dst.log)
 
     def _get_z(self, font_ids=None, char_ids=None):
         if font_ids is not None:
@@ -143,7 +143,6 @@ class TrainingFontDesignGAN():
         return z
 
     def train(self):
-        self._init_metrics()
 
         batch_n = self.real_data_n // self.params.batch_size
 
@@ -180,11 +179,12 @@ class TrainingFontDesignGAN():
                                                                            feed_dict={self.z: batched_z,
                                                                                       self.labels: batched_labels})
 
-                # save metrics
-                if count_i % self.params.save_metrics_graph_interval == 0:
-                    self._update_metrics(metrics, count_i)
-                    self._update_smoothed_metrics()
-                    self._save_metrics_graph()
+                summary = self.sess.run(self.summary,
+                                        feed_dict={self.z: batched_z,
+                                                   self.labels: batched_labels,
+                                                   self.real_imgs: batched_real_imgs})
+
+                self.writer.add_summary(summary, count_i)
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
@@ -207,41 +207,6 @@ class TrainingFontDesignGAN():
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
-
-    def _init_metrics(self):
-        self.metrics = dict()
-        self.smoothed_metrics = dict()
-
-    def _update_metrics(self, metrics, count_i):
-        for k, v in metrics.items():
-            if k not in self.metrics:
-                self.metrics[k] = np.array([[count_i], [metrics[k]]])
-            else:
-                self.metrics[k] = np.concatenate((self.metrics[k], np.array([[count_i], [metrics[k]]])), axis=1)
-
-    def _update_smoothed_metrics(self):
-        for k, v in self.metrics.items():
-            window_length = len(v[0]) // 4
-            if window_length % 2 == 0:
-                window_length += 1
-            if window_length <= 3:
-                continue
-            filtered = savgol_filter(v[1], window_length, 3)
-            self.smoothed_metrics[k] = np.array([v[0], filtered])
-
-    def _save_metrics_graph(self):
-        all_graphs = list()
-        metrics_n = len(self.metrics) + 1
-        for i, k in enumerate(self.metrics.keys()):
-            graph = go.Scatter(x=self.metrics[k][0], y=self.metrics[k][1], mode='lines', name=k, line=dict(dash='dot', color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
-            graphs = [graph]
-            if k in self.smoothed_metrics:
-                smoothed_graph = go.Scatter(x=self.smoothed_metrics[k][0], y=self.smoothed_metrics[k][1], mode='lines', name=k + '_smoothed', line=dict(color=cl.scales[str(metrics_n)]['qual']['Paired'][i]))
-                graphs.append(smoothed_graph)
-            py.plot(graphs, filename=os.path.join(self.paths.dst.metrics, '{}.html'.format(k)), auto_open=False)
-            all_graphs.extend(graphs)
-        py.plot(all_graphs, filename=os.path.join(self.paths.dst.metrics, 'all_metrics.html'), auto_open=self.params.is_auto_open)
-        self.params.is_auto_open = False
 
     def _generate_img(self, z, row_n, col_n):
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.z: z})
