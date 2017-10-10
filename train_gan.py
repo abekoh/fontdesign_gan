@@ -21,11 +21,17 @@ class TrainingFontDesignGAN():
 
         self.params = params
         self.paths = paths
+
+    def setup(self):
         self._set_dsts()
         self._build_models()
         self._load_dataset()
         self._prepare_training()
         self._save_params()
+
+    def delete(self):
+        # self.sess.close()
+        tf.reset_default_graph()
 
     def _set_dsts(self):
         for path in self.paths.dst.__dict__.values():
@@ -113,10 +119,17 @@ class TrainingFontDesignGAN():
 
         if hasattr(self.params, 'c'):
             self.labels = tf.placeholder(tf.float32, (None, self.params.char_embedding_n))
-            self.c_fake = 0.0001 * self.classifier(self.fake_imgs)
+            self.c_fake = self.params.c.penalty * self.classifier(self.fake_imgs)
             self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
             tf.summary.scalar('c_loss', self.c_loss)
-            self.c_opt = tf.train.AdamOptimizer(learning_rate=0.00001, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
+            if self.params.c.opt == 'Adam':
+                self.c_opt = tf.train.AdamOptimizer(learning_rate=self.params.c.lr, beta1=0.5, beta2=0.9).minimize(self.c_loss, var_list=g_vars)
+            elif self.params.c.opt == 'RMSProp':
+                self.c_opt = tf.train.RMSPropOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=g_vars)
+            elif self.params.c.opt == 'Adadelta':
+                self.c_opt = tf.train.AdadeltaOptimizer().minimize(self.c_loss, var_list=g_vars)
+            elif self.params.c.opt == 'SGD':
+                self.c_opt = tf.train.GradientDescentOptimizer(learning_rate=self.params.c.lr).minimize(self.c_loss, var_list=g_vars)
             correct_pred = tf.equal(tf.argmax(self.c_fake, 1), tf.argmax(self.labels, 1))
             self.c_acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
             tf.summary.scalar('c_acc', self.c_acc)
@@ -148,7 +161,8 @@ class TrainingFontDesignGAN():
 
     def train(self):
 
-        self._run_tensorboard()
+        if self.params.is_run_tensorboard:
+            self._run_tensorboard()
 
         batch_n = self.real_data_n // self.params.batch_size
 
@@ -175,10 +189,10 @@ class TrainingFontDesignGAN():
                     batched_labels = to_categorical(char_ids, self.params.char_embedding_n)
                     self.sess.run(self.c_opt, feed_dict={self.z: batched_z, self.labels: batched_labels})
 
-                summary = self.sess.run(self.summary,
-                                        feed_dict={self.z: batched_z,
-                                                   self.labels: batched_labels,
-                                                   self.real_imgs: batched_real_imgs})
+                self.score, summary = self.sess.run([self.d_loss, self.summary],
+                                                    feed_dict={self.z: batched_z,
+                                                               self.labels: batched_labels,
+                                                               self.real_imgs: batched_real_imgs})
 
                 self.writer.add_summary(summary, count_i)
 
@@ -186,9 +200,8 @@ class TrainingFontDesignGAN():
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
                     self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
 
-            if (epoch_i + 1) % self.params.save_weights_interval == 0:
-                self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
-                # self._visualize_embedding(epoch_i)
+            self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
+            # self._visualize_embedding(epoch_i)
 
     def _run_tensorboard(self):
         Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.paths.dst.log))], stdout=PIPE)
@@ -204,12 +217,10 @@ class TrainingFontDesignGAN():
         return concated_img
 
     def _init_temp_imgs_inputs(self):
-        if self.params.is_all_temp:
-            temp_batched_src_fonts = np.concatenate((np.repeat(0, 26), np.random.randint(1, 256, (256 - 26))))
-            temp_batched_src_chars = np.concatenate((np.arange(0, 26), np.repeat(0, 128 - 26), np.random.randint(1, 26, (128))))
-        else:
-            temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
-            temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
+        temp_batched_src_fonts = np.concatenate((np.repeat(0, 26), np.random.randint(1, 256, (256 - 26))))
+        temp_batched_src_chars = np.concatenate((np.arange(0, 26), np.repeat(0, 128 - 26), np.random.randint(1, 26, (128))))
+        # temp_batched_src_fonts = np.random.randint(0, self.params.font_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
+        # temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
         self.temp_batched_z = self._get_z(font_ids=temp_batched_src_fonts, char_ids=temp_batched_src_chars)
 
     def _save_temp_imgs(self, filename):
@@ -258,3 +269,6 @@ class TrainingFontDesignGAN():
         char_embedding.sprite.image_path = char_vis_img_path
         char_embedding.sprite.single_image_dim.extend([64, 64])
         projector.visualize_embeddings(summary_writer, config)
+
+    def get_score(self):
+        return self.score

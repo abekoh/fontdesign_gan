@@ -1,5 +1,6 @@
 from keras.optimizers import Optimizer
 from keras.initializers import Initializer
+import tensorflow as tf
 
 
 class Params():
