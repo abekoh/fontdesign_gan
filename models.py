@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 import ops
 
 
@@ -11,6 +12,28 @@ class Model(object):
         t_vars = tf.trainable_variables()
         t_vars_model = {v.name: v for v in t_vars if self.name in v.name}
         return t_vars_model
+
+    def _get_slice(self, data, idx, parts):
+        shape = data.get_shape().as_list()
+        size = np.concatenate(([shape[0] // parts], shape[1:]), axis=0).astype(np.int32)
+        stride = np.concatenate(([shape[0] // 2], np.zeros(len(shape[1:]))), axis=0).astype(np.int32)
+        start = stride * idx
+        return tf.slice(data, start, size)
+
+    def parallel(self, x, is_reuse=False, gpu_n=2):
+        out_all = list()
+        for i in range(gpu_n):
+            with tf.device('/gpu:{}'.format(i)):
+                with tf.variable_scope('tower_{}'.format(i)):
+
+                    inp = self._get_slice(x, i, gpu_n)
+                    out = self.__call__(inp, is_reuse)
+                    out_all.append(out)
+
+        with tf.device('/cpu:0'):
+            merged = tf.concat(out_all, axis=0)
+
+        return merged
 
 
 class Generator(Model):

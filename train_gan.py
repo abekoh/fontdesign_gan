@@ -92,17 +92,17 @@ class TrainingFontDesignGAN():
 
         self.real_imgs = tf.placeholder(tf.float32, (self.params.batch_size, self.params.img_size[0], self.params.img_size[1], self.params.img_dim), name='real_imgs')
         self.z = tf.placeholder(tf.float32, (self.params.batch_size, self.params.z_size), name='z')
-        self.fake_imgs = self.generator(self.z)
+        self.fake_imgs = self.generator.parallel(self.z)
 
-        self.d_real = self.discriminator(self.real_imgs)
-        self.d_fake = self.discriminator(self.fake_imgs, is_reuse=True)
+        self.d_real = self.discriminator.parallel(self.real_imgs)
+        self.d_fake = self.discriminator.parallel(self.fake_imgs, is_reuse=True)
 
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         epsilon = tf.random_uniform((self.params.batch_size, 1, 1, 1), minval=0., maxval=1.)
         interp = self.real_imgs + epsilon * (self.fake_imgs - self.real_imgs)
-        d_interp = self.discriminator(interp, is_reuse=True)
+        d_interp = self.discriminator.parallel(interp, is_reuse=True)
         grads = tf.gradients(d_interp, [interp])[0]
         slopes = tf.sqrt(tf.reduce_sum(tf.square(grads), reduction_indices=[-1]))
         self.grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
