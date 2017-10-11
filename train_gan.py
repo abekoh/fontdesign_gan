@@ -198,7 +198,7 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % self.params.save_imgs_interval == 0:
-                    self._save_temp_imgs('{}_{}.png'.format(epoch_i + 1, batch_i + 1))
+                    self.save_temp_imgs(os.path.join(self.paths.dst.sample, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
             self.saver.save(self.sess, os.path.join(self.paths.dst.log, 'result_{}.ckpt'.format(epoch_i)))
             # self._visualize_embedding(epoch_i)
@@ -223,13 +223,13 @@ class TrainingFontDesignGAN():
         # temp_batched_src_chars = np.random.randint(0, self.params.char_embedding_n, (self.params.temp_imgs_n), dtype=np.int32)
         self.temp_batched_z = self._get_z(font_ids=temp_batched_src_fonts, char_ids=temp_batched_src_chars)
 
-    def _save_temp_imgs(self, filename):
+    def save_temp_imgs(self, filepath):
         if not hasattr(self, 'temp_batched_z'):
             self._init_temp_imgs_inputs()
         row_n = self.params.temp_imgs_n // self.params.temp_col_n
         concated_img = self._generate_img(self.temp_batched_z, row_n, self.params.temp_col_n)
         pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.paths.dst.sample, filename))
+        pil_img.save(filepath)
 
     def _save_weights(self, epoch_i, batch_i):
         self.generator.save_weights(os.path.join(self.paths.dst.model_weights, 'gen_{}_{}.h5'.format(epoch_i + 1, batch_i + 1)))
