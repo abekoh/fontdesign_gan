@@ -1,4 +1,7 @@
 import numpy as np
+from glob import glob
+import os
+import imageio
 
 
 def concat_imgs(src_imgs, row_n, col_n):
@@ -14,3 +17,19 @@ def concat_imgs(src_imgs, row_n, col_n):
                 concated_row_img = np.concatenate((concated_row_img, white_img), axis=1)
         concated_img = np.concatenate((concated_img, concated_row_img), axis=0)
     return concated_img
+
+
+def make_gif(src_imgs_dir_path, dst_img_path):
+    img_paths = glob('{}/*_10.png'.format(src_imgs_dir_path))
+    img_filenames = sorted([os.path.basename(path) for path in img_paths],
+                           key=lambda x: int(x.split('_')[0]))
+    skipped_img_filenames = [img_filenames[i] for i in range(0, 200)]
+    sorted_img_paths = [os.path.join(src_imgs_dir_path, filename) for filename in skipped_img_filenames]
+    imgs = [imageio.imread(f) for f in sorted_img_paths]
+    # for i in range(len(imgs)):
+    #     imgs[i] = imgs[i][512:, :, :]
+    imageio.mimsave(dst_img_path, imgs)
+
+
+if __name__ == '__main__':
+    make_gif('result_pickup/2017-09-27_181947_only_wgan/generated_imgs', './test.mp4')
