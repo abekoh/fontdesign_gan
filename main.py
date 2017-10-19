@@ -38,6 +38,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     # Verbose
     tf.app.flags.DEFINE_integer('save_imgs_interval', 10, 'interval when save imgs')
+    tf.app.flags.DEFINE_integer('save_imgs_col_n', 16, 'column num of save imgs')
     tf.app.flags.DEFINE_boolean('is_run_tensorboard', True, 'run tensorboard or not')
     # Source Paths
     # tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_6628_caps_3ch_64x64.h5', 'source path of real fonts hdf5')

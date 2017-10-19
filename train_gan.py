@@ -202,22 +202,18 @@ class TrainingFontDesignGAN():
         return concated_img
 
     def _init_temp_imgs_inputs(self):
-        temp_batched_src_fonts = np.concatenate((np.repeat(0, 26), np.random.randint(1, 256, (256 - 26))))
-        temp_batched_src_chars = np.concatenate((np.arange(0, 26), np.repeat(0, 128 - 26), np.random.randint(1, 26, (128))))
-        # temp_batched_src_fonts = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.temp_imgs_n), dtype=np.int32)
-        # temp_batched_src_chars = np.random.randint(0, FLAGS.char_embedding_n, (FLAGS.temp_imgs_n), dtype=np.int32)
+        # temp_batched_src_fonts = np.concatenate((np.repeat(0, 26), np.random.randint(1, 256, (256 - 26))))
+        # temp_batched_src_chars = np.concatenate((np.arange(0, 26), np.repeat(0, 128 - 26), np.random.randint(1, 26, (128))))
+        temp_batched_src_fonts = np.random.randint(0, FLAGS.font_embedding_n, (256), dtype=np.int32)
+        temp_batched_src_chars = np.random.randint(0, FLAGS.char_embedding_n, (256), dtype=np.int32)
         self.temp_batched_z = self._get_z(font_ids=temp_batched_src_fonts, char_ids=temp_batched_src_chars)
 
     def save_temp_imgs(self, filepath):
         if not hasattr(self, 'temp_batched_z'):
             self._init_temp_imgs_inputs()
-        concated_img = self._generate_img(self.temp_batched_z, 16, 16)
+        concated_img = self._generate_img(self.temp_batched_z, FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(filepath)
-
-    def _save_weights(self, epoch_i, batch_i):
-        self.generator.save_weights(os.path.join(FLAGS.dst_model_weights, 'gen_{}_{}.h5'.format(epoch_i + 1, batch_i + 1)))
-        self.discriminator.save_weights(os.path.join(FLAGS.dst_model_weights, 'dis_{}_{}.h5'.format(epoch_i + 1, batch_i + 1)))
 
     def _init_visualize_imgs_inputs(self):
         font_vis_font_ids = np.arange(0, FLAGS.font_embedding_n, dtype=np.int32)
@@ -229,7 +225,7 @@ class TrainingFontDesignGAN():
             self._init_visualize_imgs_inputs()
         font_vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_log, 'font_vis_{}.png'.format(epoch_i)))
 
-        font_vis_img = self._generate_img(self.font_vis_z, 16, 16)
+        font_vis_img = self._generate_img(self.font_vis_z, FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
         font_vis_img = Image.fromarray(np.uint8(font_vis_img))
         font_vis_img.save(font_vis_img_path)
 
