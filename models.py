@@ -64,7 +64,7 @@ class Generator(Model):
 
             x = ops.linear(x, unit_size * unit_size * unit_n)
             x = tf.reshape(x, (batch_size, unit_size, unit_size, unit_n))
-            x = tf.contrib.layers.batch_norm(x, fused=True)
+            x = tf.contrib.layers.batch_norm(x)
             x = tf.nn.relu(x)
 
             for i in range(self.layer_n):
@@ -79,7 +79,7 @@ class Generator(Model):
                     x = tf.image.resize_nearest_neighbor(x, (new_height, new_width))
                     x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
-                        x = tf.contrib.layers.batch_norm(x, fused=True)
+                        x = tf.contrib.layers.batch_norm(x)
                         x = tf.nn.relu(x)
             x = tf.nn.tanh(x)
 
@@ -112,7 +112,7 @@ class Discriminator(Model):
                 with tf.variable_scope('layer{}'.format(i + 1)):
                     x = ops.conv2d(x, unit_n, self.k_size, 2, 'SAME')
                     if self.is_bn and i != 0:
-                        tf.contrib.layers.batch_norm(x, fused=False, scope='bn')
+                        tf.contrib.layers.batch_norm(x)
                     x = ops.lrelu(x)
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
