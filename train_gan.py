@@ -38,12 +38,6 @@ class TrainingFontDesignGAN():
         os.mkdir(FLAGS.dst_log)
         os.mkdir(FLAGS.dst_samples)
 
-    # def _save_params(self):
-    #     with open(os.path.join(FLAGS.dst.root, 'params.txt'), 'w') as f:
-    #         json.dump(FLAGS.to_dict(), f, indent=4)
-    #     with open(os.path.join(FLAGS.dst.root, 'paths.txt'), 'w') as f:
-    #         json.dump(FLAGS.to_dict(), f, indent=4)
-
     def _build_models(self):
         self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                           img_dim=FLAGS.img_dim,
@@ -192,7 +186,7 @@ class TrainingFontDesignGAN():
                     self.save_temp_imgs(os.path.join(FLAGS.dst_samples, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
             self.saver.save(self.sess, os.path.join(FLAGS.dst_log, 'result_{}.ckpt'.format(epoch_i)))
-            # self._visualize_embedding(epoch_i)
+            self._visualize_embedding(epoch_i)
 
     def _run_tensorboard(self):
         Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(FLAGS.dst_log))], stdout=PIPE)
@@ -230,34 +224,21 @@ class TrainingFontDesignGAN():
         font_vis_char_ids = np.repeat(np.array([0], dtype=np.int32), FLAGS.font_embedding_n)
         self.font_vis_z = self._get_z(font_vis_font_ids, font_vis_char_ids)
 
-        char_vis_font_ids = np.repeat(np.array([0], dtype=np.int32), FLAGS.char_embedding_n)
-        char_vis_char_ids = np.arange(0, FLAGS.char_embedding_n, dtype=np.int32)
-        self.char_vis_z = self._get_z(char_vis_font_ids, char_vis_char_ids)
-
     def _visualize_embedding(self, epoch_i):
         if not hasattr(self, 'font_vis_z'):
             self._init_visualize_imgs_inputs()
         font_vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_log, 'font_vis_{}.png'.format(epoch_i)))
-        char_vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_log, 'char_vis_{}.png'.format(epoch_i)))
 
         font_vis_img = self._generate_img(self.font_vis_z, 16, 16)
         font_vis_img = Image.fromarray(np.uint8(font_vis_img))
         font_vis_img.save(font_vis_img_path)
 
-        char_vis_img = self._generate_img(self.char_vis_z, 6, 6)
-        char_vis_img = Image.fromarray(np.uint8(char_vis_img))
-        char_vis_img.save(char_vis_img_path)
-
         summary_writer = tf.summary.FileWriter(FLAGS.dst_log)
         config = projector.ProjectorConfig()
         font_embedding = config.embeddings.add()
-        font_embedding.tensor_name = self.font_embedding_tf.name
+        font_embedding.tensor_name = 'embeddings/font_embedding'
         font_embedding.sprite.image_path = font_vis_img_path
-        font_embedding.sprite.single_image_dim.extend([64, 64])
-        char_embedding = config.embeddings.add()
-        char_embedding.tensor_name = self.char_embedding_tf.name
-        char_embedding.sprite.image_path = char_vis_img_path
-        char_embedding.sprite.single_image_dim.extend([64, 64])
+        font_embedding.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
 
     def get_score(self):
