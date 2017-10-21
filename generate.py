@@ -1,63 +1,71 @@
 import numpy as np
 import os
 from PIL import Image
-import h5py
 import tensorflow as tf
-from keras import backend as K
 
 import models
 from utils import concat_imgs
 
+FLAGS = tf.app.flags.FLAGS
+
 
 class GeneratingFontDesignGAN():
 
-    def __init__(self, params, paths):
+    def __init__(self):
+        global FLAGS
 
-        self.params = params
-        self.paths = paths
-        if not os.path.exists(self.paths.dst):
-            os.makedirs(self.paths.dst)
+    def setup(self):
+        self._make_dirs()
         self._build_model()
         self._prepare_generating()
 
+    def _make_dirs(self):
+        os.mkdir(FLAGS.dst_root)
+
     def _build_model(self):
-        if self.params.g_arch == 'dcgan':
-            self.generator = models.GeneratorDCGAN(img_size=self.params.img_size,
-                                                   img_dim=self.params.img_dim,
-                                                   layer_n=4,
-                                                   smallest_hidden_unit_n=128)
+        self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                          img_dim=FLAGS.img_dim,
+                                          z_size=FLAGS.z_size,
+                                          layer_n=FLAGS.g_layer_n,
+                                          k_size=FLAGS.g_k_size,
+                                          smallest_hidden_unit_n=FLAGS.g_smallest_hidden_unit_n)
 
     def _prepare_generating(self):
-        embedding_h5file = h5py.File(self.paths.src_embedding_h5, 'r')
-        self.font_embedding = embedding_h5file['font_embedding'].value
-        self.char_embedding = embedding_h5file['char_embedding'].value
+        self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
+        self.char_z_size = FLAGS.z_size - self.font_z_size
 
-        self.z = tf.placeholder(tf.float32, (None, 100), name='z')
-        self.generated_imgs = self.generator(self.z)
+        font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
+        char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
+
+        with tf.variable_scope('embeddings'):
+            font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
+            char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
+        self.font_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='font_ids')
+        self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
+
+        font_z = tf.nn.embedding_lookup(font_embedding, self.font_ids)
+        char_z = tf.nn.embedding_lookup(char_embedding, self.char_ids)
+
+        z = tf.concat([font_z, char_z], axis=1)
+
+        self.generated_imgs = self.generator(z)
 
         self.sess = tf.Session()
-        K.set_session(self.sess)
 
         self.saver = tf.train.Saver()
-        self.saver.restore(self.sess, self.paths.src_ckpt)
+        self.saver.restore(self.sess, FLAGS.src_ckpt)
 
-    def _get_embedded(self, font_ids, char_ids):
-        font_embedded = np.take(self.font_embedding, font_ids, axis=0)
-        char_embedded = np.take(self.char_embedding, char_ids, axis=0)
-        z = np.concatenate((font_embedded, char_embedded), axis=1)
-        return z
-
-    def generate(self, font_ids, char_ids, col_n=10, filename='generated.png'):
-        batched_z = self._get_embedded(font_ids, char_ids)
-        batched_generated_imgs = self.sess.run(self.generated_imgs, feed_dict={self.z: batched_z,
-                                                                               K.learning_phase(): 1})
-        if font_ids.shape[0] > col_n:
-            row_n = font_ids.shape[0] // col_n + 1
-        else:
-            col_n = font_ids.shape[0]
-            row_n = 1
-        concated_img = concat_imgs(batched_generated_imgs, row_n, col_n)
+    def generate(self, filename='generated.png'):
+        font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
+        char_ids = np.random.randint(0, FLAGS.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
+        generated_imgs = self.sess.run(self.generated_imgs,
+                                       feed_dict={self.font_ids: font_ids,
+                                                  self.char_ids: char_ids})
+        concated_img = concat_imgs(generated_imgs, 16, 16)
         concated_img = (concated_img + 1.) * 127.5
-        concated_img = np.reshape(concated_img, (-1, col_n * self.params.img_size[0]))
+        if FLAGS.img_dim == 1:
+            concated_img = np.reshape(concated_img, (-1, 16 * FLAGS.img_height))
+        else:
+            concated_img = np.reshape(concated_img, (-1, 16 * FLAGS.img_height, FLAGS.img_dim))
         pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.paths.dst, filename))
+        pil_img.save(os.path.join(FLAGS.dst_root, filename))
