@@ -51,7 +51,7 @@ class Generator(Model):
         self.name = name
         self.is_bn = is_bn
 
-    def __call__(self, x, is_reuse=False):
+    def __call__(self, x, is_reuse=False, is_train=True):
 
         with tf.variable_scope(self.name) as scope:
 
@@ -62,10 +62,11 @@ class Generator(Model):
             unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - 1))
             batch_size = int(x.shape[0])
 
-            x = ops.linear(x, unit_size * unit_size * unit_n)
-            x = tf.reshape(x, (batch_size, unit_size, unit_size, unit_n))
-            x = tf.contrib.layers.batch_norm(x)
-            x = tf.nn.relu(x)
+            with tf.variable_scope('pre'):
+                x = ops.linear(x, unit_size * unit_size * unit_n)
+                x = tf.reshape(x, (batch_size, unit_size, unit_size, unit_n))
+                x = ops.batch_norm(x, is_train)
+                x = tf.nn.relu(x)
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i)):
@@ -79,7 +80,7 @@ class Generator(Model):
                     x = tf.image.resize_bilinear(x, (new_height, new_width))
                     x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
-                        x = tf.contrib.layers.batch_norm(x)
+                        x = ops.batch_norm(x, is_train)
                         x = tf.nn.relu(x)
             x = tf.nn.tanh(x)
 
@@ -99,7 +100,7 @@ class Discriminator(Model):
         self.name = name
         self.is_bn = is_bn
 
-    def __call__(self, x, is_reuse=False):
+    def __call__(self, x, is_reuse=False, is_train=True):
         with tf.variable_scope(self.name) as scope:
 
             if is_reuse:
@@ -112,7 +113,7 @@ class Discriminator(Model):
                 with tf.variable_scope('layer{}'.format(i + 1)):
                     x = ops.conv2d(x, unit_n, self.k_size, 2, 'SAME')
                     if self.is_bn and i != 0:
-                        tf.contrib.layers.batch_norm(x)
+                        ops.batch_norm(x, is_train)
                     x = ops.lrelu(x)
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
@@ -134,7 +135,7 @@ class Classifier(Model):
         self.smallest_unit_n = smallest_unit_n
         self.name = name
 
-    def __call__(self, x, is_reuse=False):
+    def __call__(self, x, is_reuse=False, is_train=True):
         with tf.variable_scope(self.name) as scope:
 
             if is_reuse:
@@ -158,7 +159,7 @@ class Classifier(Model):
                 with tf.variable_scope('layer{}'.format(layer_i)):
                     x = ops.fc(x, unit_n)
                     x = tf.nn.relu(x)
-                    x = tf.contrib.layers.batch_norm(x)
+                    x = ops.batch_norm(x, is_train)
                     x = tf.nn.dropout(x, 0.5)
 
             with tf.variable_scope('output'.format(layer_i)):

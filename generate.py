@@ -102,7 +102,7 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([font_z, char_z], axis=1)
 
-        self.generated_imgs = self.generator(z)
+        self.generated_imgs = self.generator(z, is_train=False)
 
         sess_config = tf.ConfigProto(
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)

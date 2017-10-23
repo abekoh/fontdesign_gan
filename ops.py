@@ -7,6 +7,11 @@ def lrelu(x, leak=0.2):
     return tf.maximum(x, leak * x)
 
 
+def batch_norm(x, is_train, eps=1e-5, decay=0.9, scope='batch_norm'):
+    return tf.contrib.layers.batch_norm(x, decay=decay, updates_collections=None, epsilon=eps,
+                                        scale=True, is_training=is_train, scope=scope)
+
+
 def linear(x, n_out, name='linear'):
 
     with tf.variable_scope(name):
