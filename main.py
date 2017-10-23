@@ -1,6 +1,7 @@
 import tensorflow as tf
 from datetime import datetime
 
+from train_classifier import TrainingClassifier
 from train_gan import TrainingFontDesignGAN
 from generate import GeneratingFontDesignGAN
 
@@ -11,10 +12,11 @@ def define_flags():
     # Directory Path
     now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     dst_train_root = 'result/' + now_str
+    dst_classifier_root = 'result_classifier/' + now_str
     dst_gen_root = 'result_gen'
 
     # Mode
-    tf.app.flags.DEFINE_string('mode', 'train', 'train or generate')
+    tf.app.flags.DEFINE_string('mode', '', 'train_c or train_g or generate')
     tf.app.flags.DEFINE_string('gpu_ids', '0, 1', 'gpu ids')
     # Images Settings
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
@@ -37,7 +39,10 @@ def define_flags():
     tf.app.flags.DEFINE_integer('c_k_size', 3, 'kernel size of classifier')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'learning penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'learning rate of generator iwth classifier')
-    # Train Settings
+    # Train Classifier Settings
+    tf.app.flags.DEFINE_integer('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
+    tf.app.flags.DEFINE_boolean('is_shuffle', True, 'shuffle dataset')
+    # Train GAN Settings
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
     tf.app.flags.DEFINE_integer('epoch_n', 10, 'epoch cycles')
     tf.app.flags.DEFINE_integer('critic_n', 30, 'how many critic wasserstein distance')
@@ -56,11 +61,17 @@ def define_flags():
     tf.app.flags.DEFINE_string('dst_train_log', dst_train_root + '/log', 'destination log path')
     tf.app.flags.DEFINE_string('dst_train_samples', dst_train_root + '/samples', 'destination samples path')
     tf.app.flags.DEFINE_string('dst_gen_root', dst_gen_root, 'destination generate-mode path')
+    tf.app.flags.DEFINE_string('dst_classifier_root', dst_classifier_root, 'destination classifier-mode path')
+    tf.app.flags.DEFINE_string('dst_classifier_log', dst_classifier_root + '/log', 'destination classifier-mode log path')
     tf.app.flags.DEFINE_string('gen_filename', now_str + '.png', 'destination generate-mode path')
 
 
 def main(argv=None):
-    if FLAGS.mode == 'train':
+    if FLAGS.mode == 'train_c':
+        cl = TrainingClassifier()
+        cl.setup()
+        cl.train()
+    if FLAGS.mode == 'train_g':
         gan = TrainingFontDesignGAN()
         gan.setup()
         gan.train()
