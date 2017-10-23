@@ -130,7 +130,10 @@ class TrainingFontDesignGAN():
 
         self.summary = tf.summary.merge_all()
 
-        self.sess = tf.Session()
+        sess_config = tf.ConfigProto(
+            gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
+        )
+        self.sess = tf.Session(config=sess_config)
         self.sess.run(tf.global_variables_initializer())
 
         self.saver_pretrained = tf.train.Saver(var_list=c_vars)

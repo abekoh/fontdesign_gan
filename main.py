@@ -13,6 +13,7 @@ def define_flags():
 
     # Mode
     tf.app.flags.DEFINE_string('mode', 'train', 'train or generate')
+    tf.app.flags.DEFINE_string('gpu_ids', '0, 1', 'gpu ids')
     # Images Settings
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'img height')
@@ -36,7 +37,7 @@ def define_flags():
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'learning rate of generator iwth classifier')
     # Train Settings
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
-    tf.app.flags.DEFINE_integer('epoch_n', 30, 'epoch cycles')
+    tf.app.flags.DEFINE_integer('epoch_n', 10, 'epoch cycles')
     tf.app.flags.DEFINE_integer('critic_n', 30, 'how many critic wasserstein distance')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     # Verbose
