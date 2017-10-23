@@ -9,7 +9,9 @@ FLAGS = tf.app.flags.FLAGS
 
 def define_flags():
     # Directory Path
-    dst_root = 'result/' + datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+    dst_train_root = 'result/' + now_str
+    dst_gen_root = 'result_gen'
 
     # Mode
     tf.app.flags.DEFINE_string('mode', 'train', 'train or generate')
@@ -48,11 +50,13 @@ def define_flags():
     tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_6628_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     # tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_200new_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_string('src_classifier_ckpt', 'result_classifier/2017-09-30_180855/log/result_29.ckpt', 'source path of classifier ckpt')
-    tf.app.flags.DEFINE_string('src_ckpt', 'result/ckpt/result_9.ckpt', 'source path of result ckpt')
+    tf.app.flags.DEFINE_string('src_trained_ckpt', 'result_pickup/2017-10-22_032515/log/result_7.ckpt', 'source path of result ckpt')
     # Destination Paths
-    tf.app.flags.DEFINE_string('dst_root', dst_root, 'destination path')
-    tf.app.flags.DEFINE_string('dst_log', dst_root + '/log', 'destination log path')
-    tf.app.flags.DEFINE_string('dst_samples', dst_root + '/samples', 'destination samples path')
+    tf.app.flags.DEFINE_string('dst_train_root', dst_train_root, 'destination path')
+    tf.app.flags.DEFINE_string('dst_train_log', dst_train_root + '/log', 'destination log path')
+    tf.app.flags.DEFINE_string('dst_train_samples', dst_train_root + '/samples', 'destination samples path')
+    tf.app.flags.DEFINE_string('dst_gen_root', dst_gen_root, 'destination generate-mode path')
+    tf.app.flags.DEFINE_string('gen_filename', now_str + '.png', 'destination generate-mode path')
 
 
 def main(argv=None):
@@ -61,9 +65,9 @@ def main(argv=None):
         gan.setup()
         gan.train()
     if FLAGS.mode == 'generate':
-        gan = GeneratingFontDesignGAN()
+        gan = GeneratingFontDesignGAN('./gen_sample.json')
         gan.setup()
-        gan.generate()
+        gan.generate(FLAGS.gen_filename)
 
 
 if __name__ == '__main__':

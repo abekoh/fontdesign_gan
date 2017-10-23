@@ -34,9 +34,9 @@ class TrainingFontDesignGAN():
         tf.reset_default_graph()
 
     def _make_dirs(self):
-        os.mkdir(FLAGS.dst_root)
-        os.mkdir(FLAGS.dst_log)
-        os.mkdir(FLAGS.dst_samples)
+        os.mkdir(FLAGS.dst_train_root)
+        os.mkdir(FLAGS.dst_train_log)
+        os.mkdir(FLAGS.dst_train_samples)
 
     def _build_models(self):
         self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
@@ -75,7 +75,7 @@ class TrainingFontDesignGAN():
             self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
             self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
 
-        # embedding_h5file = h5py.File(os.path.join(FLAGS.dst_root, 'embeddings.h5'), 'w')
+        # embedding_h5file = h5py.File(os.path.join(FLAGS.dst_train_root, 'embeddings.h5'), 'w')
         # embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
         # embedding_h5file.create_dataset('char_embedding', data=self.char_embedding)
 
@@ -141,7 +141,7 @@ class TrainingFontDesignGAN():
 
         self.saver = tf.train.Saver()
 
-        self.writer = tf.summary.FileWriter(FLAGS.dst_log)
+        self.writer = tf.summary.FileWriter(FLAGS.dst_train_log)
 
     def _get_ids(self, is_embedding_font_ids, is_embedding_char_ids):
         if is_embedding_font_ids:
@@ -198,13 +198,13 @@ class TrainingFontDesignGAN():
 
                 # save images
                 if (batch_i + 1) % FLAGS.save_imgs_interval == 0:
-                    self.save_temp_imgs(os.path.join(FLAGS.dst_samples, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
+                    self.save_temp_imgs(os.path.join(FLAGS.dst_train_samples, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
-            self.saver.save(self.sess, os.path.join(FLAGS.dst_log, 'result_{}.ckpt'.format(epoch_i)))
+            self.saver.save(self.sess, os.path.join(FLAGS.dst_train_log, 'result_{}.ckpt'.format(epoch_i)))
             self._visualize_embedding(epoch_i)
 
     def _run_tensorboard(self):
-        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(FLAGS.dst_log))], stdout=PIPE)
+        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(FLAGS.dst_train_log))], stdout=PIPE)
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.font_ids: font_ids,
@@ -236,14 +236,14 @@ class TrainingFontDesignGAN():
     def _visualize_embedding(self, epoch_i):
         if not hasattr(self, 'vis_font_ids'):
             self._init_visualize_imgs_inputs()
-        vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_log, 'vis_{}.png'.format(epoch_i)))
+        vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_train_log, 'vis_{}.png'.format(epoch_i)))
 
         vis_img = self._generate_img(self.vis_font_ids, self.vis_char_ids,
                                      FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
         vis_img = Image.fromarray(np.uint8(vis_img))
         vis_img.save(vis_img_path)
 
-        summary_writer = tf.summary.FileWriter(FLAGS.dst_log)
+        summary_writer = tf.summary.FileWriter(FLAGS.dst_tarin_log)
         config = projector.ProjectorConfig()
         font_embedding = config.embeddings.add()
         font_embedding.tensor_name = 'embeddings/font_embedding'
