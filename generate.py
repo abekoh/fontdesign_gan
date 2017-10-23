@@ -72,7 +72,7 @@ class GeneratingFontDesignGAN():
                     ids_alpha = np.append(ids_alpha, 1. / float(step) * i)
             else:
                 ids_x = np.append(ids_x, int(id_str))
-                ids_x = np.append(ids_x, int(id_str))
+                ids_y = np.append(ids_y, int(id_str))
                 ids_alpha = np.append(ids_alpha, 0.)
         return ids_x, ids_y, ids_alpha
 
