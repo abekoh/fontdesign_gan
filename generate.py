@@ -38,28 +38,43 @@ class GeneratingFontDesignGAN():
                                           smallest_hidden_unit_n=FLAGS.g_smallest_hidden_unit_n)
 
     def _set_inputs(self):
-        self.font_gen_ids = self._construct_ids('font_ids')
-        self.char_gen_ids = self._construct_ids('char_ids')
-        assert self.font_gen_ids.shape[0] == self.char_gen_ids.shape[0], \
+        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = self._construct_ids('font_ids')
+        self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = self._construct_ids('char_ids')
+        assert self.font_gen_ids_x.shape[0] == self.char_gen_ids_x.shape[0], \
             'font_ids.shape is not equal char_ids.shape'
-        self.batch_size = self.font_gen_ids.shape[0]
+        self.batch_size = self.font_gen_ids_x.shape[0]
         self.col_n = self.json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
     def _construct_ids(self, label):
-        ids = np.array([], dtype=np.int32)
+        ids_x = np.array([], dtype=np.int32)
+        ids_y = np.array([], dtype=np.int32)
+        ids_alpha = np.array([], dtype=np.float32)
         for id_str in self.json_dict[label]:
             if '-' in id_str:
                 id_nums = id_str.split('-')
                 for i in range(int(id_nums[0]), int(id_nums[1]) + 1):
-                    ids = np.append(ids, i)
+                    ids_x = np.append(ids_x, i)
+                    ids_y = np.append(ids_y, i)
+                    ids_alpha = np.append(ids_alpha, 0.)
             elif '*' in id_str:
                 id_nums = id_str.split('*')
                 for i in range(int(id_nums[1])):
-                    ids = np.append(ids, int(id_nums[0]))
+                    ids_x = np.append(ids_x, int(id_nums[0]))
+                    ids_y = np.append(ids_y, int(id_nums[0]))
+                    ids_alpha = np.append(ids_alpha, 0.)
+            elif '..' in id_str and ':' in id_str:
+                tmp, step = id_str.split(':')
+                id_nums = tmp.split('..')
+                for i in range(int(step)):
+                    ids_x = np.append(ids_x, int(id_nums[0]))
+                    ids_y = np.append(ids_y, int(id_nums[1]))
+                    ids_alpha = np.append(ids_alpha, 1. / float(step) * i)
             else:
-                ids.append(int(id_str))
-        return np.array(ids, dtype=np.int32)
+                ids_x = np.append(ids_x, int(id_str))
+                ids_x = np.append(ids_x, int(id_str))
+                ids_alpha = np.append(ids_alpha, 0.)
+        return ids_x, ids_y, ids_alpha
 
     def _prepare_generating(self):
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
@@ -71,11 +86,19 @@ class GeneratingFontDesignGAN():
         with tf.variable_scope('embeddings'):
             font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
             char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
-        self.font_ids = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids')
-        self.char_ids = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids')
+        self.font_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_x')
+        self.font_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_y')
+        self.font_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='font_ids_alpha')
+        self.char_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids_x')
+        self.char_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids_y')
+        self.char_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='char_ids_alpha')
 
-        font_z = tf.nn.embedding_lookup(font_embedding, self.font_ids)
-        char_z = tf.nn.embedding_lookup(char_embedding, self.char_ids)
+        font_z_x = tf.nn.embedding_lookup(font_embedding, self.font_ids_x)
+        font_z_y = tf.nn.embedding_lookup(font_embedding, self.font_ids_y)
+        font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
+        char_z_x = tf.nn.embedding_lookup(char_embedding, self.char_ids_x)
+        char_z_y = tf.nn.embedding_lookup(char_embedding, self.char_ids_y)
+        char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
 
         z = tf.concat([font_z, char_z], axis=1)
 
@@ -91,8 +114,12 @@ class GeneratingFontDesignGAN():
 
     def generate(self, filename='generated.png'):
         generated_imgs = self.sess.run(self.generated_imgs,
-                                       feed_dict={self.font_ids: self.font_gen_ids,
-                                                  self.char_ids: self.char_gen_ids})
+                                       feed_dict={self.font_ids_x: self.font_gen_ids_x,
+                                                  self.font_ids_y: self.font_gen_ids_y,
+                                                  self.font_ids_alpha: self.font_gen_ids_alpha,
+                                                  self.char_ids_x: self.char_gen_ids_x,
+                                                  self.char_ids_y: self.char_gen_ids_y,
+                                                  self.char_ids_alpha: self.char_gen_ids_alpha})
         concated_img = concat_imgs(generated_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
         if FLAGS.img_dim == 1:

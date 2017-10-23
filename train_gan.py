@@ -243,7 +243,7 @@ class TrainingFontDesignGAN():
         vis_img = Image.fromarray(np.uint8(vis_img))
         vis_img.save(vis_img_path)
 
-        summary_writer = tf.summary.FileWriter(FLAGS.dst_tarin_log)
+        summary_writer = tf.summary.FileWriter(FLAGS.dst_train_log)
         config = projector.ProjectorConfig()
         font_embedding = config.embeddings.add()
         font_embedding.tensor_name = 'embeddings/font_embedding'
