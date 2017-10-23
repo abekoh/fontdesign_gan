@@ -76,7 +76,7 @@ class Generator(Model):
                     x_shape = x.get_shape().as_list()
                     new_height = 2 * x_shape[1]
                     new_width = 2 * x_shape[2]
-                    x = tf.image.resize_nearest_neighbor(x, (new_height, new_width))
+                    x = tf.image.resize_bilinear(x, (new_height, new_width))
                     x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
                         x = tf.contrib.layers.batch_norm(x)
