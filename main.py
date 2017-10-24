@@ -44,7 +44,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('is_shuffle', True, 'shuffle dataset')
     # Train GAN Settings
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
-    tf.app.flags.DEFINE_integer('epoch_n', 10, 'epoch cycles')
+    tf.app.flags.DEFINE_integer('epoch_n', 20, 'epoch cycles')
     tf.app.flags.DEFINE_integer('critic_n', 30, 'how many critic wasserstein distance')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     # Verbose
@@ -54,7 +54,7 @@ def define_flags():
     # Source Paths
     tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_6628_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     # tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_200new_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
-    tf.app.flags.DEFINE_string('src_classifier_ckpt', 'result_classifier/2017-09-30_180855/log/result_29.ckpt', 'source path of classifier ckpt')
+    tf.app.flags.DEFINE_string('src_classifier_ckpt', 'result_classifier/2017-10-23_223027/log/result_9.ckpt', 'source path of classifier ckpt')
     tf.app.flags.DEFINE_string('src_trained_ckpt', 'result_pickup/2017-10-22_032515/log/result_7.ckpt', 'source path of result ckpt')
     # Destination Paths
     tf.app.flags.DEFINE_string('dst_train_root', dst_train_root, 'destination path')

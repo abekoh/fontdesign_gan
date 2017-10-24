@@ -32,7 +32,8 @@ class TrainingClassifier():
                                      smallest_unit_n=FLAGS.c_smallest_unit_n)
         self.imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='imgs')
         self.labels = tf.placeholder(tf.float32, (FLAGS.batch_size, 26), name='labels')
-        classified = self.classifier(self.imgs)
+        self.is_train = tf.placeholder(tf.bool, name='is_train')
+        classified = self.classifier(self.imgs, is_train=self.is_train)
         self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=classified))
         self.c_opt = tf.train.AdamOptimizer(learning_rate=0.001).minimize(self.c_loss)
         correct_pred = tf.equal(tf.argmax(classified, 1), tf.argmax(self.labels, 1))
@@ -65,7 +66,8 @@ class TrainingClassifier():
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
                 _, loss, acc = self.sess.run([self.c_opt, self.c_loss, self.c_acc],
                                              feed_dict={self.imgs: batched_imgs,
-                                                        self.labels: batched_categorical_labels})
+                                                        self.labels: batched_categorical_labels,
+                                                        self.is_train: True})
                 losses.append(loss)
                 accs.append(acc)
             train_loss_avg = sum(losses) / len(losses)
@@ -78,7 +80,8 @@ class TrainingClassifier():
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
                 loss, acc = self.sess.run([self.c_loss, self.c_acc],
                                           feed_dict={self.imgs: batched_imgs,
-                                                     self.labels: batched_categorical_labels})
+                                                     self.labels: batched_categorical_labels,
+                                                     self.is_train: False})
                 losses.append(loss)
                 accs.append(acc)
             test_loss_avg = sum(losses) / len(losses)

@@ -81,6 +81,7 @@ class TrainingFontDesignGAN():
 
         self.font_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='font_ids')
         self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
+        self.is_train = tf.placeholder(tf.bool, name='is_train')
 
         font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids), 0),
                          lambda: tf.random_uniform((FLAGS.batch_size, self.font_z_size), -1, 1),
@@ -92,17 +93,17 @@ class TrainingFontDesignGAN():
 
         self.real_imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='real_imgs')
         # self.z = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.z_size), name='z')
-        self.fake_imgs = self.generator(z)
+        self.fake_imgs = self.generator(z, is_train=self.is_train)
 
-        self.d_real = self.discriminator(self.real_imgs)
-        self.d_fake = self.discriminator(self.fake_imgs, is_reuse=True)
+        self.d_real = self.discriminator(self.real_imgs, is_train=self.is_train)
+        self.d_fake = self.discriminator(self.fake_imgs, is_reuse=True, is_train=self.is_train)
 
         self.d_loss = - (tf.reduce_mean(self.d_real) - tf.reduce_mean(self.d_fake))
         self.g_loss = - tf.reduce_mean(self.d_fake)
 
         epsilon = tf.random_uniform((FLAGS.batch_size, 1, 1, 1), minval=0., maxval=1.)
         interp = self.real_imgs + epsilon * (self.fake_imgs - self.real_imgs)
-        d_interp = self.discriminator(interp, is_reuse=True)
+        d_interp = self.discriminator(interp, is_reuse=True, is_train=self.is_train)
         grads = tf.gradients(d_interp, [interp])[0]
         slopes = tf.sqrt(tf.reduce_sum(tf.square(grads), reduction_indices=[-1]))
         self.grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
@@ -119,7 +120,7 @@ class TrainingFontDesignGAN():
 
         if FLAGS.c_penalty > 0.:
             self.labels = tf.placeholder(tf.float32, (None, FLAGS.char_embedding_n))
-            self.c_fake = FLAGS.c_penalty * self.classifier(self.fake_imgs)
+            self.c_fake = FLAGS.c_penalty * self.classifier(self.fake_imgs, is_train=self.is_train)
             self.c_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels, logits=self.c_fake))
             tf.summary.scalar('c_loss', self.c_loss)
             self.c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr).minimize(self.c_loss, var_list=g_vars)
@@ -174,25 +175,29 @@ class TrainingFontDesignGAN():
 
                     self.sess.run(self.d_opt, feed_dict={self.font_ids: font_ids,
                                                          self.char_ids: char_ids,
-                                                         self.real_imgs: real_imgs})
+                                                         self.real_imgs: real_imgs,
+                                                         self.is_train: True})
 
                 font_ids, char_ids = self._get_ids(False, False)
 
                 self.sess.run(self.g_opt, feed_dict={self.font_ids: font_ids,
-                                                     self.char_ids: char_ids})
+                                                     self.char_ids: char_ids,
+                                                     self.is_train: True})
 
                 if FLAGS.c_penalty > 0.:
                     font_ids, char_ids = self._get_ids(False, True)
                     batched_labels = to_categorical(char_ids, FLAGS.char_embedding_n)
                     self.sess.run(self.c_opt, feed_dict={self.font_ids: font_ids,
                                                          self.char_ids: char_ids,
-                                                         self.labels: batched_labels})
+                                                         self.labels: batched_labels,
+                                                         self.is_train: True})
 
                 self.score, summary = self.sess.run([self.d_loss, self.summary],
                                                     feed_dict={self.font_ids: font_ids,
                                                                self.char_ids: char_ids,
                                                                self.labels: batched_labels,
-                                                               self.real_imgs: real_imgs})
+                                                               self.real_imgs: real_imgs,
+                                                               self.is_train: True})
 
                 self.writer.add_summary(summary, count_i)
 
@@ -208,7 +213,8 @@ class TrainingFontDesignGAN():
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
         batched_generated_imgs = self.sess.run(self.fake_imgs, feed_dict={self.font_ids: font_ids,
-                                                                          self.char_ids: char_ids})
+                                                                          self.char_ids: char_ids,
+                                                                          self.is_train: False})
         concated_img = concat_imgs(batched_generated_imgs, row_n, col_n)
         concated_img = (concated_img + 1.) * 127.5
         if FLAGS.img_dim == 1:
