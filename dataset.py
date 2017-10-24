@@ -66,16 +66,6 @@ class Dataset():
         for i, label in enumerate(self.h5file[key + '/labels'].value):
             self.label_ids[label] = i
 
-    def set_category_arange(self):
-        self.category_queue = dict()
-        for i, key in enumerate(self.h5file.keys()):
-            self.category_queue[key] = i
-
-    def set_category_random(self, id_n):
-        self.category_queue = dict()
-        for key in self.h5file.keys():
-            self.category_queue[key] = random.randint(0, id_n - 1)
-
     def shuffle(self, is_test=False):
         if is_test:
             random.shuffle(self.keys_queue_test)
@@ -87,25 +77,25 @@ class Dataset():
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
 
-    def get_batch(self, batch_i, batch_size, is_test=False, is_cat=False):
+    def get_batch(self, batch_i, batch_size, is_test=False):
         keys_list = list()
         for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
             if is_test:
                 keys_list.append(self.keys_queue_test[i])
             else:
                 keys_list.append(self.keys_queue_train[i])
-        return self._get(keys_list, is_cat)
+        return self._get(keys_list)
 
-    def get_random(self, batch_size, is_test=False, is_cat=False):
+    def get_random(self, batch_size, is_test=False):
         keys_list = list()
         for i in range(batch_size):
             if is_test:
                 keys_list.append(random.choice(self.keys_queue_test))
             else:
                 keys_list.append(random.choice(self.keys_queue_train))
-        return self._get(keys_list, is_cat)
+        return self._get(keys_list)
 
-    def get_selected(self, labels, is_test=False, is_cat=False):
+    def get_selected(self, labels, is_test=False):
         keys_list = list()
         for label in labels:
             num = self.get_label_id(label)
@@ -113,25 +103,20 @@ class Dataset():
                 keys_list.append(self.keys_queue_test[num])
             else:
                 keys_list.append(self.keys_queue_train[num])
-        return self._get(keys_list, is_cat)
+        return self._get(keys_list)
 
-    def get_all(self, is_test=False, is_cat=False):
+    def get_all(self, is_test=False):
         if is_test:
             return self.get_batch(0, len(self.key_queue_test), is_test)
-        return self.get_batch(0, len(self.keys_queue_train), is_test, is_cat)
+        return self.get_batch(0, len(self.keys_queue_train), is_test)
 
-    def _get(self, keys_list, is_cat=False):
+    def _get(self, keys_list):
         imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
-        cats = list()
         for i, keys in enumerate(keys_list):
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
             imgs[i] = img[np.newaxis, :]
             labels.append(self.h5file[keys[0] + '/labels'].value[keys[1]])
-            if is_cat:
-                cats.append(self.category_queue[keys[0]])
-        if is_cat:
-            return imgs, labels, cats
         return imgs, labels
 
     def get_label_id(self, label):

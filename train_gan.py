@@ -1,6 +1,5 @@
 import os
 import numpy as np
-# import h5py
 from PIL import Image
 from tqdm import tqdm
 from subprocess import Popen, PIPE
@@ -75,10 +74,6 @@ class TrainingFontDesignGAN():
             self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
             self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
 
-        # embedding_h5file = h5py.File(os.path.join(FLAGS.dst_train_root, 'embeddings.h5'), 'w')
-        # embedding_h5file.create_dataset('font_embedding', data=self.font_embedding)
-        # embedding_h5file.create_dataset('char_embedding', data=self.char_embedding)
-
         self.font_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='font_ids')
         self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
         self.is_train = tf.placeholder(tf.bool, name='is_train')
@@ -92,7 +87,6 @@ class TrainingFontDesignGAN():
         z = tf.concat([font_z, char_z], axis=1)
 
         self.real_imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='real_imgs')
-        # self.z = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.z_size), name='z')
         self.fake_imgs = self.generator(z, is_train=self.is_train)
 
         self.d_real = self.discriminator(self.real_imgs, is_train=self.is_train)
@@ -192,12 +186,12 @@ class TrainingFontDesignGAN():
                                                          self.labels: batched_labels,
                                                          self.is_train: True})
 
-                self.score, summary = self.sess.run([self.d_loss, self.summary],
-                                                    feed_dict={self.font_ids: font_ids,
-                                                               self.char_ids: char_ids,
-                                                               self.labels: batched_labels,
-                                                               self.real_imgs: real_imgs,
-                                                               self.is_train: True})
+                summary = self.sess.run(self.summary,
+                                        feed_dict={self.font_ids: font_ids,
+                                                   self.char_ids: char_ids,
+                                                   self.labels: batched_labels,
+                                                   self.real_imgs: real_imgs,
+                                                   self.is_train: True})
 
                 self.writer.add_summary(summary, count_i)
 
@@ -256,6 +250,3 @@ class TrainingFontDesignGAN():
         font_embedding.sprite.image_path = vis_img_path
         font_embedding.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
-
-    def get_score(self):
-        return self.score

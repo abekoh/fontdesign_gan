@@ -29,7 +29,3 @@ def make_gif(src_imgs_dir_path, dst_img_path):
     # for i in range(len(imgs)):
     #     imgs[i] = imgs[i][512:, :, :]
     imageio.mimsave(dst_img_path, imgs)
-
-
-if __name__ == '__main__':
-    make_gif('result_pickup/2017-09-27_181947_only_wgan/generated_imgs', './test.mp4')
