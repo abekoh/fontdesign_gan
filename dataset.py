@@ -166,10 +166,3 @@ class Dataset():
         concated_img = np.reshape(concated_img, (self.img_size[0] * 8, -1))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.show()
-
-
-if __name__ == '__main__':
-    data = Dataset('./src/fonts_6627_caps_3ch_64x64.h5', 'r', (64, 64), img_dim=3, is_mem=True)
-    data.set_load_data()
-    imgs, labels = data.get_random(16)
-    print(imgs, labels)
