@@ -121,13 +121,12 @@ class Dataset():
         return self.get_batch(0, len(self.keys_queue_train), is_test, is_cat)
 
     def _get(self, keys_list, is_cat=False):
-        imgs = np.empty((0, self.img_size[0], self.img_size[1], self.img_dim), np.float32)
+        imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
         cats = list()
-        for keys in keys_list:
+        for i, keys in enumerate(keys_list):
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
-            img = img[np.newaxis, :]
-            imgs = np.append(imgs, img, axis=0)
+            imgs[i] = img[np.newaxis, :]
             labels.append(self.h5file[keys[0] + '/labels'].value[keys[1]])
             if is_cat:
                 cats.append(self.category_queue[keys[0]])
