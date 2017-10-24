@@ -57,7 +57,7 @@ class TrainingFontDesignGAN():
                                                 smallest_unit_n=FLAGS.c_smallest_unit_n)
 
     def _load_dataset(self, is_shuffle=True):
-        self.real_dataset = Dataset(FLAGS.src_real_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
+        self.real_dataset = Dataset(FLAGS.src_real_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
         self.real_dataset.set_load_data()
         if is_shuffle:
             self.real_dataset.shuffle()

@@ -10,12 +10,25 @@ from utils import concat_imgs
 
 class Dataset():
 
-    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False, img_dim=1):
+    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False, is_mem=False, img_dim=1):
         self.mode = mode
         self.img_size = img_size
         self.is_binary = is_binary
+        self.is_mem = is_mem
         self.img_dim = img_dim
         self.h5file = h5py.File(h5_path, mode)
+        self._get = self._get_from_file
+        if self.mode == 'r':
+            # TODO: be more clearly
+            keys = self.h5file.keys()
+            self.data_n = len(keys)
+            for key in keys:
+                self.label_n = len(self.h5file[key + '/labels'].value)
+                break
+            if self.is_mem:
+                self._put_on_mem()
+                # self._set_label_ids()
+                self._get = self._get_from_mem
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
@@ -23,10 +36,13 @@ class Dataset():
             if not os.path.isdir(dir_path):
                 continue
             print('loading {}'.format(dir_path))
-            imgs = np.empty((0, self.img_size[0], self.img_size[1], self.img_dim), dtype=np.float32)
             img_paths = sorted(glob('{}/*.png'.format(dir_path)))
-            labels = np.array([], dtype=object)
-            for img_path in img_paths:
+            if len(img_paths) == 0:
+                print('.png images are not found')
+                continue
+            imgs = np.empty((len(img_paths), self.img_size[0], self.img_size[1], self.img_dim), dtype=np.float32)
+            labels = np.empty((len(img_paths)), dtype=object)
+            for i, img_path in enumerate(img_paths):
                 pil_img = Image.open(img_path)
                 np_img = np.asarray(pil_img)
                 if self.is_binary:
@@ -36,8 +52,8 @@ class Dataset():
                 np_img = np_img[np.newaxis, :, :, np.newaxis]
                 if self.img_dim == 3:
                     np_img = np.repeat(np_img, 3, axis=3)
-                imgs = np.append(imgs, np_img, axis=0)
-                labels = np.append(labels, os.path.basename(img_path).split('.')[0])
+                imgs[i] = np_img
+                labels[i] = os.path.basename(img_path).split('.')[0]
             self._save(os.path.basename(dir_path), imgs, labels)
 
     def _save(self, group_name, imgs, labels):
@@ -48,14 +64,18 @@ class Dataset():
 
     def set_load_data(self, train_rate=1.):
         self.keys_queue_train = list()
-        for key, value in self.h5file.items():
+        if self.is_mem:
+            iters = enumerate(self.h5file.values())
+        else:
+            iters = self.h5file.items()
+        for x, value in iters:
             for i in range(len(value['labels'])):
-                self.keys_queue_train.append((key, i))
+                self.keys_queue_train.append((x, i))
         if train_rate != 1.:
             self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
             self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
 
-    def set_label_ids(self, key=None):
+    def _set_label_ids(self, key=None):
         self.label_ids = dict()
         if key is None:
             max_len = 0
@@ -110,7 +130,7 @@ class Dataset():
             return self.get_batch(0, len(self.key_queue_test), is_test)
         return self.get_batch(0, len(self.keys_queue_train), is_test)
 
-    def _get(self, keys_list):
+    def _get_from_file(self, keys_list):
         imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
@@ -119,7 +139,24 @@ class Dataset():
             labels.append(self.h5file[keys[0] + '/labels'].value[keys[1]])
         return imgs, labels
 
-    def get_label_id(self, label):
+    def _put_on_mem(self):
+        print('putting data on memory...')
+        self.imgs = np.empty((self.data_n, self.label_n, self.img_size[0], self.img_size[1], self.img_dim), np.float32)
+        self.labels = np.empty((self.data_n, self.label_n), object)
+        for i, key in enumerate(self.h5file.keys()):
+            self.imgs[i] = self.h5file[key + '/imgs'].value
+            self.labels[i] = self.h5file[key + '/labels'].value
+
+    def _get_from_mem(self, keys_list):
+        imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
+        labels = list()
+        for i, keys in enumerate(keys_list):
+            img = self.imgs[keys[0]][keys[1]]
+            imgs[i] = img[np.newaxis, :]
+            labels.append(self.labels[keys[0]][keys[1]])
+        return imgs, labels
+
+    def _get_label_id(self, label):
         return self.label_ids[label]
 
     def show_random(self):
@@ -129,3 +166,10 @@ class Dataset():
         concated_img = np.reshape(concated_img, (self.img_size[0] * 8, -1))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.show()
+
+
+if __name__ == '__main__':
+    data = Dataset('./src/fonts_6627_caps_3ch_64x64.h5', 'r', (64, 64), img_dim=3, is_mem=True)
+    data.set_load_data()
+    imgs, labels = data.get_random(16)
+    print(imgs, labels)
