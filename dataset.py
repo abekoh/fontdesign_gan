@@ -97,25 +97,30 @@ class Dataset():
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
 
-    def get_batch(self, batch_i, batch_size, is_test=False):
+    def get_batch(self, batch_i, batch_size, is_test=False, is_label=True):
         keys_list = list()
         for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
             if is_test:
                 keys_list.append(self.keys_queue_test[i])
             else:
                 keys_list.append(self.keys_queue_train[i])
-        return self._get(keys_list)
+        return self._get(keys_list, is_label)
 
-    def get_random(self, batch_size, is_test=False):
-        keys_list = list()
-        for i in range(batch_size):
-            if is_test:
-                keys_list.append(random.choice(self.keys_queue_test))
-            else:
-                keys_list.append(random.choice(self.keys_queue_train))
-        return self._get(keys_list)
+    def get_random(self, batch_size, num=1, is_test=False, is_label=True):
+        keys_lists = list()
+        for _ in range(num):
+            keys_list = list()
+            for _ in range(batch_size):
+                if is_test:
+                    keys_list.append(random.choice(self.keys_queue_test))
+                else:
+                    keys_list.append(random.choice(self.keys_queue_train))
+            keys_lists.append(keys_list)
+        if num == 1:
+            return self._get(keys_lists[0], is_label)
+        return [self._get(keys_lists[i], is_label) for i in range(num)]
 
-    def get_selected(self, labels, is_test=False):
+    def get_selected(self, labels, is_test=False, is_label=True):
         keys_list = list()
         for label in labels:
             num = self.get_label_id(label)
@@ -123,21 +128,23 @@ class Dataset():
                 keys_list.append(self.keys_queue_test[num])
             else:
                 keys_list.append(self.keys_queue_train[num])
-        return self._get(keys_list)
+        return self._get(keys_list, is_label)
 
     def get_all(self, is_test=False):
         if is_test:
             return self.get_batch(0, len(self.key_queue_test), is_test)
         return self.get_batch(0, len(self.keys_queue_train), is_test)
 
-    def _get_from_file(self, keys_list):
+    def _get_from_file(self, keys_list, is_label=True):
         imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
             imgs[i] = img[np.newaxis, :]
             labels.append(self.h5file[keys[0] + '/labels'].value[keys[1]])
-        return imgs, labels
+        if is_label:
+            return imgs, labels
+        return imgs
 
     def _put_on_mem(self):
         print('putting data on memory...')
@@ -147,14 +154,16 @@ class Dataset():
             self.imgs[i] = self.h5file[key + '/imgs'].value
             self.labels[i] = self.h5file[key + '/labels'].value
 
-    def _get_from_mem(self, keys_list):
+    def _get_from_mem(self, keys_list, is_label=True):
         imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
             img = self.imgs[keys[0]][keys[1]]
             imgs[i] = img[np.newaxis, :]
             labels.append(self.labels[keys[0]][keys[1]])
-        return imgs, labels
+        if is_label:
+            return imgs, labels
+        return imgs
 
     def _get_label_id(self, label):
         return self.label_ids[label]

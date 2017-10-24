@@ -19,6 +19,13 @@ def concat_imgs(src_imgs, row_n, col_n):
     return concated_img
 
 
+def combine_imgs(src_img_list):
+    combined_img = np.empty((0, src_img_list[0].shape[1], src_img_list[0].shape[2]))
+    for src_img in src_img_list:
+        combined_img = np.concatenate((combined_img, src_img), axis=0)
+    return combined_img
+
+
 def make_gif(src_imgs_dir_path, dst_img_path):
     img_paths = glob('{}/*_10.png'.format(src_imgs_dir_path))
     img_filenames = sorted([os.path.basename(path) for path in img_paths],
@@ -29,3 +36,7 @@ def make_gif(src_imgs_dir_path, dst_img_path):
     # for i in range(len(imgs)):
     #     imgs[i] = imgs[i][512:, :, :]
     imageio.mimsave(dst_img_path, imgs)
+
+
+def diclist_to_list(dicts):
+    return {k: v for dic in dicts for k, v in dic.items()}

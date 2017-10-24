@@ -18,6 +18,7 @@ def define_flags():
     # Mode
     tf.app.flags.DEFINE_string('mode', '', 'train_c or train_g or generate')
     tf.app.flags.DEFINE_string('gpu_ids', '0, 1', 'gpu ids')
+    tf.app.flags.DEFINE_integer('gpu_n', 2, 'gpu num')
     # Images Settings
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'img height')
