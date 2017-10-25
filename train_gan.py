@@ -33,8 +33,12 @@ class TrainingFontDesignGAN():
         tf.reset_default_graph()
 
     def _make_dirs(self):
-        os.mkdir(FLAGS.dst_train_root)
-        os.mkdir(FLAGS.dst_train_log)
+        if not os.path.exists(FLAGS.dst_train_root):
+            os.mkdir(FLAGS.dst_train_root)
+        if not os.path.exists(FLAGS.dst_train_log):
+            os.mkdir(FLAGS.dst_train_log)
+        if not os.path.exists(FLAGS.dst_train_samples):
+            os.mkdir(FLAGS.dst_train_samples)
 
     def _load_dataset(self, is_shuffle=True):
         self.real_dataset = Dataset(FLAGS.src_real_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
@@ -42,7 +46,6 @@ class TrainingFontDesignGAN():
         if is_shuffle:
             self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
-        os.mkdir(FLAGS.dst_train_samples)
 
     def _build_models(self):
         self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
@@ -70,10 +73,9 @@ class TrainingFontDesignGAN():
         font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
         char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
 
-        with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
-            with tf.variable_scope('embeddings'):
-                self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
-                self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
+        with tf.variable_scope('embeddings'):
+            self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
+            self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
 
         self.font_ids = [tf.placeholder(tf.int32, (self.divided_batch_size,), name='font_ids_{}'.format(i))
                          for i in range(FLAGS.gpu_n)]
@@ -154,12 +156,20 @@ class TrainingFontDesignGAN():
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
         )
         self.sess = tf.Session(config=sess_config)
-        self.sess.run(tf.global_variables_initializer())
-
-        self.saver_pretrained = tf.train.Saver(var_list=c_vars)
-        self.saver_pretrained.restore(self.sess, FLAGS.src_classifier_ckpt)
-
         self.saver = tf.train.Saver()
+
+        checkpoint = tf.train.get_checkpoint_state(FLAGS.dst_train_log)
+        if checkpoint:
+            saver_resume = tf.train.Saver()
+            saver_resume.restore(self.sess, checkpoint.model_checkpoint_path)
+            self.epoch_start = int(checkpoint.model_checkpoint_path.split('-')[-1]) + 1
+            print('restore ckpt')
+        else:
+            self.sess.run(tf.global_variables_initializer())
+            saver_pretrained = tf.train.Saver(var_list=c_vars)
+            saver_pretrained.restore(self.sess, FLAGS.src_classifier_ckpt)
+            self.epoch_start = 0
+
         self.writer = tf.summary.FileWriter(FLAGS.dst_train_log)
 
     def _get_ids(self, is_embedding_font_ids, is_embedding_char_ids):
@@ -180,7 +190,7 @@ class TrainingFontDesignGAN():
 
         batch_n = self.real_data_n // FLAGS.batch_size
 
-        for epoch_i in tqdm(range(FLAGS.epoch_n)):
+        for epoch_i in tqdm(range(self.epoch_start, FLAGS.epoch_n), initial=self.epoch_start, total=FLAGS.epoch_n):
 
             for batch_i in tqdm(range(batch_n)):
 
@@ -225,7 +235,7 @@ class TrainingFontDesignGAN():
                 if (batch_i + 1) % FLAGS.save_imgs_interval == 0:
                     self.save_temp_imgs(os.path.join(FLAGS.dst_train_samples, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
 
-            self.saver.save(self.sess, os.path.join(FLAGS.dst_train_log, 'result_{}.ckpt'.format(epoch_i)))
+            self.saver.save(self.sess, os.path.join(FLAGS.dst_train_log, 'result.ckpt'), global_step=epoch_i)
             self._visualize_embedding(epoch_i)
 
     def _run_tensorboard(self):
