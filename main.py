@@ -28,8 +28,8 @@ def define_flags():
     dst_gen_root = 'result_gen'
 
     # Source Paths
-    # tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
-    tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_200new_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
+    tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
+    # tf.app.flags.DEFINE_string('src_real_h5', 'src/fonts_200new_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_string('src_classifier_ckpt', 'result_classifier/current/log/result_9.ckpt', 'source path of classifier ckpt')
     tf.app.flags.DEFINE_string('src_trained_ckpt', 'result_pickup/2017-10-22_032515/log/result_7.ckpt', 'source path of result ckpt')
     # Destination Paths

@@ -116,8 +116,6 @@ class Dataset():
                 else:
                     keys_list.append(random.choice(self.keys_queue_train))
             keys_lists.append(keys_list)
-        if num == 1:
-            return self._get(keys_lists[0], is_label)
         return [self._get(keys_lists[i], is_label) for i in range(num)]
 
     def get_selected(self, labels, is_test=False, is_label=True):
