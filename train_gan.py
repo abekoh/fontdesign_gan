@@ -26,44 +26,43 @@ class TrainingFontDesignGAN():
         self._prepare_training()
         self._load_dataset()
 
-    def __del__(self):
-        Popen(['killall', 'tensorbaord'], stdout=PIPE)
-
     def reset(self):
         tf.reset_default_graph()
 
     def _make_dirs(self):
-        if not os.path.exists(FLAGS.dst_train_root):
-            os.mkdir(FLAGS.dst_train_root)
-        if not os.path.exists(FLAGS.dst_train_log):
-            os.mkdir(FLAGS.dst_train_log)
-        if not os.path.exists(FLAGS.dst_train_samples):
-            os.mkdir(FLAGS.dst_train_samples)
+        if not os.path.exists(FLAGS.dst_gan):
+            os.makedirs(FLAGS.dst_gan)
+        self.dst_log = os.path.join(FLAGS.dst_gan, 'log')
+        self.dst_log_fontemb = os.path.join(self.dst_log, 'font_embedding')
+        self.dst_samples = os.path.join(FLAGS.dst_gan, 'sample')
+        if not os.path.exists(self.dst_log_fontemb):
+            os.makedirs(self.dst_log_fontemb)
+        if not os.path.exists(self.dst_samples):
+            os.mkdir(self.dst_samples)
 
-    def _load_dataset(self, is_shuffle=True):
-        self.real_dataset = Dataset(FLAGS.src_real_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
+    def _load_dataset(self):
+        self.real_dataset = Dataset(FLAGS.font_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
         self.real_dataset.set_load_data()
-        if is_shuffle:
-            self.real_dataset.shuffle()
+        self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
 
     def _build_models(self):
         self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                           img_dim=FLAGS.img_dim,
                                           z_size=FLAGS.z_size,
-                                          layer_n=FLAGS.g_layer_n,
-                                          k_size=FLAGS.g_k_size,
-                                          smallest_hidden_unit_n=FLAGS.g_smallest_hidden_unit_n)
+                                          layer_n=4,
+                                          k_size=3,
+                                          smallest_hidden_unit_n=64)
         self.discriminator = models.Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                                   img_dim=FLAGS.img_dim,
-                                                  layer_n=FLAGS.d_layer_n,
-                                                  k_size=FLAGS.d_k_size,
-                                                  smallest_hidden_unit_n=FLAGS.d_smallest_hidden_unit_n)
+                                                  layer_n=4,
+                                                  k_size=3,
+                                                  smallest_hidden_unit_n=64)
         self.classifier = models.Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
                                             img_dim=FLAGS.img_dim,
-                                            k_size=FLAGS.c_k_size,
+                                            k_size=3,
                                             class_n=26,
-                                            smallest_unit_n=FLAGS.c_smallest_unit_n)
+                                            smallest_unit_n=64)
 
     def _prepare_training(self):
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
@@ -152,13 +151,15 @@ class TrainingFontDesignGAN():
         tf.summary.scalar('c_acc', avg_c_acc)
         self.summary = tf.summary.merge_all()
 
+        print(FLAGS.gpu_ids)
         sess_config = tf.ConfigProto(
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
         )
         self.sess = tf.Session(config=sess_config)
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(max_to_keep=FLAGS.ckpt_keep_n,
+                                    keep_checkpoint_every_n_hours=FLAGS.keep_ckpt_hour)
 
-        checkpoint = tf.train.get_checkpoint_state(FLAGS.dst_train_log)
+        checkpoint = tf.train.get_checkpoint_state(self.dst_log)
         if checkpoint:
             saver_resume = tf.train.Saver()
             saver_resume.restore(self.sess, checkpoint.model_checkpoint_path)
@@ -167,10 +168,10 @@ class TrainingFontDesignGAN():
         else:
             self.sess.run(tf.global_variables_initializer())
             saver_pretrained = tf.train.Saver(var_list=c_vars)
-            saver_pretrained.restore(self.sess, FLAGS.src_classifier_ckpt)
+            saver_pretrained.restore(self.sess, FLAGS.classifier_ckpt)
             self.epoch_start = 0
 
-        self.writer = tf.summary.FileWriter(FLAGS.dst_train_log)
+        self.writer = tf.summary.FileWriter(self.dst_log)
 
     def _get_ids(self, is_embedding_font_ids, is_embedding_char_ids):
         if is_embedding_font_ids:
@@ -188,58 +189,54 @@ class TrainingFontDesignGAN():
         if FLAGS.is_run_tensorboard:
             self._run_tensorboard()
 
-        batch_n = self.real_data_n // FLAGS.batch_size
-
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.epoch_n), initial=self.epoch_start, total=FLAGS.epoch_n):
 
-            for batch_i in tqdm(range(batch_n)):
+            for i in range(FLAGS.critic_n):
 
-                count_i = epoch_i * batch_n + batch_i
-
-                for i in range(FLAGS.critic_n):
-
-                    real_imgs = self.real_dataset.get_random(self.divided_batch_size, num=FLAGS.gpu_n, is_label=False)
-                    font_ids, char_ids = self._get_ids(False, False)
-
-                    feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                            {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                            {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
-                            {self.is_train: True}]
-                    self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
-
+                real_imgs = self.real_dataset.get_random(self.divided_batch_size, num=FLAGS.gpu_n, is_label=False)
                 font_ids, char_ids = self._get_ids(False, False)
 
                 feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.is_train: True}]
-                self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
-
-                font_ids, char_ids = self._get_ids(False, True)
-                labels = [to_categorical(char_ids[i], FLAGS.char_embedding_n) for i in range(FLAGS.gpu_n)]
-                feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
-                        {self.is_train: True}]
-                self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
-
-                feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
                         {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
                         {self.is_train: True}]
-                summary = self.sess.run(self.summary, feed_dict=diclist_to_list(feed))
+                self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
 
-                self.writer.add_summary(summary, count_i)
+            font_ids, char_ids = self._get_ids(False, False)
 
-                # save images
-                if (batch_i + 1) % FLAGS.save_imgs_interval == 0:
-                    self.save_temp_imgs(os.path.join(FLAGS.dst_train_samples, '{}_{}.png'.format(epoch_i + 1, batch_i + 1)))
+            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.is_train: True}]
+            self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
 
-            self.saver.save(self.sess, os.path.join(FLAGS.dst_train_log, 'result.ckpt'), global_step=epoch_i)
-            self._visualize_embedding(epoch_i)
+            font_ids, char_ids = self._get_ids(False, True)
+            labels = [to_categorical(char_ids[i], FLAGS.char_embedding_n) for i in range(FLAGS.gpu_n)]
+            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
+                    {self.is_train: True}]
+            self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
+
+            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                    {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
+                    {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
+                    {self.is_train: True}]
+            summary = self.sess.run(self.summary, feed_dict=diclist_to_list(feed))
+
+            self.writer.add_summary(summary, epoch_i)
+
+            # save images
+            if (epoch_i + 1) % FLAGS.sample_imgs_interval == 0:
+                self._save_sample_imgs(epoch_i + 1)
+
+            self.saver.save(self.sess, os.path.join(self.dst_log, 'result.ckpt'), global_step=epoch_i + 1)
+
+            if (epoch_i + 1) % FLAGS.embedding_interval == 0:
+                self._save_embedding_imgs(epoch_i + 1)
 
     def _run_tensorboard(self):
-        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(FLAGS.dst_train_log))], stdout=PIPE)
+        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log))], stdout=PIPE)
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
         feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
@@ -257,41 +254,38 @@ class TrainingFontDesignGAN():
             combined_img = np.reshape(combined_img, (-1, col_n * FLAGS.img_height))
         else:
             combined_img = np.reshape(combined_img, (-1, col_n * FLAGS.img_height, FLAGS.img_dim))
-        return combined_img
+        return Image.fromarray(np.uint8(combined_img))
 
-    def _init_temp_imgs_inputs(self):
-        self.temp_font_ids = [np.random.randint(0, FLAGS.font_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
-        self.temp_char_ids = [np.random.randint(0, FLAGS.char_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
+    def _init_sample_imgs_inputs(self):
+        self.sample_font_ids = [np.random.randint(0, FLAGS.font_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
+        self.sample_char_ids = [np.random.randint(0, FLAGS.char_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
 
-    def save_temp_imgs(self, filepath):
-        if not hasattr(self, 'temp_font_ids'):
-            self._init_temp_imgs_inputs()
-        concated_img = self._generate_img(self.temp_font_ids, self.temp_char_ids,
+    def _save_sample_imgs(self, epoch_i):
+        if not hasattr(self, 'sample_font_ids'):
+            self._init_sample_imgs_inputs()
+        concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
                                           FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
-        pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(filepath)
+        concated_img.save(os.path.join(self.dst_samples, '{}.png'.format(epoch_i)))
 
-    def _init_visualize_imgs_inputs(self):
-        self.vis_font_ids = list()
+    def _init_embedding_imgs_inputs(self):
+        self.embedding_font_ids = list()
         for i in range(FLAGS.gpu_n):
-            self.vis_font_ids.append(np.arange(FLAGS.font_embedding_n // FLAGS.gpu_n * i,
-                                               FLAGS.font_embedding_n // FLAGS.gpu_n * (i + 1), dtype=np.int32))
-        self.vis_char_ids = [np.repeat(np.array([0], dtype=np.int32), FLAGS.font_embedding_n // FLAGS.gpu_n) for _ in range(FLAGS.gpu_n)]
+            self.embedding_font_ids.append(np.arange(FLAGS.font_embedding_n // FLAGS.gpu_n * i,
+                                                     FLAGS.font_embedding_n // FLAGS.gpu_n * (i + 1), dtype=np.int32))
+        self.embedding_char_ids = [np.repeat(np.array([0], dtype=np.int32), FLAGS.font_embedding_n // FLAGS.gpu_n) for _ in range(FLAGS.gpu_n)]
 
-    def _visualize_embedding(self, epoch_i):
-        if not hasattr(self, 'vis_font_ids'):
-            self._init_visualize_imgs_inputs()
-        vis_img_path = os.path.realpath(os.path.join(FLAGS.dst_train_log, 'vis_{}.png'.format(epoch_i)))
+    def _save_embedding_imgs(self, epoch_i):
+        if not hasattr(self, 'embedding_font_ids'):
+            self._init_embedding_imgs_inputs()
+        embedding_img_path = os.path.realpath(os.path.join(self.dst_log_fontemb, '{}.png'.format(epoch_i)))
+        embedding_img = self._generate_img(self.embedding_font_ids, self.embedding_char_ids,
+                                           FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
+        embedding_img.save(embedding_img_path)
 
-        vis_img = self._generate_img(self.vis_font_ids, self.vis_char_ids,
-                                     FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
-        vis_img = Image.fromarray(np.uint8(vis_img))
-        vis_img.save(vis_img_path)
-
-        summary_writer = tf.summary.FileWriter(FLAGS.dst_train_log)
+        summary_writer = tf.summary.FileWriter(self.dst_log)
         config = projector.ProjectorConfig()
-        font_embedding = config.embeddings.add()
-        font_embedding.tensor_name = 'embeddings/font_embedding'
-        font_embedding.sprite.image_path = vis_img_path
-        font_embedding.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
+        embedding_config = config.embeddings.add()
+        embedding_config.tensor_name = 'embeddings/font_embedding'
+        embedding_config.sprite.image_path = embedding_img_path
+        embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
