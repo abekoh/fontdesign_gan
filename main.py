@@ -22,7 +22,7 @@ def define_flags():
 
     # Source Paths
     tf.app.flags.DEFINE_string('font_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
-    tf.app.flags.DEFINE_string('classifier_ckpt', 'result_classifier/current/log/result_9.ckpt', 'source path of classifier ckpt')
+    tf.app.flags.DEFINE_string('src_classifier', 'result_classifier/current', 'source path of classifier ckpt')
     tf.app.flags.DEFINE_string('src_gan', 'result_pickup/2017-10-26_070102', 'source path of result ckpt')
     # Destination Paths
     tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'destination path')

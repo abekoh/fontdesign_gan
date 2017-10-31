@@ -167,8 +167,11 @@ class TrainingFontDesignGAN():
             print('restore ckpt')
         else:
             self.sess.run(tf.global_variables_initializer())
+            src_log = os.path.join(FLAGS.src_classifier, 'log')
+            classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
+            assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
             saver_pretrained = tf.train.Saver(var_list=c_vars)
-            saver_pretrained.restore(self.sess, FLAGS.classifier_ckpt)
+            saver_pretrained.restore(self.sess, classifier_checkpoint.model_checkpoint_path)
             self.epoch_start = 0
 
         self.writer = tf.summary.FileWriter(self.dst_log)
