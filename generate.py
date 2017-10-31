@@ -26,16 +26,18 @@ class GeneratingFontDesignGAN():
         self._prepare_generating()
 
     def _make_dirs(self):
-        if not os.path.exists(FLAGS.dst_gen_root):
-            os.mkdir(FLAGS.dst_gen_root)
+        self.src_log = os.path.join(FLAGS.src_gan, 'log')
+        self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
+        if not os.path.exists(self.dst_generated):
+            os.mkdir(self.dst_generated)
 
     def _build_model(self):
         self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                           img_dim=FLAGS.img_dim,
                                           z_size=FLAGS.z_size,
-                                          layer_n=FLAGS.g_layer_n,
-                                          k_size=FLAGS.g_k_size,
-                                          smallest_hidden_unit_n=FLAGS.g_smallest_hidden_unit_n)
+                                          layer_n=4,
+                                          k_size=3,
+                                          smallest_hidden_unit_n=64)
 
     def _set_inputs(self):
         self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = self._construct_ids('font_ids')
@@ -110,7 +112,9 @@ class GeneratingFontDesignGAN():
         self.sess = tf.Session(config=sess_config)
 
         self.saver = tf.train.Saver()
-        self.saver.restore(self.sess, FLAGS.src_trained_ckpt)
+        checkpoint = tf.train.get_checkpoint_state(self.src_log)
+        assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
+        self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
     def generate(self, filename='generated.png'):
         generated_imgs = self.sess.run(self.generated_imgs,
@@ -127,4 +131,4 @@ class GeneratingFontDesignGAN():
         else:
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
         pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(FLAGS.dst_gen_root, filename))
+        pil_img.save(os.path.join(self.dst_generated, filename))

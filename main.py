@@ -23,10 +23,11 @@ def define_flags():
     # Source Paths
     tf.app.flags.DEFINE_string('font_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_string('classifier_ckpt', 'result_classifier/current/log/result_9.ckpt', 'source path of classifier ckpt')
-    tf.app.flags.DEFINE_string('gan_ckpt', 'result_pickup/2017-10-22_032515/log/result_7.ckpt', 'source path of result ckpt')
+    tf.app.flags.DEFINE_string('src_gan', 'result_pickup/2017-10-26_070102', 'source path of result ckpt')
     # Destination Paths
     tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'destination path')
     tf.app.flags.DEFINE_string('dst_classifier', dst_classifier, 'destination classifier-mode path')
+    tf.app.flags.DEFINE_string('gen_name', now_str + '.png', 'destination classifier-mode path')
 
     # Images Settings
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
@@ -71,7 +72,7 @@ def main(argv=None):
     if FLAGS.mode == 'generate':
         gan = GeneratingFontDesignGAN('./gen_sample.json')
         gan.setup()
-        gan.generate(FLAGS.gen_filename)
+        gan.generate(FLAGS.gen_name)
 
 
 if __name__ == '__main__':
