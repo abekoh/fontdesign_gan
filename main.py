@@ -1,11 +1,6 @@
 import tensorflow as tf
 from datetime import datetime
 
-from dataset import Dataset
-from train_classifier import TrainingClassifier
-from train_gan import TrainingFontDesignGAN
-from generate import GeneratingFontDesignGAN
-
 FLAGS = tf.app.flags.FLAGS
 
 
@@ -17,7 +12,7 @@ def define_flags():
     # Common
     tf.app.flags.DEFINE_string('gpu_ids', '0', 'gpu ids')
     tf.app.flags.DEFINE_integer('gpu_n', 1, 'gpu num')
-    tf.app.flags.DEFINE_string('font_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
+    tf.app.flags.DEFINE_string('font_h5', '', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'img height')
     tf.app.flags.DEFINE_integer('img_dim', 3, 'img dimention')
@@ -27,7 +22,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
 
-    # Dataset
+    # Make Dataset
     tf.app.flags.DEFINE_string('src_font_imgs', '../../font_dataset/png/6628_64x64', 'source path of result ckpt')
 
     # Train Classifier
@@ -39,7 +34,7 @@ def define_flags():
     # Train GAN
     dst_gan = 'result/gan/' + now_str
     tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'destination path')
-    tf.app.flags.DEFINE_string('src_classifier', 'result_classifier/current', 'source path of classifier ckpt')
+    tf.app.flags.DEFINE_string('src_classifier', '', 'source path of classifier ckpt')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'learning penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'learning rate of generator iwth classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 150000, 'epoch cycles')
@@ -52,26 +47,37 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('is_run_tensorboard', True, 'run tensorboard or not')
 
     # Generate GAN
-    tf.app.flags.DEFINE_string('src_gan', 'result_pickup/2017-10-26_070102', 'source path of result ckpt')
+    tf.app.flags.DEFINE_string('src_gan', '', 'source path of result ckpt')
     tf.app.flags.DEFINE_string('gen_name', now_str + '.png', 'destination classifier-mode path')
 
 
 def main(argv=None):
     if FLAGS.mode == 'make_dataset':
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
         dataset.load_imgs(FLAGS.src_font_imgs)
-    if FLAGS.mode == 'train_c':
+    elif FLAGS.mode == 'train_c':
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
         cl.setup()
         cl.train()
-    if FLAGS.mode == 'train_g':
+    elif FLAGS.mode == 'train_g':
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        assert FLAGS.src_cla != '', 'have to set --src_classifier'
+        from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.setup()
         gan.train()
-    if FLAGS.mode == 'generate':
+    elif FLAGS.mode == 'generate':
+        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN('./gen_sample.json')
         gan.setup()
         gan.generate(FLAGS.gen_name)
+    else:
+        print('set --mode {make_dataset train_c train_g generate}')
 
 
 if __name__ == '__main__':
