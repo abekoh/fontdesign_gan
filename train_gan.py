@@ -18,16 +18,14 @@ class TrainingFontDesignGAN():
 
     def __init__(self):
         global FLAGS
-
-    def setup(self):
-        self._make_dirs()
+        self._setup_dirs()
         self._prepare_training()
         self._load_dataset()
 
     def reset(self):
         tf.reset_default_graph()
 
-    def _make_dirs(self):
+    def _setup_dirs(self):
         if not os.path.exists(FLAGS.dst_gan):
             os.makedirs(FLAGS.dst_gan)
         self.dst_log = os.path.join(FLAGS.dst_gan, 'log')

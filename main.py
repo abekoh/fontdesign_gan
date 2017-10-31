@@ -71,21 +71,18 @@ def main(argv=None):
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
-        cl.setup()
         cl.train()
     elif FLAGS.mode == 'train_g':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         assert FLAGS.src_classifier != '', 'have to set --src_classifier'
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
-        gan.setup()
         gan.train()
     elif FLAGS.mode == 'generate':
         assert FLAGS.src_gan != '', 'have to set --src_gan'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        gan.setup()
         gan.generate(FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')

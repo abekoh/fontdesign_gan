@@ -14,13 +14,11 @@ class TrainingClassifier():
 
     def __init__(self):
         global FLAGS
-
-    def setup(self):
-        self._make_dirs()
+        self._setup_dirs()
         self._prepare_training()
         self._load_dataset()
 
-    def _make_dirs(self):
+    def _setup_dirs(self):
         if not os.path.exists(FLAGS.dst_classifier):
             os.makedirs(FLAGS.dst_classifier)
         self.dst_log = os.path.join(FLAGS.dst_classifier, 'log')
