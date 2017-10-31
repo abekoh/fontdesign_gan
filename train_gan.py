@@ -6,7 +6,6 @@ from subprocess import Popen, PIPE
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
-from keras.utils import to_categorical
 
 import models
 from dataset import Dataset
@@ -213,7 +212,7 @@ class TrainingFontDesignGAN():
             self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
 
             font_ids, char_ids = self._get_ids(False, True)
-            labels = [to_categorical(char_ids[i], FLAGS.char_embedding_n) for i in range(FLAGS.gpu_n)]
+            labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
             feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                     {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
                     {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},

@@ -1,7 +1,7 @@
 import os
 
 import tensorflow as tf
-from keras.utils import to_categorical
+import numpy as np
 from tqdm import tqdm
 
 from models import Classifier
@@ -92,4 +92,4 @@ class TrainingClassifier():
             self.saver.save(self.sess, os.path.join(self.dst_log, 'result_{}.ckpt'.format(epoch_i)))
 
     def _labels_to_categorical(self, labels):
-        return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
+        return np.eye(26)[list(map(lambda x: ord(x) - 65, labels))]
