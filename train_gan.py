@@ -189,7 +189,7 @@ class TrainingFontDesignGAN():
         if FLAGS.is_run_tensorboard:
             self._run_tensorboard()
 
-        for epoch_i in tqdm(range(self.epoch_start, FLAGS.epoch_n), initial=self.epoch_start, total=FLAGS.epoch_n):
+        for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
 
             for i in range(FLAGS.critic_n):
 

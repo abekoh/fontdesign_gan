@@ -45,7 +45,8 @@ def define_flags():
 
     # Train GAN Settings
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
-    tf.app.flags.DEFINE_integer('epoch_n', 150000, 'epoch cycles')
+    tf.app.flags.DEFINE_integer('gan_epoch_n', 150000, 'epoch cycles')
+    tf.app.flags.DEFINE_integer('c_epoch_n', 10, 'epoch cycles')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'how many critic wasserstein distance')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
 

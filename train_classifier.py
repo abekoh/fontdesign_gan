@@ -21,15 +21,18 @@ class TrainingClassifier():
         self._load_dataset()
 
     def _make_dirs(self):
-        os.mkdir(FLAGS.dst_classifier_root)
-        os.mkdir(FLAGS.dst_classifier_log)
+        if not os.path.exists(FLAGS.dst_classifier):
+            os.makedirs(FLAGS.dst_classifier)
+        self.dst_log = os.path.join(FLAGS.dst_classifier, 'log')
+        if not os.path.exists(self.dst_log):
+            os.mkdir(self.dst_log)
 
     def _prepare_training(self):
         self.classifier = Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
                                      img_dim=FLAGS.img_dim,
-                                     k_size=FLAGS.c_k_size,
+                                     k_size=3,
                                      class_n=26,
-                                     smallest_unit_n=FLAGS.c_smallest_unit_n)
+                                     smallest_unit_n=64)
         self.imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='imgs')
         self.labels = tf.placeholder(tf.float32, (FLAGS.batch_size, 26), name='labels')
         self.is_train = tf.placeholder(tf.bool, name='is_train')
@@ -48,17 +51,16 @@ class TrainingClassifier():
         self.saver = tf.train.Saver()
 
     def _load_dataset(self):
-        self.dataset = Dataset(FLAGS.src_real_h5, 'r', (FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
+        self.dataset = Dataset(FLAGS.font_h5, 'r', (FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
         self.dataset.set_load_data(train_rate=FLAGS.train_rate)
-        if FLAGS.is_shuffle:
-            self.dataset.shuffle()
+        self.dataset.shuffle()
         self.train_data_n = self.dataset.get_img_len()
         self.test_data_n = self.dataset.get_img_len(is_test=True)
 
     def train(self):
         train_batch_n = self.train_data_n // FLAGS.batch_size
         test_batch_n = self.test_data_n // FLAGS.batch_size
-        for epoch_i in tqdm(range(FLAGS.epoch_n)):
+        for epoch_i in tqdm(range(FLAGS.c_epoch_n)):
             # train
             losses, accs = list(), list()
             for batch_i in tqdm(range(train_batch_n)):
@@ -87,7 +89,7 @@ class TrainingClassifier():
             test_loss_avg = sum(losses) / len(losses)
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
-            self.saver.save(self.sess, os.path.join(FLAGS.dst_classifier_log, 'result_{}.ckpt'.format(epoch_i)))
+            self.saver.save(self.sess, os.path.join(self.dst_log, 'result_{}.ckpt'.format(epoch_i)))
 
     def _labels_to_categorical(self, labels):
         return to_categorical(list(map(lambda x: ord(x) - 65, labels)), 26)
