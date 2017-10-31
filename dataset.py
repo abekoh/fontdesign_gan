@@ -41,6 +41,7 @@ class Dataset():
                 if inp == 'n':
                     print('canceled')
                     sys.exit()
+            self.h5file = h5py.File(h5_path, mode)
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
