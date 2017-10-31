@@ -21,7 +21,6 @@ class TrainingFontDesignGAN():
 
     def setup(self):
         self._make_dirs()
-        self._build_models()
         self._prepare_training()
         self._load_dataset()
 
@@ -45,25 +44,24 @@ class TrainingFontDesignGAN():
         self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
 
-    def _build_models(self):
-        self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                          img_dim=FLAGS.img_dim,
-                                          z_size=FLAGS.z_size,
-                                          layer_n=4,
-                                          k_size=3,
-                                          smallest_hidden_unit_n=64)
-        self.discriminator = models.Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                                  img_dim=FLAGS.img_dim,
-                                                  layer_n=4,
-                                                  k_size=3,
-                                                  smallest_hidden_unit_n=64)
-        self.classifier = models.Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                            img_dim=FLAGS.img_dim,
-                                            k_size=3,
-                                            class_n=26,
-                                            smallest_unit_n=64)
-
     def _prepare_training(self):
+        generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                     img_dim=FLAGS.img_dim,
+                                     z_size=FLAGS.z_size,
+                                     layer_n=4,
+                                     k_size=3,
+                                     smallest_hidden_unit_n=64)
+        discriminator = models.Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                             img_dim=FLAGS.img_dim,
+                                             layer_n=4,
+                                             k_size=3,
+                                             smallest_hidden_unit_n=64)
+        classifier = models.Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                       img_dim=FLAGS.img_dim,
+                                       k_size=3,
+                                       class_n=26,
+                                       smallest_unit_n=64)
+
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
         self.divided_batch_size = FLAGS.batch_size // FLAGS.gpu_n
@@ -109,30 +107,30 @@ class TrainingFontDesignGAN():
                                  lambda: tf.nn.embedding_lookup(self.char_embedding, self.char_ids[i]))
                 z = tf.concat([font_z, char_z], axis=1)
 
-                self.fake_imgs[i] = self.generator(z, is_reuse=g_reuse[i], is_train=self.is_train)
+                self.fake_imgs[i] = generator(z, is_reuse=g_reuse[i], is_train=self.is_train)
 
-                d_real = self.discriminator(self.real_imgs[i], is_reuse=d_reuse[i],  is_train=self.is_train)
-                d_fake = self.discriminator(self.fake_imgs[i], is_reuse=True, is_train=self.is_train)
+                d_real = discriminator(self.real_imgs[i], is_reuse=d_reuse[i],  is_train=self.is_train)
+                d_fake = discriminator(self.fake_imgs[i], is_reuse=True, is_train=self.is_train)
 
                 d_loss[i] = - (tf.reduce_mean(d_real) - tf.reduce_mean(d_fake))
                 g_loss[i] = - tf.reduce_mean(d_fake)
 
                 epsilon = tf.random_uniform((self.divided_batch_size, 1, 1, 1), minval=0., maxval=1.)
                 interp = self.real_imgs[i] + epsilon * (self.fake_imgs[i] - self.real_imgs[i])
-                d_interp = self.discriminator(interp, is_reuse=True, is_train=self.is_train)
+                d_interp = discriminator(interp, is_reuse=True, is_train=self.is_train)
                 grads = tf.gradients(d_interp, [interp])[0]
                 slopes = tf.sqrt(tf.reduce_sum(tf.square(grads), reduction_indices=[-1]))
                 grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
                 d_loss[i] += 10 * grad_penalty
 
-                c_fake = FLAGS.c_penalty * self.classifier(self.fake_imgs[i], is_reuse=c_reuse[i], is_train=self.is_train)
+                c_fake = FLAGS.c_penalty * classifier(self.fake_imgs[i], is_reuse=c_reuse[i], is_train=self.is_train)
                 c_loss[i] = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels[i], logits=c_fake))
                 correct_pred = tf.equal(tf.argmax(c_fake, 1), tf.argmax(self.labels[i], 1))
                 c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
         with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
-            d_vars = self.discriminator.get_trainable_variables()
-            g_vars = self.generator.get_trainable_variables()
+            d_vars = discriminator.get_trainable_variables()
+            g_vars = generator.get_trainable_variables()
             c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
 
             sum_d_loss = sum(d_loss)

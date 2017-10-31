@@ -21,7 +21,6 @@ class GeneratingFontDesignGAN():
 
     def setup(self):
         self._make_dirs()
-        self._build_model()
         self._set_inputs()
         self._prepare_generating()
 
@@ -30,14 +29,6 @@ class GeneratingFontDesignGAN():
         self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
-
-    def _build_model(self):
-        self.generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                          img_dim=FLAGS.img_dim,
-                                          z_size=FLAGS.z_size,
-                                          layer_n=4,
-                                          k_size=3,
-                                          smallest_hidden_unit_n=64)
 
     def _set_inputs(self):
         self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = self._construct_ids('font_ids')
@@ -79,6 +70,13 @@ class GeneratingFontDesignGAN():
         return ids_x, ids_y, ids_alpha
 
     def _prepare_generating(self):
+        generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                     img_dim=FLAGS.img_dim,
+                                     z_size=FLAGS.z_size,
+                                     layer_n=4,
+                                     k_size=3,
+                                     smallest_hidden_unit_n=64)
+
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
 
@@ -104,7 +102,7 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([font_z, char_z], axis=1)
 
-        self.generated_imgs = self.generator(z, is_train=False)
+        self.generated_imgs = generator(z, is_train=False)
 
         sess_config = tf.ConfigProto(
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
