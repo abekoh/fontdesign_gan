@@ -11,13 +11,43 @@ from utils import concat_imgs
 FLAGS = tf.app.flags.FLAGS
 
 
+def construct_ids(ids):
+    ids_x = np.array([], dtype=np.int32)
+    ids_y = np.array([], dtype=np.int32)
+    ids_alpha = np.array([], dtype=np.float32)
+    for id_str in ids:
+        if '-' in id_str:
+            id_nums = id_str.split('-')
+            for i in range(int(id_nums[0]), int(id_nums[1]) + 1):
+                ids_x = np.append(ids_x, i)
+                ids_y = np.append(ids_y, i)
+                ids_alpha = np.append(ids_alpha, 0.)
+        elif '*' in id_str:
+            id_nums = id_str.split('*')
+            for i in range(int(id_nums[1])):
+                ids_x = np.append(ids_x, int(id_nums[0]))
+                ids_y = np.append(ids_y, int(id_nums[0]))
+                ids_alpha = np.append(ids_alpha, 0.)
+        elif '..' in id_str and ':' in id_str:
+            tmp, step = id_str.split(':')
+            id_nums = tmp.split('..')
+            for i in range(int(step)):
+                ids_x = np.append(ids_x, int(id_nums[0]))
+                ids_y = np.append(ids_y, int(id_nums[1]))
+                ids_alpha = np.append(ids_alpha, 1. / float(step) * i)
+        else:
+            ids_x = np.append(ids_x, int(id_str))
+            ids_y = np.append(ids_y, int(id_str))
+            ids_alpha = np.append(ids_alpha, 0.)
+    return ids_x, ids_y, ids_alpha
+
+
 class GeneratingFontDesignGAN():
 
-    def __init__(self, json_path):
+    def __init__(self):
         global FLAGS
-        if json_path is not None:
-            with open(json_path, 'r') as json_file:
-                self.json_dict = json.load(json_file)
+        with open(FLAGS.src_ids, 'r') as json_file:
+            self.json_dict = json.load(json_file)
 
     def setup(self):
         self._make_dirs()
@@ -31,43 +61,13 @@ class GeneratingFontDesignGAN():
             os.mkdir(self.dst_generated)
 
     def _set_inputs(self):
-        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = self._construct_ids('font_ids')
-        self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = self._construct_ids('char_ids')
+        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = construct_ids(self.json_dict['font_ids'])
+        self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = construct_ids(self.json_dict['char_ids'])
         assert self.font_gen_ids_x.shape[0] == self.char_gen_ids_x.shape[0], \
             'font_ids.shape is not equal char_ids.shape'
         self.batch_size = self.font_gen_ids_x.shape[0]
         self.col_n = self.json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
-
-    def _construct_ids(self, label):
-        ids_x = np.array([], dtype=np.int32)
-        ids_y = np.array([], dtype=np.int32)
-        ids_alpha = np.array([], dtype=np.float32)
-        for id_str in self.json_dict[label]:
-            if '-' in id_str:
-                id_nums = id_str.split('-')
-                for i in range(int(id_nums[0]), int(id_nums[1]) + 1):
-                    ids_x = np.append(ids_x, i)
-                    ids_y = np.append(ids_y, i)
-                    ids_alpha = np.append(ids_alpha, 0.)
-            elif '*' in id_str:
-                id_nums = id_str.split('*')
-                for i in range(int(id_nums[1])):
-                    ids_x = np.append(ids_x, int(id_nums[0]))
-                    ids_y = np.append(ids_y, int(id_nums[0]))
-                    ids_alpha = np.append(ids_alpha, 0.)
-            elif '..' in id_str and ':' in id_str:
-                tmp, step = id_str.split(':')
-                id_nums = tmp.split('..')
-                for i in range(int(step)):
-                    ids_x = np.append(ids_x, int(id_nums[0]))
-                    ids_y = np.append(ids_y, int(id_nums[1]))
-                    ids_alpha = np.append(ids_alpha, 1. / float(step) * i)
-            else:
-                ids_x = np.append(ids_x, int(id_str))
-                ids_y = np.append(ids_y, int(id_str))
-                ids_alpha = np.append(ids_alpha, 0.)
-        return ids_x, ids_y, ids_alpha
 
     def _prepare_generating(self):
         generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),

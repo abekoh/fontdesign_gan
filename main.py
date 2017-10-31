@@ -57,6 +57,7 @@ def define_flags():
 
     # Generate GAN
     tf.app.flags.DEFINE_string('src_gan', '', 'source path of result ckpt')
+    tf.app.flags.DEFINE_string('src_ids', '', 'source path of result ckpt')
     tf.app.flags.DEFINE_string('gen_name', now_str + '.png', 'destination classifier-mode path')
 
 
@@ -81,8 +82,9 @@ def main(argv=None):
         gan.train()
     elif FLAGS.mode == 'generate':
         assert FLAGS.src_gan != '', 'have to set --src_gan'
+        assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
-        gan = GeneratingFontDesignGAN('./gen_sample.json')
+        gan = GeneratingFontDesignGAN()
         gan.setup()
         gan.generate(FLAGS.gen_name)
     else:
