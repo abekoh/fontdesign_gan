@@ -1,6 +1,7 @@
 import tensorflow as tf
 from datetime import datetime
 
+from dataset import Dataset
 from train_classifier import TrainingClassifier
 from train_gan import TrainingFontDesignGAN
 from generate import GeneratingFontDesignGAN
@@ -24,6 +25,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('font_h5', 'src/fonts_6627_caps_3ch_64x64.h5', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_string('src_classifier', 'result_classifier/current', 'source path of classifier ckpt')
     tf.app.flags.DEFINE_string('src_gan', 'result_pickup/2017-10-26_070102', 'source path of result ckpt')
+    tf.app.flags.DEFINE_string('src_font_imgs', '../../font_dataset/png/6628_64x64', 'source path of result ckpt')
     # Destination Paths
     tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'destination path')
     tf.app.flags.DEFINE_string('dst_classifier', dst_classifier, 'destination classifier-mode path')
@@ -61,6 +63,9 @@ def define_flags():
 
 
 def main(argv=None):
+    if FLAGS.mode == 'make_dataset':
+        dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
+        dataset.load_imgs(FLAGS.src_font_imgs)
     if FLAGS.mode == 'train_c':
         cl = TrainingClassifier()
         cl.setup()

@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 from PIL import Image
 import h5py
@@ -16,9 +17,11 @@ class Dataset():
         self.is_binary = is_binary
         self.is_mem = is_mem
         self.img_dim = img_dim
-        self.h5file = h5py.File(h5_path, mode)
         self._get = self._get_from_file
+
         if self.mode == 'r':
+            assert os.path.exists(h5_path), 'hdf5 file is not found: {}'.format(h5_path)
+            self.h5file = h5py.File(h5_path, mode)
             # TODO: be more clearly
             keys = self.h5file.keys()
             self.data_n = len(keys)
@@ -29,6 +32,15 @@ class Dataset():
                 self._put_on_mem()
                 # self._set_label_ids()
                 self._get = self._get_from_mem
+        if self.mode == 'w':
+            if os.path.exists(h5_path):
+                while True:
+                    inp = input('overwrite {}? (y/n)\n'.format(h5_path))
+                    if inp == 'y' or inp == 'n':
+                        break
+                if inp == 'n':
+                    print('canceled')
+                    sys.exit()
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
