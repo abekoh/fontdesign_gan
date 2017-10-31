@@ -1,7 +1,15 @@
 import tensorflow as tf
 from datetime import datetime
+import subprocess
 
 FLAGS = tf.app.flags.FLAGS
+
+
+def get_gpu_n():
+    result = subprocess.run('nvidia-smi -L | wc -l', shell=True, stdout=subprocess.PIPE)
+    if result.returncode != 0:
+        return 0
+    return int(result.stdout)
 
 
 def define_flags():
@@ -10,8 +18,9 @@ def define_flags():
     tf.app.flags.DEFINE_string('mode', '', 'train_c or train_g or generate')
 
     # Common
-    tf.app.flags.DEFINE_string('gpu_ids', '0', 'gpu ids')
-    tf.app.flags.DEFINE_integer('gpu_n', 1, 'gpu num')
+    gpu_n = get_gpu_n()
+    tf.app.flags.DEFINE_integer('gpu_n', gpu_n, 'gpu num')
+    tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(gpu_n)]), 'gpu ids')
     tf.app.flags.DEFINE_string('font_h5', '', 'source path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'img width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'img height')
