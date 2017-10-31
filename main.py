@@ -74,7 +74,7 @@ def main(argv=None):
         cl.train()
     elif FLAGS.mode == 'train_g':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
-        assert FLAGS.src_cla != '', 'have to set --src_classifier'
+        assert FLAGS.src_classifier != '', 'have to set --src_classifier'
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.setup()
