@@ -122,29 +122,31 @@ class TrainingFontDesignGAN():
                 grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
                 d_loss[i] += 10 * grad_penalty
 
-                c_fake = FLAGS.c_penalty * classifier(self.fake_imgs[i], is_reuse=c_reuse[i], is_train=self.is_train)
-                c_loss[i] = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels[i], logits=c_fake))
-                correct_pred = tf.equal(tf.argmax(c_fake, 1), tf.argmax(self.labels[i], 1))
-                c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+                if FLAGS.c_penalty != 0.:
+                    c_fake = FLAGS.c_penalty * classifier(self.fake_imgs[i], is_reuse=c_reuse[i], is_train=self.is_train)
+                    c_loss[i] = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels[i], logits=c_fake))
+                    correct_pred = tf.equal(tf.argmax(c_fake, 1), tf.argmax(self.labels[i], 1))
+                    c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
         with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
             d_vars = discriminator.get_trainable_variables()
             g_vars = generator.get_trainable_variables()
-            c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
-
             sum_d_loss = sum(d_loss)
             sum_g_loss = sum(g_loss)
-            sum_c_loss = sum(c_loss)
-            avg_c_acc = sum(c_acc) / len(c_acc)
-
             self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(sum_d_loss, var_list=d_vars)
             self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(sum_g_loss, var_list=g_vars)
-            self.c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr).minimize(sum_c_loss, var_list=g_vars)
+
+            if FLAGS.c_penalty != 0:
+                c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
+                sum_c_loss = sum(c_loss)
+                avg_c_acc = sum(c_acc) / len(c_acc)
+                self.c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr).minimize(sum_c_loss, var_list=g_vars)
 
         tf.summary.scalar('d_loss', sum_d_loss)
         tf.summary.scalar('g_loss', sum_g_loss)
-        tf.summary.scalar('c_loss', sum_c_loss)
-        tf.summary.scalar('c_acc', avg_c_acc)
+        if FLAGS.c_penalty != 0:
+            tf.summary.scalar('c_loss', sum_c_loss)
+            tf.summary.scalar('c_acc', avg_c_acc)
         self.summary = tf.summary.merge_all()
 
         print(FLAGS.gpu_ids)
@@ -163,11 +165,12 @@ class TrainingFontDesignGAN():
             print('restore ckpt')
         else:
             self.sess.run(tf.global_variables_initializer())
-            src_log = os.path.join(FLAGS.src_classifier, 'log')
-            classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
-            assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
-            saver_pretrained = tf.train.Saver(var_list=c_vars)
-            saver_pretrained.restore(self.sess, classifier_checkpoint.model_checkpoint_path)
+            if FLAGS.c_penalty != 0:
+                src_log = os.path.join(FLAGS.src_classifier, 'log')
+                classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
+                assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
+                saver_pretrained = tf.train.Saver(var_list=c_vars)
+                saver_pretrained.restore(self.sess, classifier_checkpoint.model_checkpoint_path)
             self.epoch_start = 0
 
         self.writer = tf.summary.FileWriter(self.dst_log)
@@ -208,19 +211,21 @@ class TrainingFontDesignGAN():
                     {self.is_train: True}]
             self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
 
-            font_ids, char_ids = self._get_ids(False, True)
-            labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
-            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
-                    {self.is_train: True}]
-            self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
+            if FLAGS.c_penalty != 0.:
+                font_ids, char_ids = self._get_ids(False, True)
+                labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
+                feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                        {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                        {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
+                        {self.is_train: True}]
+                self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
 
             feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                     {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
                     {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
                     {self.is_train: True}]
+            if FLAGS.c_penalty != 0.:
+                feed.append({self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)})
             summary = self.sess.run(self.summary, feed_dict=diclist_to_list(feed))
 
             self.writer.add_summary(summary, epoch_i)
