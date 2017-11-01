@@ -72,6 +72,21 @@ class Dataset():
                 labels[i] = os.path.basename(img_path).split('.')[0]
             self._save(os.path.basename(dir_path), imgs, labels)
 
+    def load_imgs_mnist(self, src_dir_path):
+        mode_dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
+        for mode_dir_path in tqdm(mode_dir_paths):
+            img_paths = sorted(glob('{}/**/*.png'.format(mode_dir_path), recursive=True))
+            imgs = np.empty((len(img_paths), 28, 28, 1), dtype=np.float32)
+            labels = np.empty((len(img_paths)), dtype=object)
+            for i, img_path in enumerate(img_paths):
+                pil_img = Image.open(img_path)
+                np_img = np.asarray(pil_img)
+                np_img = (np_img.astype(np.float32) / 127.5) - 1.
+                np_img = np_img[np.newaxis, :, :, np.newaxis]
+                imgs[i] = np_img
+                labels[i] = img_path.split('/')[-2]
+            self._save(os.path.basename(mode_dir_path), imgs, labels)
+
     def _save(self, group_name, imgs, labels):
         self.h5file.create_group(group_name)
         self.h5file.create_dataset(group_name + '/imgs', data=imgs)
