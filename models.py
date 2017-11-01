@@ -81,7 +81,7 @@ class Generator(Model):
                         x = ops.deconv2d(x, [x_shape[0], x_shape[1] * 2, x_shape[1] * 2, unit_n], self.k_size, 2, 'SAME')
                     else:
                         x = tf.image.resize_bilinear(x, (x_shape[1] * 2, x_shape[2] * 2))
-                    x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
+                        x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
                         x = ops.batch_norm(x, is_train)
                         x = tf.nn.relu(x)
