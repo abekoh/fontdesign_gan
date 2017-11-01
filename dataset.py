@@ -5,6 +5,7 @@ from PIL import Image
 import h5py
 from glob import glob
 import random
+from tqdm import tqdm
 
 from utils import concat_imgs
 
@@ -46,13 +47,12 @@ class Dataset():
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
-        for dir_path in dir_paths:
+        for dir_path in tqdm(dir_paths):
             if not os.path.isdir(dir_path):
                 continue
-            print('loading {}'.format(dir_path))
             img_paths = sorted(glob('{}/*.png'.format(dir_path)))
             if len(img_paths) == 0:
-                print('.png images are not found')
+                print('png images are not found at {}'.format(dir_path))
                 continue
             imgs = np.empty((len(img_paths), self.img_size[0], self.img_size[1], self.img_dim), dtype=np.float32)
             labels = np.empty((len(img_paths)), dtype=object)
