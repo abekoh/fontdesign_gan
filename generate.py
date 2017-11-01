@@ -126,6 +126,8 @@ class GeneratingFontDesignGAN():
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
         concated_img = concat_imgs(generated_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
+        if FLAGS.is_flip:
+            concated_img = concated_img * -1.
         if FLAGS.img_dim == 1:
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
         else:

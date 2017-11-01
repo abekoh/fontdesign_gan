@@ -25,6 +25,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'image\'\'s height')
     tf.app.flags.DEFINE_integer('img_dim', 3, 'image\'s dimention')
+    tf.app.flags.DEFINE_boolean('is_flip', False, 'flip image')
     tf.app.flags.DEFINE_integer('font_embedding_n', 256, 'num of font embedding ids')
     tf.app.flags.DEFINE_integer('char_embedding_n', 26, 'num of char embedding ids')
     tf.app.flags.DEFINE_float('font_embedding_rate', 0.5, 'rate of font embedding')
@@ -66,7 +67,7 @@ def main(argv=None):
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         assert FLAGS.font_imgs != '', 'have to set --font_imgs'
         from dataset import Dataset
-        dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
+        dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_flip=FLAGS.is_flip)
         dataset.load_imgs(FLAGS.font_imgs)
     elif FLAGS.mode == 'train_c':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'

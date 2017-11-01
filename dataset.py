@@ -11,12 +11,13 @@ from utils import concat_imgs
 
 class Dataset():
 
-    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False, is_mem=False, img_dim=1):
+    def __init__(self, h5_path, mode, img_size=(256, 256), is_binary=False, is_mem=False, img_dim=1, is_flip=False):
         self.mode = mode
         self.img_size = img_size
         self.is_binary = is_binary
         self.is_mem = is_mem
         self.img_dim = img_dim
+        self.is_flip = is_flip
         self._get = self._get_from_file
 
         if self.mode == 'r':
@@ -62,6 +63,8 @@ class Dataset():
                     np_img = (np_img.astype(np.float32) * 2.) - 1.
                 else:
                     np_img = (np_img.astype(np.float32) / 127.5) - 1.
+                if self.is_flip:
+                    np_img = np_img * -1.
                 np_img = np_img[np.newaxis, :, :, np.newaxis]
                 if self.img_dim == 3:
                     np_img = np.repeat(np_img, 3, axis=3)
