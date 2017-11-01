@@ -38,7 +38,8 @@ class Model(object):
 
 class Generator(Model):
 
-    def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='generator', is_bn=True):
+    def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3,
+                 smallest_hidden_unit_n=128, name='generator', is_bn=True, is_transpose=False):
 
         super(Generator, self).__init__(name)
 
@@ -50,6 +51,7 @@ class Generator(Model):
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.name = name
         self.is_bn = is_bn
+        self.is_transpose = is_transpose
 
     def __call__(self, x, is_reuse=False, is_train=True):
 
@@ -75,9 +77,10 @@ class Generator(Model):
                     else:
                         unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - i - 2))
                     x_shape = x.get_shape().as_list()
-                    new_height = 2 * x_shape[1]
-                    new_width = 2 * x_shape[2]
-                    x = tf.image.resize_bilinear(x, (new_height, new_width))
+                    if self.is_transpose:
+                        x = ops.deconv2d(x, [x_shape[0], x_shape[1] * 2, x_shape[1] * 2, unit_n], self.k_size, 2, 'SAME')
+                    else:
+                        x = tf.image.resize_bilinear(x, (x_shape[1] * 2, x_shape[2] * 2))
                     x = ops.conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
                         x = ops.batch_norm(x, is_train)

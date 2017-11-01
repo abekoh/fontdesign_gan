@@ -49,6 +49,26 @@ def conv2d(x, n_out, k, s, p, stddev=0.02, name='conv2d'):
         return conv
 
 
+def deconv2d(x, out_shape, k, s, p, stddev=0.02, name='deconv2d'):
+
+    with tf.variable_scope(name):
+
+        inp_shape = x.get_shape().as_list()
+        strides = [1, s, s, 1]
+
+        w_init = tf.random_normal_initializer(stddev=stddev)
+        w = tf.get_variable('w', [k, k, out_shape[-1], inp_shape[-1]], initializer=w_init)
+
+        deconv = tf.nn.conv2d_transpose(x, w, output_shape=out_shape, strides=strides, padding=p)
+
+        b_init = tf.constant_initializer(0.0)
+        b = tf.get_variable('b', shape=(out_shape[-1],), initializer=b_init)
+
+        deconv = tf.reshape(tf.nn.bias_add(deconv, b), deconv.get_shape())
+
+        return deconv
+
+
 def maxpool2d(x, k, s, p, name='maxpool2d'):
     strides = [1, s, s, 1]
     ksize = [1, k, k, 1]

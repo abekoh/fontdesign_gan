@@ -48,7 +48,8 @@ class TrainingFontDesignGAN():
                                      z_size=FLAGS.z_size,
                                      layer_n=4,
                                      k_size=3,
-                                     smallest_hidden_unit_n=64)
+                                     smallest_hidden_unit_n=64,
+                                     is_transpose=False)
         discriminator = models.Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                              img_dim=FLAGS.img_dim,
                                              layer_n=4,
