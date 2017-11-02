@@ -110,16 +110,16 @@ class Dataset():
             self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
             self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
 
-    def _set_label_ids(self, key=None):
-        self.label_ids = dict()
-        if key is None:
-            max_len = 0
-            for k, v in self.h5file.items():
-                if len(v) > max_len:
-                    key = k
-                    max_len = len(v)
-        for i, label in enumerate(self.h5file[key + '/labels'].value):
-            self.label_ids[label] = i
+    # def _set_label_ids(self, key=None):
+    #     self.label_ids = dict()
+    #     if key is None:
+    #         max_len = 0
+    #         for k, v in self.h5file.items():
+    #             if len(v) > max_len:
+    #                 key = k
+    #                 max_len = len(v)
+    #     for i, label in enumerate(self.h5file[key + '/labels'].value):
+    #         self.label_ids[label] = i
 
     def shuffle(self, is_test=False):
         if is_test:
@@ -153,15 +153,29 @@ class Dataset():
             keys_lists.append(keys_list)
         return [self._get(keys_lists[i], is_label) for i in range(num)]
 
-    def get_selected(self, labels, is_test=False, is_label=True):
-        keys_list = list()
-        for label in labels:
-            num = self.get_label_id(label)
-            if is_test:
-                keys_list.append(self.keys_queue_test[num])
-            else:
-                keys_list.append(self.keys_queue_train[num])
-        return self._get(keys_list, is_label)
+    # def get_selected(self, labels, is_test=False, is_label=True):
+    #     keys_list = list()
+    #     for label in labels:
+    #         num = self.get_label_id(label)
+    #         if is_test:
+    #             keys_list.append(self.keys_queue_test[num])
+    #         else:
+    #             keys_list.append(self.keys_queue_train[num])
+    #     return self._get(keys_list, is_label)
+
+    def get_random_by_labels(self, batch_size, labels, num=1, is_test=False, is_label=True):
+        if is_test:
+            keys_queue = self.keys_queue_test
+        else:
+            keys_queue = self.keys_queue_train
+        filtered_keys_queue = filter(lambda x: chr(x[1] + 65) in labels, keys_queue)
+        keys_lists = list()
+        for _ in range(num):
+            keys_list = list()
+            for _ in range(batch_size):
+                keys_list.append(random.choice(filtered_keys_queue))
+            keys_lists.append(keys_list)
+        return [self._get(keys_lists[i], is_label) for i in range(num)]
 
     def get_all(self, is_test=False):
         if is_test:
@@ -198,8 +212,8 @@ class Dataset():
             return imgs, labels
         return imgs
 
-    def _get_label_id(self, label):
-        return self.label_ids[label]
+    # def _get_label_id(self, label):
+    #     return self.label_ids[label]
 
     def show_random(self):
         imgs, _ = self.get_random(64)
