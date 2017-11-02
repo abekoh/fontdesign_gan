@@ -50,7 +50,7 @@ def define_flags():
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'training rate of generator with classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 150000, 'num of epoch for training GAN')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'num of critics to approximate wasserstein distance')
-    tf.app.flags.DEFINE_integer('sample_imgs_interval', 20, 'interval epochs of saving images')
+    tf.app.flags.DEFINE_integer('sample_imgs_interval', 1, 'interval epochs of saving images')
     tf.app.flags.DEFINE_integer('embedding_interval', 20, 'interval epochs of saving embedding images')
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 4, 'hours of keeping ckpts')

@@ -39,8 +39,8 @@ class TrainingFontDesignGAN():
     def _load_dataset(self):
         self.real_dataset = Dataset(FLAGS.font_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
         if FLAGS.chars != '':
-            labels = FLAGS.chars.replace(' ', '').split(',')
-            self.real_dataset.set_load_data(labels=labels)
+            ids = [int(s) for s in FLAGS.chars.replace(' ', '').split(',')]
+            self.real_dataset.set_load_data(ids=ids)
         else:
             self.real_dataset.set_load_data()
         self.real_dataset.shuffle()
@@ -181,12 +181,16 @@ class TrainingFontDesignGAN():
 
         self.writer = tf.summary.FileWriter(self.dst_log)
 
-    def _get_ids(self, is_embedding_font_ids, is_embedding_char_ids):
-        if is_embedding_font_ids:
+    def _get_ids(self, embedding_font_ids=None, embedding_char_ids=None):
+        if type(embedding_font_ids) == int:
+            font_ids = [np.repeat(0, embedding_font_ids, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
+        elif embedding_font_ids == 'random':
             font_ids = [np.random.randint(0, FLAGS.font_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
         else:
             font_ids = [np.ones(self.divided_batch_size) * -1] * FLAGS.gpu_n
-        if is_embedding_char_ids:
+        if type(embedding_char_ids) == int:
+            char_ids = [np.repeat(embedding_char_ids, self.divided_batch_size).astype(np.int32) for _ in range(FLAGS.gpu_n)]
+        elif embedding_char_ids == 'random':
             char_ids = [np.random.randint(0, FLAGS.char_embedding_n, (self.divided_batch_size), dtype=np.int32) for _ in range(FLAGS.gpu_n)]
         else:
             char_ids = [np.ones(self.divided_batch_size) * -1] * FLAGS.gpu_n
@@ -199,42 +203,44 @@ class TrainingFontDesignGAN():
 
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
 
-            for critic_i in range(FLAGS.critic_n):
+            for char_i in range(FLAGS.char_embedding_n):
 
-                real_imgs = self.real_dataset.get_random(self.divided_batch_size, num=FLAGS.gpu_n, is_label=False)
-                font_ids, char_ids = self._get_ids(False, False)
+                for critic_i in range(FLAGS.critic_n):
+
+                    real_imgs = self.real_dataset.get_random_by_ids(self.divided_batch_size, [char_i], num=FLAGS.gpu_n, is_label=False)
+                    font_ids, char_ids = self._get_ids(None, char_i)
+
+                    feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                            {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                            {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
+                            {self.is_train: True}]
+                    self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
+
+                font_ids, char_ids = self._get_ids(None, None)
+
+                feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                        {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                        {self.is_train: True}]
+                self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
+
+                if FLAGS.c_penalty != 0.:
+                    font_ids, char_ids = self._get_ids(None, 'random')
+                    labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
+                    feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
+                            {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
+                            {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
+                            {self.is_train: True}]
+                    self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
 
                 feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
                         {self.is_train: True}]
-                self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
+                if FLAGS.c_penalty != 0.:
+                    feed.append({self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)})
+                summary = self.sess.run(self.summary, feed_dict=diclist_to_list(feed))
 
-            font_ids, char_ids = self._get_ids(False, False)
-
-            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.is_train: True}]
-            self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
-
-            if FLAGS.c_penalty != 0.:
-                font_ids, char_ids = self._get_ids(False, True)
-                labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
-                feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                        {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
-                        {self.is_train: True}]
-                self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
-
-            feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
-                    {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
-                    {self.is_train: True}]
-            if FLAGS.c_penalty != 0.:
-                feed.append({self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)})
-            summary = self.sess.run(self.summary, feed_dict=diclist_to_list(feed))
-
-            self.writer.add_summary(summary, epoch_i)
+                self.writer.add_summary(summary, epoch_i)
 
             # save images
             if (epoch_i + 1) % FLAGS.sample_imgs_interval == 0:

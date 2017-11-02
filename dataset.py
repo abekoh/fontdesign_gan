@@ -93,17 +93,15 @@ class Dataset():
         self.h5file.create_dataset(group_name + '/labels', data=labels, dtype=h5py.special_dtype(vlen=str))
         self.h5file.flush()
 
-    def set_load_data(self, train_rate=1., labels=None):
+    def set_load_data(self, train_rate=1., ids=None):
         self.keys_queue_train = list()
-        if labels is not None:
-            label_nums = [ord(l) - 65 for l in labels]
         if self.is_mem:
             iters = enumerate(self.h5file.values())
         else:
             iters = self.h5file.items()
         for x, value in iters:
             for i in range(len(value['labels'])):
-                if labels is not None and i not in label_nums:
+                if ids is not None and i not in ids:
                     continue
                 self.keys_queue_train.append((x, i))
         if train_rate != 1.:
@@ -163,12 +161,12 @@ class Dataset():
     #             keys_list.append(self.keys_queue_train[num])
     #     return self._get(keys_list, is_label)
 
-    def get_random_by_labels(self, batch_size, labels, num=1, is_test=False, is_label=True):
+    def get_random_by_ids(self, batch_size, ids, num=1, is_test=False, is_label=True):
         if is_test:
             keys_queue = self.keys_queue_test
         else:
             keys_queue = self.keys_queue_train
-        filtered_keys_queue = filter(lambda x: chr(x[1] + 65) in labels, keys_queue)
+        filtered_keys_queue = list(filter(lambda x: x[1] in ids, keys_queue))
         keys_lists = list()
         for _ in range(num):
             keys_list = list()
