@@ -93,15 +93,20 @@ class Dataset():
         self.h5file.create_dataset(group_name + '/labels', data=labels, dtype=h5py.special_dtype(vlen=str))
         self.h5file.flush()
 
-    def set_load_data(self, train_rate=1.):
+    def set_load_data(self, train_rate=1., labels=None):
         self.keys_queue_train = list()
+        if labels is not None:
+            label_nums = [ord(l) - 65 for l in labels]
         if self.is_mem:
             iters = enumerate(self.h5file.values())
         else:
             iters = self.h5file.items()
         for x, value in iters:
             for i in range(len(value['labels'])):
+                if labels is not None and i not in label_nums:
+                    continue
                 self.keys_queue_train.append((x, i))
+        print(self.keys_queue_train)
         if train_rate != 1.:
             self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
             self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
