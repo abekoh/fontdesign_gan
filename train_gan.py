@@ -216,7 +216,7 @@ class TrainingFontDesignGAN():
                             {self.is_train: True}]
                     self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
 
-                font_ids, char_ids = self._get_ids(None, None)
+                font_ids, char_ids = self._get_ids(None, char_i)
 
                 feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
