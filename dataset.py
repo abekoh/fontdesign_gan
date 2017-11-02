@@ -106,7 +106,6 @@ class Dataset():
                 if labels is not None and i not in label_nums:
                     continue
                 self.keys_queue_train.append((x, i))
-        print(self.keys_queue_train)
         if train_rate != 1.:
             self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
             self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
