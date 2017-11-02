@@ -199,7 +199,7 @@ class TrainingFontDesignGAN():
 
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
 
-            for i in range(FLAGS.critic_n):
+            for critic_i in range(FLAGS.critic_n):
 
                 real_imgs = self.real_dataset.get_random(self.divided_batch_size, num=FLAGS.gpu_n, is_label=False)
                 font_ids, char_ids = self._get_ids(False, False)
