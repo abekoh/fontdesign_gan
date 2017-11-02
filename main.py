@@ -25,7 +25,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'image\'\'s height')
     tf.app.flags.DEFINE_integer('img_dim', 3, 'image\'s dimention')
-    tf.app.flags.DEFINE_boolean('is_flip', False, 'flip image')
+    tf.app.flags.DEFINE_boolean('flip', False, 'flip image')
     tf.app.flags.DEFINE_integer('font_embedding_n', 256, 'num of font embedding ids')
     tf.app.flags.DEFINE_integer('char_embedding_n', 26, 'num of char embedding ids')
     tf.app.flags.DEFINE_float('font_embedding_rate', 0.5, 'rate of font embedding')
@@ -54,7 +54,9 @@ def define_flags():
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 4, 'hours of keeping ckpts')
     tf.app.flags.DEFINE_integer('save_imgs_col_n', 16, 'num of saving image\'s columns')
-    tf.app.flags.DEFINE_boolean('is_run_tensorboard', True, 'run tensorboard or not')
+    tf.app.flags.DEFINE_boolean('transpose', False, 'use conv2d_transpose or resize_bilinear')
+    tf.app.flags.DEFINE_boolean('batchnorm', False, 'use batchnorm in Generator and Discriminator or not')
+    tf.app.flags.DEFINE_boolean('run_tensorboard', True, 'run tensorboard or not')
 
     # Generate GAN
     tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')
