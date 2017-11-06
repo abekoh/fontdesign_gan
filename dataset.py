@@ -6,6 +6,7 @@ import h5py
 from glob import glob
 import random
 from tqdm import tqdm
+import math
 
 from utils import concat_imgs
 
@@ -175,10 +176,10 @@ class Dataset():
             keys_lists.append(keys_list)
         return [self._get(keys_lists[i], is_label) for i in range(num)]
 
-    def get_all(self, is_test=False):
+    def get_all(self, is_test=False, is_label=True):
         if is_test:
             return self.get_batch(0, len(self.key_queue_test), is_test)
-        return self.get_batch(0, len(self.keys_queue_train), is_test)
+        return self.get_batch(0, len(self.keys_queue_train), is_test, is_label)
 
     def _get_from_file(self, keys_list, is_label=True):
         imgs = np.empty((len(keys_list), self.img_size[0], self.img_size[1], self.img_dim), np.float32)
@@ -220,3 +221,13 @@ class Dataset():
         concated_img = np.reshape(concated_img, (self.img_size[0] * 8, -1))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.show()
+
+    def save_index(self, dst_img_path):
+        imgs_n = len(self.keys_queue_train)
+        imgs = self.get_all(is_label=False)
+        col_n = math.ceil(math.sqrt(imgs_n))
+        concated_img = concat_imgs(imgs, col_n, col_n)
+        concated_img = (concated_img + 1.) * 127.5
+        concated_img = np.reshape(concated_img, (-1, col_n * self.img_size[0], self.img_dim))
+        pil_img = Image.fromarray(np.uint8(concated_img))
+        pil_img.save(dst_img_path)
