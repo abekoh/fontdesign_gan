@@ -77,7 +77,9 @@ class GeneratingFontDesignGAN():
                                      z_size=FLAGS.z_size,
                                      layer_n=4,
                                      k_size=3,
-                                     smallest_hidden_unit_n=64)
+                                     smallest_hidden_unit_n=64,
+                                     is_transpose=FLAGS.transpose,
+                                     is_bn=FLAGS.batchnorm)
 
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
@@ -126,7 +128,7 @@ class GeneratingFontDesignGAN():
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
         concated_img = concat_imgs(generated_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
-        if FLAGS.is_flip:
+        if FLAGS.flip:
             concated_img = concated_img * -1.
         if FLAGS.img_dim == 1:
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
