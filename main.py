@@ -58,6 +58,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('transpose', False, 'use conv2d_transpose or resize_bilinear')
     tf.app.flags.DEFINE_boolean('batchnorm', False, 'use batchnorm in Generator and Discriminator or not')
     tf.app.flags.DEFINE_boolean('run_tensorboard', True, 'run tensorboard or not')
+    tf.app.flags.DEFINE_integer('tensorboard_port', 6006, 'port of tensorboard')
 
     # Generate GAN
     tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')

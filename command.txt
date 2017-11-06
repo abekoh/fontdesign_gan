@@ -1,0 +1,1 @@
+python main.py --mode train_g --font_h5 src/fonts_6627_caps_3ch_64x64.h5 --c_penalty 0. --gpu_n 1 --gpu_ids 0 

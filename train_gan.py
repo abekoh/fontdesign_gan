@@ -252,7 +252,7 @@ class TrainingFontDesignGAN():
                 self._save_embedding_imgs(epoch_i + 1)
 
     def _run_tensorboard(self):
-        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log))], stdout=PIPE)
+        Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log)), '--port', '{}'.format(FLAGS.tensorboard_port)], stdout=PIPE)
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
         feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
