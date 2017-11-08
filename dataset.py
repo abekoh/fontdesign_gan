@@ -140,17 +140,14 @@ class Dataset():
                 keys_list.append(self.keys_queue_train[i])
         return self._get(keys_list, is_label)
 
-    def get_random(self, batch_size, num=1, is_test=False, is_label=True):
-        keys_lists = list()
-        for _ in range(num):
-            keys_list = list()
-            for _ in range(batch_size):
-                if is_test:
-                    keys_list.append(random.choice(self.keys_queue_test))
-                else:
-                    keys_list.append(random.choice(self.keys_queue_train))
-            keys_lists.append(keys_list)
-        return [self._get(keys_lists[i], is_label) for i in range(num)]
+    def get_random(self, batch_size, is_test=False, is_label=True):
+        keys_list = list()
+        for _ in range(batch_size):
+            if is_test:
+                keys_list.append(random.choice(self.keys_queue_test))
+            else:
+                keys_list.append(random.choice(self.keys_queue_train))
+        return self._get(keys_list, is_label)
 
     # def get_selected(self, labels, is_test=False, is_label=True):
     #     keys_list = list()
@@ -162,19 +159,16 @@ class Dataset():
     #             keys_list.append(self.keys_queue_train[num])
     #     return self._get(keys_list, is_label)
 
-    def get_random_by_ids(self, batch_size, ids, num=1, is_test=False, is_label=True):
+    def get_random_by_ids(self, batch_size, ids, is_test=False, is_label=True):
         if is_test:
             keys_queue = self.keys_queue_test
         else:
             keys_queue = self.keys_queue_train
         filtered_keys_queue = list(filter(lambda x: x[1] in ids, keys_queue))
-        keys_lists = list()
-        for _ in range(num):
-            keys_list = list()
-            for _ in range(batch_size):
-                keys_list.append(random.choice(filtered_keys_queue))
-            keys_lists.append(keys_list)
-        return [self._get(keys_lists[i], is_label) for i in range(num)]
+        keys_list = list()
+        for _ in range(batch_size):
+            keys_list.append(random.choice(filtered_keys_queue))
+        return self._get(keys_list, is_label)
 
     def get_all(self, is_test=False, is_label=True):
         if is_test:
