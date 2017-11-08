@@ -73,7 +73,7 @@ def main(argv=None):
         from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_flip=FLAGS.flip)
         dataset.load_imgs(FLAGS.font_imgs)
-        dataset.set_load_data(ids=[1])
+        dataset.set_load_data(ids=[0])
         dataset.save_index(FLAGS.font_h5 + '.png')
     elif FLAGS.mode == 'train_c':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
