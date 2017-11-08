@@ -159,10 +159,10 @@ class TrainingFontDesignGAN():
                 sum_c_grads = self._average_gradients(c_grads)
                 self.c_train = c_opt.apply_gradients(sum_c_grads)
 
-        tf.summary.scalar('d_loss', sum(d_loss))
-        tf.summary.scalar('g_loss', sum(g_loss))
+        tf.summary.scalar('d_loss', sum(d_loss) / len(d_loss))
+        tf.summary.scalar('g_loss', sum(g_loss) / len(g_loss))
         if FLAGS.c_penalty != 0:
-            tf.summary.scalar('c_loss', sum(c_loss))
+            tf.summary.scalar('c_loss', sum(c_loss / len(c_loss)))
             tf.summary.scalar('c_acc', sum(c_acc) / len(c_acc))
         self.summary = tf.summary.merge_all()
 
