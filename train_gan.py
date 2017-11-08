@@ -69,26 +69,28 @@ class TrainingFontDesignGAN():
             g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
             c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr)
 
-        fake_imgs = [0] * FLAGS.gpu_n
-        d_loss = [0] * FLAGS.gpu_n
-        g_loss = [0] * FLAGS.gpu_n
-        c_loss = [0] * FLAGS.gpu_n
-        c_acc = [0] * FLAGS.gpu_n
+        self.gpu_n = len(FLAGS.gpu_ids.split(','))
 
-        d_grads = [0] * FLAGS.gpu_n
-        g_grads = [0] * FLAGS.gpu_n
-        c_grads = [0] * FLAGS.gpu_n
+        fake_imgs = [0] * self.gpu_n
+        d_loss = [0] * self.gpu_n
+        g_loss = [0] * self.gpu_n
+        c_loss = [0] * self.gpu_n
+        c_acc = [0] * self.gpu_n
 
-        d_reuse = [True for _ in range(FLAGS.gpu_n)]
-        g_reuse = [True for _ in range(FLAGS.gpu_n)]
-        c_reuse = [True for _ in range(FLAGS.gpu_n)]
+        d_grads = [0] * self.gpu_n
+        g_grads = [0] * self.gpu_n
+        c_grads = [0] * self.gpu_n
+
+        d_reuse = [True for _ in range(self.gpu_n)]
+        g_reuse = [True for _ in range(self.gpu_n)]
+        c_reuse = [True for _ in range(self.gpu_n)]
         d_reuse[0] = False
         g_reuse[0] = False
         c_reuse[0] = False
 
-        divided_batch_size = FLAGS.batch_size // FLAGS.gpu_n
+        divided_batch_size = FLAGS.batch_size // self.gpu_n
 
-        for i in range(FLAGS.gpu_n):
+        for i in range(self.gpu_n):
             batch_start = i * divided_batch_size
             batch_end = (i + 1) * divided_batch_size
             with tf.device('/gpu:{}'.format(i)):
@@ -245,7 +247,7 @@ class TrainingFontDesignGAN():
 
                 if FLAGS.c_penalty != 0.:
                     font_ids, char_ids = self._get_ids(None, 'random')
-                    labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(FLAGS.gpu_n)]
+                    labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(self.gpu_n)]
                     feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.labels: labels, self.is_train: True}
                     self.sess.run(self.c_train, feed_dict=feed)
 

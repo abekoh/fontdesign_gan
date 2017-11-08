@@ -18,9 +18,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('mode', '', 'make_dataset or train_c or train_g or generate')
 
     # Common
-    gpu_n = get_gpu_n()
-    tf.app.flags.DEFINE_integer('gpu_n', gpu_n, 'num of GPUs')
-    tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(gpu_n)]), 'using GPU ids')
+    tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
     tf.app.flags.DEFINE_string('font_h5', '', 'path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'image\'\'s height')
@@ -48,7 +46,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('chars', '', 'characters for training')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'training penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'training rate of generator with classifier')
-    tf.app.flags.DEFINE_integer('gan_epoch_n', 150000, 'num of epoch for training GAN')
+    tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'num of critics to approximate wasserstein distance')
     tf.app.flags.DEFINE_integer('sample_imgs_interval', 1, 'interval epochs of saving images')
     tf.app.flags.DEFINE_integer('embedding_interval', 20, 'interval epochs of saving embedding images')
