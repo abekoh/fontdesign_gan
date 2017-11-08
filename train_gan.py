@@ -7,7 +7,7 @@ from subprocess import Popen, PIPE
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 
-import models
+from models import Generator, Discriminator, Classifier
 from dataset import Dataset
 from utils import concat_imgs, combine_imgs, diclist_to_list
 
@@ -47,25 +47,6 @@ class TrainingFontDesignGAN():
         self.real_data_n = self.real_dataset.get_img_len()
 
     def _prepare_training(self):
-        generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                     img_dim=FLAGS.img_dim,
-                                     z_size=FLAGS.z_size,
-                                     layer_n=4,
-                                     k_size=3,
-                                     smallest_hidden_unit_n=64,
-                                     is_transpose=FLAGS.transpose,
-                                     is_bn=FLAGS.batchnorm)
-        discriminator = models.Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                             img_dim=FLAGS.img_dim,
-                                             layer_n=4,
-                                             k_size=3,
-                                             smallest_hidden_unit_n=64,
-                                             is_bn=FLAGS.batchnorm)
-        classifier = models.Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                       img_dim=FLAGS.img_dim,
-                                       k_size=3,
-                                       class_n=26,
-                                       smallest_unit_n=64)
 
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
@@ -74,25 +55,34 @@ class TrainingFontDesignGAN():
         font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
         char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
 
-        with tf.variable_scope('embeddings'):
-            self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
-            self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
+        with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
+            with tf.variable_scope('embeddings'):
+                self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
+                self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
 
-        self.font_ids = [tf.placeholder(tf.int32, (self.divided_batch_size,), name='font_ids_{}'.format(i))
-                         for i in range(FLAGS.gpu_n)]
-        self.char_ids = [tf.placeholder(tf.int32, (self.divided_batch_size,), name='char_ids_{}'.format(i))
-                         for i in range(FLAGS.gpu_n)]
-        self.is_train = tf.placeholder(tf.bool, name='is_train')
-        self.real_imgs = [tf.placeholder(tf.float32, (self.divided_batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim),
-                          name='real_imgs_{}'.format(i)) for i in range(FLAGS.gpu_n)]
-        self.labels = [tf.placeholder(tf.float32, (self.divided_batch_size, FLAGS.char_embedding_n), name='labels_{}'.format(i))
-                       for i in range(FLAGS.gpu_n)]
+            self.font_ids = [tf.placeholder(tf.int32, (self.divided_batch_size,), name='font_ids_{}'.format(i))
+                             for i in range(FLAGS.gpu_n)]
+            self.char_ids = [tf.placeholder(tf.int32, (self.divided_batch_size,), name='char_ids_{}'.format(i))
+                             for i in range(FLAGS.gpu_n)]
+            self.is_train = tf.placeholder(tf.bool, name='is_train')
+            self.real_imgs = [tf.placeholder(tf.float32, (self.divided_batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim),
+                              name='real_imgs_{}'.format(i)) for i in range(FLAGS.gpu_n)]
+            self.labels = [tf.placeholder(tf.float32, (self.divided_batch_size, FLAGS.char_embedding_n), name='labels_{}'.format(i))
+                           for i in range(FLAGS.gpu_n)]
+
+            d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
+            g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
+            c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr)
 
         self.fake_imgs = [0] * FLAGS.gpu_n
         d_loss = [0] * FLAGS.gpu_n
         g_loss = [0] * FLAGS.gpu_n
         c_loss = [0] * FLAGS.gpu_n
         c_acc = [0] * FLAGS.gpu_n
+
+        d_grads = [0] * FLAGS.gpu_n
+        g_grads = [0] * FLAGS.gpu_n
+        c_grads = [0] * FLAGS.gpu_n
 
         d_reuse = [True for _ in range(FLAGS.gpu_n)]
         g_reuse = [True for _ in range(FLAGS.gpu_n)]
@@ -103,6 +93,25 @@ class TrainingFontDesignGAN():
 
         for i in range(FLAGS.gpu_n):
             with tf.device('/gpu:{}'.format(i)):
+                generator = Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                      img_dim=FLAGS.img_dim,
+                                      z_size=FLAGS.z_size,
+                                      layer_n=4,
+                                      k_size=3,
+                                      smallest_hidden_unit_n=64,
+                                      is_transpose=FLAGS.transpose,
+                                      is_bn=FLAGS.batchnorm)
+                discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                              img_dim=FLAGS.img_dim,
+                                              layer_n=4,
+                                              k_size=3,
+                                              smallest_hidden_unit_n=64,
+                                              is_bn=FLAGS.batchnorm)
+                classifier = Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                        img_dim=FLAGS.img_dim,
+                                        k_size=3,
+                                        class_n=26,
+                                        smallest_unit_n=64)
 
                 font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids[i]), 0),
                                  lambda: tf.random_uniform((self.divided_batch_size, self.font_z_size), -1, 1),
@@ -114,7 +123,7 @@ class TrainingFontDesignGAN():
 
                 self.fake_imgs[i] = generator(z, is_reuse=g_reuse[i], is_train=self.is_train)
 
-                d_real = discriminator(self.real_imgs[i], is_reuse=d_reuse[i],  is_train=self.is_train)
+                d_real = discriminator(self.real_imgs[i], is_reuse=d_reuse[i], is_train=self.is_train)
                 d_fake = discriminator(self.fake_imgs[i], is_reuse=True, is_train=self.is_train)
 
                 d_loss[i] = - (tf.reduce_mean(d_real) - tf.reduce_mean(d_fake))
@@ -128,34 +137,35 @@ class TrainingFontDesignGAN():
                 grad_penalty = tf.reduce_mean((slopes - 1.) ** 2)
                 d_loss[i] += 10 * grad_penalty
 
+                d_vars = [var for var in tf.trainable_variables() if 'discriminator' in var.name]
+                g_vars = [var for var in tf.trainable_variables() if 'generator' in var.name]
+
+                d_grads[i] = d_opt.compute_gradients(d_loss[i], var_list=d_vars)
+                g_grads[i] = g_opt.compute_gradients(g_loss[i], var_list=g_vars)
+
                 if FLAGS.c_penalty != 0.:
                     c_fake = FLAGS.c_penalty * classifier(self.fake_imgs[i], is_reuse=c_reuse[i], is_train=self.is_train)
                     c_loss[i] = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels[i], logits=c_fake))
                     correct_pred = tf.equal(tf.argmax(c_fake, 1), tf.argmax(self.labels[i], 1))
                     c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+                    c_grads[i] = c_opt.compute_gradients(c_loss[i], var_list=g_vars)
 
         with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
-            d_vars = discriminator.get_trainable_variables()
-            g_vars = generator.get_trainable_variables()
-            sum_d_loss = sum(d_loss)
-            sum_g_loss = sum(g_loss)
-            self.d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(sum_d_loss, var_list=d_vars)
-            self.g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9).minimize(sum_g_loss, var_list=g_vars)
-
+            sum_d_grads = self._average_gradients(d_grads)
+            sum_g_grads = self._average_gradients(g_grads)
+            self.d_train = d_opt.apply_gradients(sum_d_grads)
+            self.g_train = g_opt.apply_gradients(sum_g_grads)
             if FLAGS.c_penalty != 0:
-                c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
-                sum_c_loss = sum(c_loss)
-                avg_c_acc = sum(c_acc) / len(c_acc)
-                self.c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr).minimize(sum_c_loss, var_list=g_vars)
+                sum_c_grads = self._average_gradients(c_grads)
+                self.c_train = c_opt.apply_gradients(sum_c_grads)
 
-        tf.summary.scalar('d_loss', sum_d_loss)
-        tf.summary.scalar('g_loss', sum_g_loss)
+        tf.summary.scalar('d_loss', sum(d_loss))
+        tf.summary.scalar('g_loss', sum(g_loss))
         if FLAGS.c_penalty != 0:
-            tf.summary.scalar('c_loss', sum_c_loss)
-            tf.summary.scalar('c_acc', avg_c_acc)
+            tf.summary.scalar('c_loss', sum(c_loss))
+            tf.summary.scalar('c_acc', sum(c_acc) / len(c_acc))
         self.summary = tf.summary.merge_all()
 
-        print(FLAGS.gpu_ids)
         sess_config = tf.ConfigProto(
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
         )
@@ -175,11 +185,26 @@ class TrainingFontDesignGAN():
                 src_log = os.path.join(FLAGS.src_classifier, 'log')
                 classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
                 assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
+                c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
                 saver_pretrained = tf.train.Saver(var_list=c_vars)
                 saver_pretrained.restore(self.sess, classifier_checkpoint.model_checkpoint_path)
             self.epoch_start = 0
 
         self.writer = tf.summary.FileWriter(self.dst_log)
+
+    def _average_gradients(self, tower_grads):
+        averaged_grads = []
+        for grad_and_vars in zip(*tower_grads):
+            grads = []
+            for g, _ in grad_and_vars:
+                expanded_g = tf.expand_dims(g, axis=0)
+                grads.append(expanded_g)
+            grad = tf.concat(grads, axis=0)
+            grad = tf.reduce_mean(grad, axis=0)
+            v = grad_and_vars[0][1]
+            grad_and_var = (grad, v)
+            averaged_grads.append(grad_and_var)
+        return averaged_grads
 
     def _get_ids(self, embedding_font_ids=None, embedding_char_ids=None):
         if type(embedding_font_ids) == int:
@@ -214,14 +239,14 @@ class TrainingFontDesignGAN():
                             {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
                             {self.real_imgs[i]: real_imgs[i] for i in range(FLAGS.gpu_n)},
                             {self.is_train: True}]
-                    self.sess.run(self.d_opt, feed_dict=diclist_to_list(feed))
+                    self.sess.run(self.d_train, feed_dict=diclist_to_list(feed))
 
                 font_ids, char_ids = self._get_ids(None, char_i)
 
                 feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.is_train: True}]
-                self.sess.run(self.g_opt, feed_dict=diclist_to_list(feed))
+                self.sess.run(self.g_train, feed_dict=diclist_to_list(feed))
 
                 if FLAGS.c_penalty != 0.:
                     font_ids, char_ids = self._get_ids(None, 'random')
@@ -230,7 +255,7 @@ class TrainingFontDesignGAN():
                             {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
                             {self.labels[i]: labels[i] for i in range(FLAGS.gpu_n)},
                             {self.is_train: True}]
-                    self.sess.run(self.c_opt, feed_dict=diclist_to_list(feed))
+                    self.sess.run(self.c_train, feed_dict=diclist_to_list(feed))
 
                 feed = [{self.font_ids[i]: font_ids[i] for i in range(FLAGS.gpu_n)},
                         {self.char_ids[i]: char_ids[i] for i in range(FLAGS.gpu_n)},
