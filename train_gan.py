@@ -50,12 +50,11 @@ class TrainingFontDesignGAN():
 
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
-        # FLAGS.batch_size = FLAGS.batch_size // FLAGS.gpu_n
 
         font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
         char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
 
-        with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
+        with tf.device('/cpu:0'):
             with tf.variable_scope('embeddings'):
                 self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
                 self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
@@ -150,7 +149,8 @@ class TrainingFontDesignGAN():
                     c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
                     c_grads[i] = c_opt.compute_gradients(c_loss[i], var_list=g_vars)
 
-        with tf.device('/gpu:{}'.format(FLAGS.gpu_n - 1)):
+        with tf.device('/cpu:0'):
+            self.fake_imgs = tf.concat(fake_imgs, axis=0)
             sum_d_grads = self._average_gradients(d_grads)
             sum_g_grads = self._average_gradients(g_grads)
             self.d_train = d_opt.apply_gradients(sum_d_grads)
@@ -158,8 +158,6 @@ class TrainingFontDesignGAN():
             if FLAGS.c_penalty != 0:
                 sum_c_grads = self._average_gradients(c_grads)
                 self.c_train = c_opt.apply_gradients(sum_c_grads)
-
-        self.fake_imgs = tf.concat(fake_imgs, axis=0)
 
         tf.summary.scalar('d_loss', sum(d_loss))
         tf.summary.scalar('g_loss', sum(g_loss))
