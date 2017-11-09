@@ -1,4 +1,5 @@
 import os
+import math
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -283,7 +284,12 @@ class TrainingFontDesignGAN():
             combined_img = np.reshape(combined_img, (-1, col_n * FLAGS.img_height, FLAGS.img_dim))
         return Image.fromarray(np.uint8(combined_img))
 
+    def _init_save_imgs_edge_n(self):
+        self.save_imgs_edge_n = math.ceil(math.sqrt(FLAGS.batch_size))
+
     def _init_sample_imgs_inputs(self):
+        if not hasattr(self, 'save_imgs_edge_n'):
+            self._init_save_imgs_edge_n()
         self.sample_font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
         self.sample_char_ids = np.random.randint(0, FLAGS.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
 
@@ -291,10 +297,12 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'sample_font_ids'):
             self._init_sample_imgs_inputs()
         concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
-                                          FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
+                                          self.save_imgs_edge_n, self.save_imgs_edge_n)
         concated_img.save(os.path.join(self.dst_samples, '{}.png'.format(epoch_i)))
 
     def _init_embedding_imgs_inputs(self):
+        if not hasattr(self, 'save_imgs_edge_n'):
+            self._init_save_imgs_edge_n()
         self.embedding_font_ids = np.arange(0, FLAGS.font_embedding_n, dtype=np.int32)
         self.embedding_char_ids = np.repeat(np.array([0], dtype=np.int32), FLAGS.font_embedding_n)
 
@@ -303,7 +311,7 @@ class TrainingFontDesignGAN():
             self._init_embedding_imgs_inputs()
         embedding_img_path = os.path.realpath(os.path.join(self.dst_log_fontemb, '{}.png'.format(epoch_i)))
         embedding_img = self._generate_img(self.embedding_font_ids, self.embedding_char_ids,
-                                           FLAGS.save_imgs_col_n, FLAGS.save_imgs_col_n)
+                                           self.save_imgs_edge_n, self.save_imgs_edge_n)
         embedding_img.save(embedding_img_path)
 
         summary_writer = tf.summary.FileWriter(self.dst_log)

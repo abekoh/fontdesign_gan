@@ -52,7 +52,6 @@ def define_flags():
     tf.app.flags.DEFINE_integer('embedding_interval', 20, 'interval epochs of saving embedding images')
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 4, 'hours of keeping ckpts')
-    tf.app.flags.DEFINE_integer('save_imgs_col_n', 16, 'num of saving image\'s columns')
     tf.app.flags.DEFINE_boolean('transpose', False, 'use conv2d_transpose or resize_bilinear')
     tf.app.flags.DEFINE_boolean('batchnorm', False, 'use batchnorm in Generator and Discriminator or not')
     tf.app.flags.DEFINE_boolean('run_tensorboard', True, 'run tensorboard or not')
