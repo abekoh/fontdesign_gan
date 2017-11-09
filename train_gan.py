@@ -94,7 +94,7 @@ class TrainingFontDesignGAN():
 
             d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
             g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
-            c_opt = tf.train.RMSPropOptimizer(learning_rate=FLAGS.c_lr)
+            c_opt = tf.train.AdamOptimizer(learning_rate=FLAGS.c_lr, beta1=0.5, beta2=0.9)
 
         # Initialize lists for multi gpu
         fake_imgs = [0] * self.gpu_n
@@ -192,7 +192,7 @@ class TrainingFontDesignGAN():
         tf.summary.scalar('d_loss', -(sum(d_loss) / len(d_loss)))
         tf.summary.scalar('g_loss', -(sum(g_loss) / len(g_loss)))
         if FLAGS.c_penalty != 0:
-            tf.summary.scalar('c_loss', sum(c_loss / len(c_loss)))
+            tf.summary.scalar('c_loss', sum(c_loss) / len(c_loss))
             tf.summary.scalar('c_acc', sum(c_acc) / len(c_acc))
         self.summary = tf.summary.merge_all()
 
@@ -273,7 +273,6 @@ class TrainingFontDesignGAN():
 
                 # Maximize character likelihood
                 if FLAGS.c_penalty != 0.:
-                    font_ids, char_ids = self._get_ids(None, 'random')
                     labels = np.eye(FLAGS.char_embedding_n)[char_ids]
                     self.sess.run(self.c_train, feed_dict={self.font_ids: font_ids,
                                                            self.char_ids: char_ids,
