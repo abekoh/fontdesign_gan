@@ -163,8 +163,8 @@ class TrainingFontDesignGAN():
                 sum_c_grads = self._average_gradients(c_grads)
                 self.c_train = c_opt.apply_gradients(sum_c_grads)
 
-        tf.summary.scalar('d_loss', sum(d_loss) / len(d_loss))
-        tf.summary.scalar('g_loss', sum(g_loss) / len(g_loss))
+        tf.summary.scalar('d_loss', -(sum(d_loss) / len(d_loss)))
+        tf.summary.scalar('g_loss', -(sum(g_loss) / len(g_loss)))
         if FLAGS.c_penalty != 0:
             tf.summary.scalar('c_loss', sum(c_loss / len(c_loss)))
             tf.summary.scalar('c_acc', sum(c_acc) / len(c_acc))
@@ -226,39 +226,44 @@ class TrainingFontDesignGAN():
         return font_ids, char_ids
 
     def train(self):
-
         if FLAGS.run_tensorboard:
             self._run_tensorboard()
 
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
-
             for char_i in range(FLAGS.char_embedding_n):
-
+                # Approximate wasserstein distance
                 for critic_i in range(FLAGS.critic_n):
-
                     real_imgs = self.real_dataset.get_random_by_ids(FLAGS.batch_size, [char_i], is_label=False)
                     font_ids, char_ids = self._get_ids(None, char_i)
+                    self.sess.run(self.d_train, feed_dict={self.font_ids: font_ids,
+                                                           self.char_ids: char_ids,
+                                                           self.real_imgs: real_imgs,
+                                                           self.is_train: True})
 
-                    feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
-                    self.sess.run(self.d_train, feed_dict=feed)
-
+                # Minimize wasserstein distance
                 font_ids, char_ids = self._get_ids(None, char_i)
+                self.sess.run(self.g_train, feed_dict={self.font_ids: font_ids,
+                                                       self.char_ids: char_ids,
+                                                       self.is_train: True})
 
-                feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.is_train: True}
-                self.sess.run(self.g_train, feed_dict=feed)
-
+                # Maximize character likelihood
                 if FLAGS.c_penalty != 0.:
                     font_ids, char_ids = self._get_ids(None, 'random')
-                    labels = [np.eye(FLAGS.char_embedding_n)[char_ids[i]] for i in range(self.gpu_n)]
-                    feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.labels: labels, self.is_train: True}
-                    self.sess.run(self.c_train, feed_dict=feed)
+                    labels = np.eye(FLAGS.char_embedding_n)[char_ids]
+                    self.sess.run(self.c_train, feed_dict={self.font_ids: font_ids,
+                                                           self.char_ids: char_ids,
+                                                           self.labels: labels,
+                                                           self.is_train: True})
 
-                feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
-                if FLAGS.c_penalty != 0.:
-                    feed[self.labels] = labels
-                summary = self.sess.run(self.summary, feed_dict=feed)
+            real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
+            font_ids, char_ids = self._get_ids(None, 'random')
+            feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
+            if FLAGS.c_penalty != 0.:
+                labels = np.eye(FLAGS.char_embedding_n)[char_ids]
+                feed[self.labels] = labels
+            summary = self.sess.run(self.summary, feed_dict=feed)
 
-                self.writer.add_summary(summary, epoch_i)
+            self.writer.add_summary(summary, epoch_i)
 
             # save images
             if (epoch_i + 1) % FLAGS.sample_imgs_interval == 0:
