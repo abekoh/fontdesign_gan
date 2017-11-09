@@ -6,19 +6,18 @@ from ops import lrelu, batch_norm, linear, conv2d, deconv2d, maxpool2d, fc
 class Generator():
 
     def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3,
-                 smallest_hidden_unit_n=128, name='generator', is_bn=True, is_transpose=False):
+                 smallest_hidden_unit_n=128, is_bn=True, is_transpose=False):
         self.img_size = img_size
         self.img_dim = img_dim
         self.z_size = z_size
         self.k_size = k_size
         self.layer_n = layer_n
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
-        self.name = name
         self.is_bn = is_bn
         self.is_transpose = is_transpose
 
     def __call__(self, x, is_reuse=False, is_train=True):
-        with tf.variable_scope(self.name) as scope:
+        with tf.variable_scope('generator') as scope:
             if is_reuse:
                 scope.reuse_variables()
 
@@ -56,17 +55,16 @@ class Generator():
 
 class Discriminator():
 
-    def __init__(self, img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128, name='discriminator', is_bn=True):
+    def __init__(self, img_size=(128, 128), img_dim=1, k_size=5, layer_n=3, smallest_hidden_unit_n=128, is_bn=True):
         self.img_size = img_size
         self.img_dim = img_dim
         self.k_size = k_size
         self.layer_n = layer_n
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
-        self.name = name
         self.is_bn = is_bn
 
     def __call__(self, x, is_reuse=False, is_train=True):
-        with tf.variable_scope(self.name) as scope:
+        with tf.variable_scope('discriminator') as scope:
             if is_reuse:
                 scope.reuse_variables()
 
@@ -89,16 +87,15 @@ class Discriminator():
 
 class Classifier():
 
-    def __init__(self, img_size, img_dim, k_size, class_n, smallest_unit_n=64, name='classifier'):
+    def __init__(self, img_size, img_dim, k_size, class_n, smallest_unit_n=64):
         self.img_size = img_size
         self.img_dim = img_dim
         self.k_size = k_size
         self.class_n = class_n
         self.smallest_unit_n = smallest_unit_n
-        self.name = name
 
     def __call__(self, x, is_reuse=False, is_train=True):
-        with tf.variable_scope(self.name) as scope:
+        with tf.variable_scope('classifier') as scope:
 
             if is_reuse:
                 scope.reuse_variables()
