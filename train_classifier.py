@@ -1,4 +1,5 @@
 import os
+import csv
 import json
 
 import tensorflow as tf
@@ -20,6 +21,9 @@ class TrainingClassifier():
         self._save_flags()
         self._prepare_training()
         self._load_dataset()
+
+    def __del__(self):
+        self.csv_file.close()
 
     def _setup_dirs(self):
         '''
@@ -91,6 +95,7 @@ class TrainingClassifier():
         self.test_data_n = self.dataset.get_img_len(is_test=True)
 
     def train(self):
+        self._init_csv()
         train_batch_n = self.train_data_n // FLAGS.batch_size
         test_batch_n = self.test_data_n // FLAGS.batch_size
         for epoch_i in tqdm(range(FLAGS.c_epoch_n)):
@@ -122,7 +127,13 @@ class TrainingClassifier():
             test_loss_avg = sum(losses) / len(losses)
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
-            self.saver.save(self.sess, os.path.join(self.dst_log, 'result_{}.ckpt'.format(epoch_i)))
+            self.saver.save(self.sess, os.path.join(self.dst_log, 'result_{}.ckpt'.format(epoch_i + 1)))
+            self.csv_writer.writerow([epoch_i + 1, train_loss_avg, train_acc_avg, test_loss_avg, test_loss_avg])
+
+    def _init_csv(self):
+        self.csv_file = open(os.path.join(self.dst_log, 'result.csv'), 'w')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['', 'train_loss', 'train_acc', 'test_loss', 'test_acc'])
 
     def _labels_to_categorical(self, labels):
         return np.eye(26)[list(map(lambda x: ord(x) - 65, labels))]
