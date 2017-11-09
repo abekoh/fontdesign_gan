@@ -43,7 +43,6 @@ def define_flags():
     dst_gan = 'result/gan/' + now_str
     tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('src_classifier', '', 'path of trained classifier\'s result directory')
-    tf.app.flags.DEFINE_string('chars', '', 'characters for training')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'training penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0000025, 'training rate of generator with classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')

@@ -40,11 +40,7 @@ class TrainingFontDesignGAN():
 
     def _load_dataset(self):
         self.real_dataset = Dataset(FLAGS.font_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
-        if FLAGS.chars != '':
-            ids = [int(s) for s in FLAGS.chars.replace(' ', '').split(',')]
-            self.real_dataset.set_load_data(ids=ids)
-        else:
-            self.real_dataset.set_load_data()
+        self.real_dataset.set_load_data()
         self.real_dataset.shuffle()
         self.real_data_n = self.real_dataset.get_img_len()
 
