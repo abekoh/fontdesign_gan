@@ -128,7 +128,7 @@ class TrainingClassifier():
             test_acc_avg = sum(accs) / len(accs)
             print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
             self.saver.save(self.sess, os.path.join(self.dst_log, 'result_{}.ckpt'.format(epoch_i + 1)))
-            self.csv_writer.writerow([epoch_i + 1, train_loss_avg, train_acc_avg, test_loss_avg, test_loss_avg])
+            self.csv_writer.writerow([epoch_i + 1, train_loss_avg, train_acc_avg, test_loss_avg, test_acc_avg])
 
     def _init_csv(self):
         self.csv_file = open(os.path.join(self.dst_log, 'result.csv'), 'w')
