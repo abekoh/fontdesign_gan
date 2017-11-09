@@ -1,11 +1,10 @@
 import os
-
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
 
-from models import Classifier
 from dataset import Dataset
+from models import Classifier
 
 FLAGS = tf.app.flags.FLAGS
 

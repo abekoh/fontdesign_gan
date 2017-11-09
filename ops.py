@@ -1,5 +1,5 @@
-import numpy as np
 import tensorflow as tf
+import numpy as np
 
 
 def lrelu(x, leak=0.2):

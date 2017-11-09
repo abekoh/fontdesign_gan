@@ -1,16 +1,16 @@
 import os
-import math
 import time
-import numpy as np
-from PIL import Image
-from tqdm import tqdm
+import math
 from subprocess import Popen, PIPE
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
 
-from models import Generator, Discriminator, Classifier
 from dataset import Dataset
+from models import Generator, Discriminator, Classifier
 from utils import concat_imgs
 
 FLAGS = tf.app.flags.FLAGS

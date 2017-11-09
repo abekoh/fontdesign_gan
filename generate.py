@@ -1,11 +1,12 @@
-import numpy as np
 import os
-from PIL import Image
-import tensorflow as tf
 import json
 import math
 
-import models
+import tensorflow as tf
+import numpy as np
+from PIL import Image
+
+from models import Generator
 from utils import concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
@@ -72,14 +73,14 @@ class GeneratingFontDesignGAN():
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
     def _prepare_generating(self):
-        generator = models.Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                     img_dim=FLAGS.img_dim,
-                                     z_size=FLAGS.z_size,
-                                     layer_n=4,
-                                     k_size=3,
-                                     smallest_hidden_unit_n=64,
-                                     is_transpose=FLAGS.transpose,
-                                     is_bn=FLAGS.batchnorm)
+        generator = Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                              img_dim=FLAGS.img_dim,
+                              z_size=FLAGS.z_size,
+                              layer_n=4,
+                              k_size=3,
+                              smallest_hidden_unit_n=64,
+                              is_transpose=FLAGS.transpose,
+                              is_bn=FLAGS.batchnorm)
 
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
