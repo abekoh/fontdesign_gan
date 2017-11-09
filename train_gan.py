@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from dataset import Dataset
 from models import Generator, Discriminator, Classifier
+from ops import average_gradients
 from utils import concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
@@ -170,12 +171,12 @@ class TrainingFontDesignGAN():
 
         with tf.device('/cpu:0'):
             self.fake_imgs = tf.concat(fake_imgs, axis=0)
-            avg_d_grads = self._average_gradients(d_grads)
-            avg_g_grads = self._average_gradients(g_grads)
+            avg_d_grads = average_gradients(d_grads)
+            avg_g_grads = average_gradients(g_grads)
             self.d_train = d_opt.apply_gradients(avg_d_grads)
             self.g_train = g_opt.apply_gradients(avg_g_grads)
             if FLAGS.c_penalty != 0:
-                avg_c_grads = self._average_gradients(c_grads)
+                avg_c_grads = average_gradients(c_grads)
                 self.c_train = c_opt.apply_gradients(avg_c_grads)
 
         # Calculate summary for tensorboard
@@ -215,20 +216,6 @@ class TrainingFontDesignGAN():
 
         # Setup writer for tensorboard
         self.writer = tf.summary.FileWriter(self.dst_log)
-
-    def _average_gradients(self, tower_grads):
-        averaged_grads = []
-        for grad_and_vars in zip(*tower_grads):
-            grads = []
-            for g, _ in grad_and_vars:
-                expanded_g = tf.expand_dims(g, axis=0)
-                grads.append(expanded_g)
-            grad = tf.concat(grads, axis=0)
-            grad = tf.reduce_mean(grad, axis=0)
-            v = grad_and_vars[0][1]
-            grad_and_var = (grad, v)
-            averaged_grads.append(grad_and_var)
-        return averaged_grads
 
     def _get_ids(self, embedding_font_ids=None, embedding_char_ids=None):
         '''

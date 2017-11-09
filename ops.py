@@ -93,3 +93,18 @@ def fc(x, n_out, name='fc'):
         b = tf.get_variable('b', [n_out], initializer=b_init)
 
         return tf.matmul(x, w) + b
+
+
+def average_gradients(tower_grads):
+    averaged_grads = []
+    for grad_and_vars in zip(*tower_grads):
+        grads = []
+        for g, _ in grad_and_vars:
+            expanded_g = tf.expand_dims(g, axis=0)
+            grads.append(expanded_g)
+        grad = tf.concat(grads, axis=0)
+        grad = tf.reduce_mean(grad, axis=0)
+        v = grad_and_vars[0][1]
+        grad_and_var = (grad, v)
+        averaged_grads.append(grad_and_var)
+    return averaged_grads
