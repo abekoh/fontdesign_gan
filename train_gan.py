@@ -1,5 +1,6 @@
 import os
 import math
+import time
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -270,6 +271,7 @@ class TrainingFontDesignGAN():
 
     def _run_tensorboard(self):
         Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log)), '--port', '{}'.format(FLAGS.tensorboard_port)], stdout=PIPE)
+        time.sleep(1)
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
         feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.is_train: False}
