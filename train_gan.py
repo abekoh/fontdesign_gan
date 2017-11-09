@@ -321,8 +321,6 @@ class TrainingFontDesignGAN():
         generated_imgs = self.sess.run(self.fake_imgs, feed_dict=feed)
         combined_img = concat_imgs(generated_imgs, row_n, col_n)
         combined_img = (combined_img + 1.) * 127.5
-        if FLAGS.flip:
-            combined_img = combined_img * -1.
         if FLAGS.img_dim == 1:
             combined_img = np.reshape(combined_img, (-1, col_n * FLAGS.img_height))
         else:
