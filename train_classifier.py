@@ -16,6 +16,7 @@ class TrainingClassifier():
     def __init__(self):
         global FLAGS
         self._setup_dirs()
+        self._save_flags()
         self._prepare_training()
         self._load_dataset()
 
@@ -28,6 +29,13 @@ class TrainingClassifier():
         self.dst_log = os.path.join(FLAGS.dst_classifier, 'log')
         if not os.path.exists(self.dst_log):
             os.mkdir(self.dst_log)
+
+    def _save_flags(self):
+        '''
+        Save FLAGS as JSON
+        '''
+        with open(os.path.join(self.dst_log, 'flags.json'), 'w') as f:
+            json.dump(FLAGS.__dict__['__flags'], f, indent=4)
 
     def _prepare_training(self):
         '''

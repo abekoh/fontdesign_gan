@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import math
 from subprocess import Popen, PIPE
@@ -23,6 +24,7 @@ class TrainingFontDesignGAN():
         global FLAGS
         self._check_params()
         self._setup_dirs()
+        self._save_flags()
         self._prepare_training()
         self._load_dataset()
 
@@ -51,6 +53,13 @@ class TrainingFontDesignGAN():
             os.makedirs(self.dst_log_fontemb)
         if not os.path.exists(self.dst_samples):
             os.mkdir(self.dst_samples)
+
+    def _save_flags(self):
+        '''
+        Save FLAGS as JSON
+        '''
+        with open(os.path.join(self.dst_log, 'flags.json'), 'w') as f:
+            json.dump(FLAGS.__dict__['__flags'], f, indent=4)
 
     def _load_dataset(self):
         '''
