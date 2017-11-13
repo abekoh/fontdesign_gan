@@ -53,7 +53,7 @@ class Dataset():
                 if self.img_dim == 3:
                     np_img = np.repeat(np_img, 3, axis=3)
                 imgs[i] = np_img
-                fontnames[i] = os.path.basename(img_path).split('.')[0]
+                fontnames[i] = os.path.basename(img_path).replace('.png', '')
             self._save(os.path.basename(dir_path), imgs, fontnames)
 
     def _save(self, group_name, imgs, fontnames):
@@ -66,22 +66,26 @@ class Dataset():
         print('preparing dataset...')
         self.keys_queue_train = list()
         self.label_to_id = dict()
-        is_same_font_n = True
-        prev_font_n = 0
+        fontnames_list = list()
+        all_fontnames = set()
         for i, (key, val) in enumerate(self.h5file.items()):
+            fontnames = list()
+            for fontname in val['fontnames'].value:
+                fontnames.append(fontname)
+                all_fontnames.add(fontname)
+            fontnames_list.append(fontnames)
             font_n = len(val['imgs'])
             for j in range(font_n):
                 self.keys_queue_train.append((key, j))
-            if prev_font_n != 0 and font_n != prev_font_n:
-                is_same_font_n = False
-            prev_font_n = max(font_n, prev_font_n)
             self.label_to_id[key] = i
-        self.font_n = prev_font_n
+        self.font_n = len(all_fontnames)
         self.label_n = len(self.label_to_id)
         if train_rate != 1.:
-            assert is_same_font_n, 'If you want to divide train/test, all of font num should be same.'
-            train_n = int(font_n * train_rate)
-            train_ids = random.sample(range(0, font_n), train_n)
+            for i in range(self.label_n):
+                for fontname in all_fontnames:
+                    assert fontname in fontnames_list[i], 'If you want to divide train/test, all of fonts must have same characters'
+            train_n = int(self.font_n * train_rate)
+            train_ids = random.sample(range(0, self.font_n), train_n)
             self.keys_queue_test = list(filter(lambda x: x[1] not in train_ids, self.keys_queue_train))
             self.keys_queue_train = list(filter(lambda x: x[1] in train_ids, self.keys_queue_train))
         if self.is_mem:
@@ -163,3 +167,8 @@ class Dataset():
         if is_label:
             return imgs, labels
         return imgs
+
+
+if __name__ == '__main__':
+    dataset = Dataset('./src/fonts_6561_caps_3ch_64x64_new.h5', 'r', 64, 64, 3)
+    dataset.set_load_data(0.9)
