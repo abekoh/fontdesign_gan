@@ -3,7 +3,6 @@ import csv
 import json
 
 import tensorflow as tf
-import numpy as np
 from tqdm import tqdm
 
 from dataset import Dataset
@@ -102,7 +101,7 @@ class TrainingClassifier():
             # train
             losses, accs = list(), list()
             for batch_i in tqdm(range(train_batch_n)):
-                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size)
+                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_label=True)
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
                 _, loss, acc = self.sess.run([self.c_train, self.c_loss, self.c_acc],
                                              feed_dict={self.imgs: batched_imgs,
@@ -116,7 +115,7 @@ class TrainingClassifier():
             # test
             accs = list()
             for batch_i in tqdm(range(test_batch_n)):
-                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_test=True)
+                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_test=True, is_label=True)
                 batched_categorical_labels = self._labels_to_categorical(batched_labels)
                 loss, acc = self.sess.run([self.c_loss, self.c_acc],
                                           feed_dict={self.imgs: batched_imgs,
@@ -134,6 +133,3 @@ class TrainingClassifier():
         self.csv_file = open(os.path.join(self.dst_log, 'result.csv'), 'w')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['', 'train_loss', 'train_acc', 'test_loss', 'test_acc'])
-
-    def _labels_to_categorical(self, labels):
-        return np.eye(26)[list(map(lambda x: ord(x) - 65, labels))]

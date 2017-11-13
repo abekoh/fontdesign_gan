@@ -1,15 +1,12 @@
 import os
 import sys
 import random
-import math
 
 import numpy as np
 from PIL import Image
 import h5py
 from glob import glob
 from tqdm import tqdm
-
-from utils import concat_imgs
 
 
 class Dataset():
@@ -21,21 +18,7 @@ class Dataset():
         self.img_dim = img_dim
         self.is_mem = is_mem
 
-        assert mode == 'r' or mode == 'w', 'mode must be \'r\' or \'w\''
-        if self.mode == 'r':
-            assert os.path.exists(h5_path), 'hdf5 file is not found: {}'.format(h5_path)
-            self.h5file = h5py.File(h5_path, mode)
-            # # TODO: be more clearly
-            # keys = self.h5file.keys()
-            # self.data_n = len(keys)
-            # for key in keys:
-            #     self.label_n = len(self.h5file[key + '/labels'].value)
-            #     break
-            # if self.is_mem:
-            #     self._put_on_mem()
-            #     self._get = self._get_from_mem
-            # else:
-            #     self._get = self._get_from_file
+        assert mode == 'w' or mode == 'r', 'mode must be \'w\' or \'r\''
         if self.mode == 'w':
             if os.path.exists(h5_path):
                 while True:
@@ -46,6 +29,13 @@ class Dataset():
                     print('canceled')
                     sys.exit()
             self.h5file = h5py.File(h5_path, mode)
+        if self.mode == 'r':
+            assert os.path.exists(h5_path), 'hdf5 file is not found: {}'.format(h5_path)
+            self.h5file = h5py.File(h5_path, mode)
+            if self.is_mem:
+                self._get = self._get_from_mem
+            else:
+                self._get = self._get_from_file
 
     def load_imgs(self, src_dir_path):
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
@@ -74,28 +64,26 @@ class Dataset():
 
     def set_load_data(self, train_rate=1.):
         self.keys_queue_train = list()
-        # if self.is_mem:
-        #     iters = enumerate(self.h5file.values())
-        # else:
-        #     iters = self.h5file.items()
+        is_same_font_n = True
+        prev_font_n = 0
+        self.label_n = 0
         for key, val in self.h5file.items():
-            for i in range(len(val['imgs'])):
+            font_n = len(val['imgs'])
+            for i in range(font_n):
                 self.keys_queue_train.append((key, i))
+            if prev_font_n != 0 and font_n != prev_font_n:
+                is_same_font_n = False
+            prev_font_n = max(font_n, prev_font_n)
+            self.label_n += 1
+        self.font_n = prev_font_n
         if train_rate != 1.:
-            self.keys_queue_test = self.keys_queue_train[int(len(self.keys_queue_train) * train_rate):]
-            self.keys_queue_train = self.keys_queue_train[:int(len(self.keys_queue_train) * train_rate)]
-        print(self.keys_queue_test)
-
-    # def _set_label_ids(self, key=None):
-    #     self.label_ids = dict()
-    #     if key is None:
-    #         max_len = 0
-    #         for k, v in self.h5file.items():
-    #             if len(v) > max_len:
-    #                 key = k
-    #                 max_len = len(v)
-    #     for i, label in enumerate(self.h5file[key + '/labels'].value):
-    #         self.label_ids[label] = i
+            assert is_same_font_n, 'If you want to divide train/test, all of font num should be same.'
+            train_n = int(font_n * train_rate)
+            train_ids = random.sample(range(0, font_n), train_n)
+            self.keys_queue_test = list(filter(lambda x: x[1] not in train_ids, self.keys_queue_train))
+            self.keys_queue_train = list(filter(lambda x: x[1] in train_ids, self.keys_queue_train))
+        if self.is_mem:
+            self._put_on_mem()
 
     def shuffle(self, is_test=False):
         if is_test:
@@ -108,7 +96,7 @@ class Dataset():
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
 
-    def get_batch(self, batch_i, batch_size, is_test=False, is_label=True):
+    def get_batch(self, batch_i, batch_size, is_test=False, is_label=False):
         keys_list = list()
         for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
             if is_test:
@@ -117,7 +105,7 @@ class Dataset():
                 keys_list.append(self.keys_queue_train[i])
         return self._get(keys_list, is_label)
 
-    def get_random(self, batch_size, is_test=False, is_label=True):
+    def get_random(self, batch_size, is_test=False, is_label=False):
         keys_list = list()
         for _ in range(batch_size):
             if is_test:
@@ -126,85 +114,46 @@ class Dataset():
                 keys_list.append(random.choice(self.keys_queue_train))
         return self._get(keys_list, is_label)
 
-    # def get_selected(self, labels, is_test=False, is_label=True):
-    #     keys_list = list()
-    #     for label in labels:
-    #         num = self.get_label_id(label)
-    #         if is_test:
-    #             keys_list.append(self.keys_queue_test[num])
-    #         else:
-    #             keys_list.append(self.keys_queue_train[num])
-    #     return self._get(keys_list, is_label)
-
-    def get_random_by_ids(self, batch_size, ids, is_test=False, is_label=True):
+    def get_random_by_labels(self, batch_size, labels, is_test=False, is_label=False):
         if is_test:
             keys_queue = self.keys_queue_test
         else:
             keys_queue = self.keys_queue_train
-        filtered_keys_queue = list(filter(lambda x: x[1] in ids, keys_queue))
+        filtered_keys_queue = list(filter(lambda x: x[1] in labels, keys_queue))
         keys_list = list()
         for _ in range(batch_size):
             keys_list.append(random.choice(filtered_keys_queue))
         return self._get(keys_list, is_label)
 
-    def get_all(self, is_test=False, is_label=True):
-        if is_test:
-            return self.get_batch(0, len(self.key_queue_test), is_test)
-        return self.get_batch(0, len(self.keys_queue_train), is_test, is_label)
-
-    def _get_from_file(self, keys_list, is_label=True):
+    def _get_from_file(self, keys_list, is_label=False):
         imgs = np.empty((len(keys_list), self.img_width, self.img_height, self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
             img = self.h5file[keys[0] + '/imgs'].value[keys[1]]
             imgs[i] = img[np.newaxis, :]
-            labels.append(self.h5file[keys[0] + '/labels'].value[keys[1]])
+            labels.append(keys[0])
         if is_label:
             return imgs, labels
         return imgs
 
     def _put_on_mem(self):
         print('putting data on memory...')
-        self.imgs = np.empty((self.data_n, self.label_n, self.img_width, self.img_height, self.img_dim), np.float32)
-        self.labels = np.empty((self.data_n, self.label_n), object)
+        self.imgs = np.empty((self.label_n, self.font_n, self.img_width, self.img_height, self.img_dim), np.float32)
+        self.label_to_id = dict()
+        self.label_to_font_n = dict()
         for i, key in enumerate(self.h5file.keys()):
             self.imgs[i] = self.h5file[key + '/imgs'].value
-            self.labels[i] = self.h5file[key + '/labels'].value
+            self.label_to_id[key] = i
+            self.label_to_font_n[key] = len(self.imgs[i])
 
-    def _get_from_mem(self, keys_list, is_label=True):
+    def _get_from_mem(self, keys_list, is_label=False):
         imgs = np.empty((len(keys_list), self.img_width, self.img_height, self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
-            img = self.imgs[keys[0]][keys[1]]
+            assert keys[1] < self.label_to_font_n[keys[0]], 'Image is out of range'
+            img = self.imgs[self.label_to_id[keys[0]]][keys[1]]
             imgs[i] = img[np.newaxis, :]
-            labels.append(self.labels[keys[0]][keys[1]])
+            labels.append(keys[0])
         if is_label:
             return imgs, labels
         return imgs
-
-    # def _get_label_id(self, label):
-    #     return self.label_ids[label]
-
-    def show_random(self):
-        imgs, _ = self.get_random(64)
-        concated_img = concat_imgs(imgs, 8, 8)
-        concated_img = (concated_img + 1.) * 127.5
-        concated_img = np.reshape(concated_img, (self.img_width * 8, -1))
-        pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.show()
-
-    def save_index(self, dst_img_path):
-        imgs_n = len(self.keys_queue_train)
-        imgs = self.get_all(is_label=False)
-        col_n = math.ceil(math.sqrt(imgs_n))
-        concated_img = concat_imgs(imgs, col_n, col_n)
-        concated_img = (concated_img + 1.) * 127.5
-        concated_img = np.reshape(concated_img, (-1, col_n * self.img_width, self.img_dim))
-        pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(dst_img_path)
-
-
-if __name__ == '__main__':
-    dataset = Dataset('./src/200_64x64.h5', 'r', 64, 64, 3, is_mem=True)
-    # dataset.load_imgs('../../font_dataset/200_64x64_by_char')
-    dataset.set_load_data(0.9)

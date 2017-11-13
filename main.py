@@ -66,10 +66,8 @@ def main(argv=None):
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         assert FLAGS.font_imgs != '', 'have to set --font_imgs'
         from dataset import Dataset
-        dataset = Dataset(FLAGS.font_h5, 'w', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim)
+        dataset = Dataset(FLAGS.font_h5, 'w', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         dataset.load_imgs(FLAGS.font_imgs)
-        dataset.set_load_data(ids=[0])
-        dataset.save_index(FLAGS.font_h5 + '.png')
     elif FLAGS.mode == 'train_c':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
