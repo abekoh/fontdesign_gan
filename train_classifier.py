@@ -3,6 +3,7 @@ import csv
 import json
 
 import tensorflow as tf
+import numpy as np
 from tqdm import tqdm
 
 from dataset import Dataset
@@ -87,11 +88,11 @@ class TrainingClassifier():
         self.saver = tf.train.Saver()
 
     def _load_dataset(self):
-        self.dataset = Dataset(FLAGS.font_h5, 'r', (FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
+        self.dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.dataset.set_load_data(train_rate=FLAGS.train_rate)
         self.dataset.shuffle()
-        self.train_data_n = self.dataset.get_img_len()
-        self.test_data_n = self.dataset.get_img_len(is_test=True)
+        self.train_data_n = self.dataset.get_data_n()
+        self.test_data_n = self.dataset.get_data_n(is_test=True)
 
     def train(self):
         self._init_csv()
@@ -102,7 +103,7 @@ class TrainingClassifier():
             losses, accs = list(), list()
             for batch_i in tqdm(range(train_batch_n)):
                 batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_label=True)
-                batched_categorical_labels = self._labels_to_categorical(batched_labels)
+                batched_categorical_labels = np.eye(26)[self.dataset.get_ids_from_labels(batched_labels)]
                 _, loss, acc = self.sess.run([self.c_train, self.c_loss, self.c_acc],
                                              feed_dict={self.imgs: batched_imgs,
                                                         self.labels: batched_categorical_labels,
@@ -116,7 +117,7 @@ class TrainingClassifier():
             accs = list()
             for batch_i in tqdm(range(test_batch_n)):
                 batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_test=True, is_label=True)
-                batched_categorical_labels = self._labels_to_categorical(batched_labels)
+                batched_categorical_labels = np.eye(26)[self.dataset.get_ids_from_labels(batched_labels)]
                 loss, acc = self.sess.run([self.c_loss, self.c_acc],
                                           feed_dict={self.imgs: batched_imgs,
                                                      self.labels: batched_categorical_labels,

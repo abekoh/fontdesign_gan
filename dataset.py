@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 class Dataset():
 
-    def __init__(self, h5_path, mode, img_width, img_height, img_dim, is_mem=False):
+    def __init__(self, h5_path, mode, img_width, img_height, img_dim, is_mem=True):
         self.mode = mode
         self.img_width = img_width
         self.img_height = img_height
@@ -63,19 +63,21 @@ class Dataset():
         self.h5file.flush()
 
     def set_load_data(self, train_rate=1.):
+        print('preparing dataset...')
         self.keys_queue_train = list()
+        self.label_to_id = dict()
         is_same_font_n = True
         prev_font_n = 0
-        self.label_n = 0
-        for key, val in self.h5file.items():
+        for i, (key, val) in enumerate(self.h5file.items()):
             font_n = len(val['imgs'])
-            for i in range(font_n):
-                self.keys_queue_train.append((key, i))
+            for j in range(font_n):
+                self.keys_queue_train.append((key, j))
             if prev_font_n != 0 and font_n != prev_font_n:
                 is_same_font_n = False
             prev_font_n = max(font_n, prev_font_n)
-            self.label_n += 1
+            self.label_to_id[key] = i
         self.font_n = prev_font_n
+        self.label_n = len(self.label_to_id)
         if train_rate != 1.:
             assert is_same_font_n, 'If you want to divide train/test, all of font num should be same.'
             train_n = int(font_n * train_rate)
@@ -91,10 +93,16 @@ class Dataset():
         else:
             random.shuffle(self.keys_queue_train)
 
-    def get_img_len(self, is_test=False):
+    def get_data_n(self, is_test=False):
         if is_test:
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
+
+    def get_ids_from_labels(self, labels):
+        ids = list()
+        for label in labels:
+            ids.append(self.label_to_id[label])
+        return ids
 
     def get_batch(self, batch_i, batch_size, is_test=False, is_label=False):
         keys_list = list()
@@ -139,11 +147,9 @@ class Dataset():
     def _put_on_mem(self):
         print('putting data on memory...')
         self.imgs = np.empty((self.label_n, self.font_n, self.img_width, self.img_height, self.img_dim), np.float32)
-        self.label_to_id = dict()
         self.label_to_font_n = dict()
         for i, key in enumerate(self.h5file.keys()):
             self.imgs[i] = self.h5file[key + '/imgs'].value
-            self.label_to_id[key] = i
             self.label_to_font_n[key] = len(self.imgs[i])
 
     def _get_from_mem(self, keys_list, is_label=False):
