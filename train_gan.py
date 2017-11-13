@@ -306,7 +306,7 @@ class TrainingFontDesignGAN():
                 self._save_sample_imgs(epoch_i + 1)
 
             # Save images for tensorboard projector
-            if (epoch_i + 1) % FLAGS.embedding_interval == 0:
+            if (epoch_i + 1) % FLAGS.embedding_imgs_interval == 0:
                 self._save_embedding_imgs(epoch_i + 1)
 
     def _run_tensorboard(self):
