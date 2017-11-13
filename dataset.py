@@ -153,7 +153,11 @@ class Dataset():
         self.imgs = np.empty((self.label_n, self.font_n, self.img_width, self.img_height, self.img_dim), np.float32)
         self.label_to_font_n = dict()
         for i, key in enumerate(self.h5file.keys()):
-            self.imgs[i] = self.h5file[key + '/imgs'].value
+            val = self.h5file[key + '/imgs'].value
+            if len(val) < self.font_n:
+                white_imgs = np.ones((self.font_n - len(val), self.img_width, self.img_height, self.img_dim), np.float32)
+                val = np.concatenate((val, white_imgs), axis=0)
+            self.imgs[i] = val
             self.label_to_font_n[key] = len(self.imgs[i])
 
     def _get_from_mem(self, keys_list, is_label=False):
