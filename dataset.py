@@ -131,7 +131,7 @@ class Dataset():
             keys_queue = self.keys_queue_test
         else:
             keys_queue = self.keys_queue_train
-        filtered_keys_queue = list(filter(lambda x: x[1] in labels, keys_queue))
+        filtered_keys_queue = list(filter(lambda x: x[0] in labels, keys_queue))
         keys_list = list()
         for _ in range(batch_size):
             keys_list.append(random.choice(filtered_keys_queue))
@@ -167,8 +167,3 @@ class Dataset():
         if is_label:
             return imgs, labels
         return imgs
-
-
-if __name__ == '__main__':
-    dataset = Dataset('./src/fonts_6561_caps_3ch_64x64_new.h5', 'r', 64, 64, 3)
-    dataset.set_load_data(0.9)

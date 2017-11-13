@@ -3,6 +3,7 @@ from datetime import datetime
 import subprocess
 
 FLAGS = tf.app.flags.FLAGS
+ALPHABET_CAPS = tuple(chr(i) for i in range(65, 65 + 26))
 
 
 def get_gpu_n():
@@ -24,7 +25,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('img_height', 64, 'image\'\'s height')
     tf.app.flags.DEFINE_integer('img_dim', 3, 'image\'s dimention')
     tf.app.flags.DEFINE_integer('font_embedding_n', 256, 'num of font embedding ids')
-    tf.app.flags.DEFINE_integer('char_embedding_n', 26, 'num of char embedding ids')
+    tf.app.flags.DEFINE_integer('embedding_chars', ALPHABET_CAPS, 'char embeddings')
     tf.app.flags.DEFINE_float('font_embedding_rate', 0.5, 'rate of font embedding')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')

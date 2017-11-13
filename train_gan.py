@@ -65,10 +65,9 @@ class TrainingFontDesignGAN():
         '''
         Load dataset
         '''
-        self.real_dataset = Dataset(FLAGS.font_h5, 'r', img_size=(FLAGS.img_width, FLAGS.img_height), img_dim=FLAGS.img_dim, is_mem=True)
+        self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.real_dataset.set_load_data()
         self.real_dataset.shuffle()
-        self.real_data_n = self.real_dataset.get_img_len()
 
     def _prepare_training(self):
         '''
@@ -77,11 +76,12 @@ class TrainingFontDesignGAN():
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
+        self.char_embedding_n = len(FLAGS.embedding_chars)
 
         with tf.device('/cpu:0'):
             # Set embeddings from uniform distribution
             font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
-            char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
+            char_embedding_np = np.random.uniform(-1, 1, (self.char_embedding_n, self.char_z_size)).astype(np.float32)
             with tf.variable_scope('embeddings'):
                 self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
                 self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
@@ -90,7 +90,7 @@ class TrainingFontDesignGAN():
             self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
             self.is_train = tf.placeholder(tf.bool, name='is_train')
             self.real_imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='real_imgs')
-            self.labels = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.char_embedding_n), name='labels')
+            self.labels = tf.placeholder(tf.float32, (FLAGS.batch_size, self.char_embedding_n), name='labels')
 
             d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
             g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
@@ -226,21 +226,21 @@ class TrainingFontDesignGAN():
         # Setup writer for tensorboard
         self.writer = tf.summary.FileWriter(self.dst_log)
 
-    def _get_ids(self, embedding_font_ids=None, embedding_char_ids=None):
+    def _get_ids(self, font_selector=None, char_selector=None):
         '''
         Get embedding ids
         '''
-        if type(embedding_font_ids) == int:
-            font_ids = np.repeat(0, embedding_font_ids, (FLAGS.batch_size), dtype=np.int32)
-        elif embedding_font_ids == 'random':
+        if type(font_selector) == int:
+            font_ids = np.repeat(0, font_selector, (FLAGS.batch_size), dtype=np.int32)
+        elif font_selector == 'random':
             font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
         else:
             # All ids are -1 -> z is generated from uniform distribution when calculate graph
             font_ids = np.ones(FLAGS.batch_size) * -1
-        if type(embedding_char_ids) == int:
-            char_ids = np.repeat(embedding_char_ids, FLAGS.batch_size).astype(np.int32)
-        elif embedding_char_ids == 'random':
-            char_ids = np.random.randint(0, FLAGS.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
+        if type(char_selector) == str and len(char_selector) == 1:
+            char_ids = np.repeat(self.real_dataset.get_ids_from_labels(char_selector)[0], FLAGS.batch_size).astype(np.int32)
+        elif char_selector == 'random':
+            char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
         else:
             # All ids are -1 -> z is generated from uniform distribution when calculate graph
             char_ids = np.ones(FLAGS.batch_size) * -1
@@ -255,25 +255,25 @@ class TrainingFontDesignGAN():
             self._run_tensorboard()
 
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
-            for char_i in range(FLAGS.char_embedding_n):
+            for embedding_char in FLAGS.embedding_chars:
                 # Approximate wasserstein distance
                 for critic_i in range(FLAGS.critic_n):
-                    real_imgs = self.real_dataset.get_random_by_ids(FLAGS.batch_size, [char_i], is_label=False)
-                    font_ids, char_ids = self._get_ids(None, char_i)
+                    real_imgs = self.real_dataset.get_random_by_labels(FLAGS.batch_size, [embedding_char])
+                    font_ids, char_ids = self._get_ids(None, embedding_char)
                     self.sess.run(self.d_train, feed_dict={self.font_ids: font_ids,
                                                            self.char_ids: char_ids,
                                                            self.real_imgs: real_imgs,
                                                            self.is_train: True})
 
                 # Minimize wasserstein distance
-                font_ids, char_ids = self._get_ids(None, char_i)
+                font_ids, char_ids = self._get_ids(None, embedding_char)
                 self.sess.run(self.g_train, feed_dict={self.font_ids: font_ids,
                                                        self.char_ids: char_ids,
                                                        self.is_train: True})
 
                 # Maximize character likelihood
                 if FLAGS.c_penalty != 0.:
-                    labels = np.eye(FLAGS.char_embedding_n)[char_ids]
+                    labels = np.eye(self.char_embedding_n)[char_ids]
                     self.sess.run(self.c_train, feed_dict={self.font_ids: font_ids,
                                                            self.char_ids: char_ids,
                                                            self.labels: labels,
@@ -284,7 +284,7 @@ class TrainingFontDesignGAN():
             font_ids, char_ids = self._get_ids(None, 'random')
             feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
             if FLAGS.c_penalty != 0.:
-                labels = np.eye(FLAGS.char_embedding_n)[char_ids]
+                labels = np.eye(self.char_embedding_n)[char_ids]
                 feed[self.labels] = labels
             summary = self.sess.run(self.summary, feed_dict=feed)
 
@@ -335,7 +335,7 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'save_imgs_edge_n'):
             self._init_save_imgs_edge_n()
         self.sample_font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
-        self.sample_char_ids = np.random.randint(0, FLAGS.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
+        self.sample_char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
 
     def _save_sample_imgs(self, epoch_i):
         '''
