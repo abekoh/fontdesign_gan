@@ -4,6 +4,9 @@ from glob import glob
 import numpy as np
 import imageio
 
+ALPHABET_CAPS = list(chr(i) for i in range(65, 65 + 26))
+HIRAGANA_SEION = list('あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわゐゑをん')
+
 
 def concat_imgs(src_imgs, row_n, col_n):
     concated_img = np.empty((0, src_imgs.shape[1] * col_n, src_imgs.shape[3]))
@@ -39,5 +42,10 @@ def make_gif(src_imgs_dir_path, dst_img_path):
     imageio.mimsave(dst_img_path, imgs)
 
 
-def diclist_to_list(dicts):
-    return {k: v for dic in dicts for k, v in dic.items()}
+def set_embedding_chars(embedding_chars_type):
+    embedding_chars = list()
+    if 'caps' in embedding_chars_type:
+        embedding_chars.extend(ALPHABET_CAPS)
+    if 'hiragana' in embedding_chars_type:
+        embedding_chars.extend(HIRAGANA_SEION)
+    return embedding_chars

@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from models import Generator
-from utils import concat_imgs
+from utils import set_embedding_chars, concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -84,9 +84,12 @@ class GeneratingFontDesignGAN():
 
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
+        self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
+        assert self.embedding_chars != [], 'embedding_chars is empty'
+        self.char_embedding_n = len(self.embedding_chars)
 
         font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
-        char_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_embedding_n, self.char_z_size)).astype(np.float32)
+        char_embedding_np = np.random.uniform(-1, 1, (self.char_embedding_n, self.char_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
             font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
@@ -129,8 +132,6 @@ class GeneratingFontDesignGAN():
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
         concated_img = concat_imgs(generated_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
-        if FLAGS.flip:
-            concated_img = concated_img * -1.
         if FLAGS.img_dim == 1:
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
         else:

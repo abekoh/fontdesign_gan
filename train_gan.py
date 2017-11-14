@@ -13,11 +13,9 @@ from tqdm import tqdm
 from dataset import Dataset
 from models import Generator, Discriminator, Classifier
 from ops import average_gradients
-from utils import concat_imgs
+from utils import set_embedding_chars, concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
-ALPHABET_CAPS = list(chr(i) for i in range(65, 65 + 26))
-HIRAGANA_SEION = list('あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわゐゑをん')
 
 
 class TrainingFontDesignGAN():
@@ -78,11 +76,7 @@ class TrainingFontDesignGAN():
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
-        self.embedding_chars = list()
-        if 'caps' in FLAGS.embedding_chars_type:
-            self.embedding_chars.extend(ALPHABET_CAPS)
-        if 'hiragana' in FLAGS.embedding_chars_type:
-            self.embedding_chars.extend(HIRAGANA_SEION)
+        self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
 
