@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from models import Generator
-from utils import set_embedding_chars, concat_imgs
+from utils import set_embedding_chars, concat_imgs, divide_img_dims, save_heatmap
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -110,7 +110,10 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([font_z, char_z], axis=1)
 
-        self.generated_imgs = generator(z, is_train=False)
+        if FLAGS.intermediate:
+            self.generated_imgs, self.intermediate_imgs = generator(z, is_train=False, is_intermediate=True)
+        else:
+            self.generated_imgs = generator(z, is_train=False)
 
         sess_config = tf.ConfigProto(
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
@@ -122,7 +125,7 @@ class GeneratingFontDesignGAN():
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
         self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
-    def generate(self, filename='generated.png'):
+    def generate(self, filename='generated', ext='png'):
         generated_imgs = self.sess.run(self.generated_imgs,
                                        feed_dict={self.font_ids_x: self.font_gen_ids_x,
                                                   self.font_ids_y: self.font_gen_ids_y,
@@ -137,4 +140,18 @@ class GeneratingFontDesignGAN():
         else:
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
         pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.dst_generated, filename))
+        pil_img.save(os.path.join(self.dst_generated, '{}.{}'.format(filename, ext)))
+
+    def visualize_intermediate(self, filename='intermediate', ext='png'):
+        assert self.font_gen_ids_x.shape[0] == 0, 'Image num should be 1 if you want to visualize intermediate layers'
+        all_intermediate_imgs = self.sess.run(self.intermediate_imgs,
+                                              feed_dict={self.font_ids_x: self.font_gen_ids_x,
+                                                         self.font_ids_y: self.font_gen_ids_y,
+                                                         self.font_ids_alpha: self.font_gen_ids_alpha,
+                                                         self.char_ids_x: self.char_gen_ids_x,
+                                                         self.char_ids_y: self.char_gen_ids_y,
+                                                         self.char_ids_alpha: self.char_gen_ids_alpha})
+        for i, intermediate_imgs in enumerate(all_intermediate_imgs):
+            imgs = divide_img_dims(intermediate_imgs)
+            imgs = (imgs - np.mean(imgs)) / np.std(imgs)
+            save_heatmap(imgs, 'intermediate layer{}'.format(i), os.path.join(self.dst_generated, '{}_{}.{}'.format(filename, i, ext)))

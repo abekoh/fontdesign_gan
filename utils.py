@@ -1,7 +1,9 @@
 import os
 from glob import glob
+import math
 
 import numpy as np
+from matplotlib import pyplot as plt
 import imageio
 
 ALPHABET_CAPS = list(chr(i) for i in range(65, 65 + 26))
@@ -23,11 +25,42 @@ def concat_imgs(src_imgs, row_n, col_n):
     return concated_img
 
 
+def divide_img_dims(src_imgs):
+    divided_imgs = np.empty((src_imgs.shape[0] * src_imgs.shape[3], src_imgs.shape[1], src_imgs.shape[2]))
+    for img_i in range(src_imgs.shape[0]):
+        for dim_i in range(src_imgs.shape[3]):
+            divided_img = src_imgs[img_i, :, :, dim_i]
+            divided_imgs[img_i * src_imgs.shape[3] + dim_i] = divided_img
+    return divided_imgs
+
+
 def combine_imgs(src_img_list):
     combined_img = np.empty((0, src_img_list[0].shape[1], src_img_list[0].shape[2]))
     for src_img in src_img_list:
         combined_img = np.concatenate((combined_img, src_img), axis=0)
     return combined_img
+
+
+def save_heatmap(imgs, title, dst_path):
+    print('making heatmap... ({})'.format(title))
+    edge_n = get_imgs_edge_n(imgs.shape[0])
+    fig, axes = plt.subplots(edge_n, edge_n, figsize=(10, 10))
+    for i in range(edge_n ** 2):
+        row_i = i // edge_n
+        col_i = i % edge_n
+        if i >= imgs.shape[0]:
+            axes[row_i, col_i].axis('off')
+            continue
+        axes[row_i, col_i].pcolor(imgs[i], cmap=plt.get_cmap('plasma'))
+        axes[row_i, col_i].set_aspect('equal', 'box')
+        axes[row_i, col_i].tick_params(labelbottom='off', bottom='off', labelleft='off', left='off')
+        axes[row_i, col_i].set_xticklabels([])
+    plt.suptitle(title)
+    plt.savefig(dst_path, dpi=100)
+
+
+def get_imgs_edge_n(img_n):
+    return math.ceil(math.sqrt(img_n))
 
 
 def make_gif(src_imgs_dir_path, dst_img_path):

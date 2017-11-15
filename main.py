@@ -58,7 +58,8 @@ def define_flags():
     # Generate GAN
     tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')
     tf.app.flags.DEFINE_string('src_ids', '', 'path of ids settings\' json')
-    tf.app.flags.DEFINE_string('gen_name', now_str + '.png', 'filename of saveing image')
+    tf.app.flags.DEFINE_string('gen_name', now_str, 'filename of saveing image')
+    tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
 
 
 def main(argv=None):
@@ -85,7 +86,9 @@ def main(argv=None):
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        gan.generate(FLAGS.gen_name)
+        gan.generate(filename=FLAGS.gen_name)
+        if FLAGS.intermediate:
+            gan.visualize_intermediate(filename=FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

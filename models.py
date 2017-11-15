@@ -16,7 +16,7 @@ class Generator():
         self.is_bn = is_bn
         self.is_transpose = is_transpose
 
-    def __call__(self, x, is_reuse=False, is_train=True):
+    def __call__(self, x, is_reuse=False, is_train=True, is_intermediate=False):
         with tf.variable_scope('generator') as scope:
             if is_reuse:
                 scope.reuse_variables()
@@ -24,6 +24,8 @@ class Generator():
             unit_size = self.img_size[0] // (2 ** self.layer_n)
             unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - 1))
             batch_size = int(x.shape[0])
+            if is_intermediate:
+                intermediate_xs = list()
 
             with tf.variable_scope('pre'):
                 x = linear(x, unit_size * unit_size * unit_n)
@@ -31,6 +33,8 @@ class Generator():
                 if self.is_bn:
                     x = batch_norm(x, is_train)
                 x = tf.nn.relu(x)
+                if is_intermediate:
+                    intermediate_xs.append(x)
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i)):
@@ -48,8 +52,12 @@ class Generator():
                         if self.is_bn:
                             x = batch_norm(x, is_train)
                         x = tf.nn.relu(x)
+                        if is_intermediate:
+                            intermediate_xs.append(x)
             x = tf.nn.tanh(x)
 
+            if is_intermediate:
+                return x, intermediate_xs
             return x
 
 
