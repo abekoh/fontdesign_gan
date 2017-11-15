@@ -41,9 +41,13 @@ def combine_imgs(src_img_list):
     return combined_img
 
 
-def save_heatmap(imgs, title, dst_path):
+def save_heatmap(imgs, title, dst_path, vmin=None, vmax=None):
     print('making heatmap... ({})'.format(title))
     edge_n = get_imgs_edge_n(imgs.shape[0])
+    if not vmin:
+        vmin = np.min(imgs)
+    if not vmax:
+        vmax = np.max(imgs)
     fig, axes = plt.subplots(edge_n, edge_n, figsize=(10, 10))
     for i in range(edge_n ** 2):
         row_i = i // edge_n
@@ -51,7 +55,7 @@ def save_heatmap(imgs, title, dst_path):
         if i >= imgs.shape[0]:
             axes[row_i, col_i].axis('off')
             continue
-        axes[row_i, col_i].pcolor(imgs[i], cmap=plt.get_cmap('plasma'))
+        axes[row_i, col_i].pcolor(imgs[i], vmin=vmin, vmax=vmax, cmap=plt.get_cmap('plasma'))
         axes[row_i, col_i].set_aspect('equal', 'box')
         axes[row_i, col_i].tick_params(labelbottom='off', bottom='off', labelleft='off', left='off')
         axes[row_i, col_i].set_xticklabels([])
