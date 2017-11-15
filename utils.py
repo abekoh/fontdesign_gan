@@ -26,11 +26,10 @@ def concat_imgs(src_imgs, row_n, col_n):
 
 
 def divide_img_dims(src_imgs):
-    divided_imgs = np.empty((src_imgs.shape[0] * src_imgs.shape[3], src_imgs.shape[1], src_imgs.shape[2]))
-    for img_i in range(src_imgs.shape[0]):
-        for dim_i in range(src_imgs.shape[3]):
-            divided_img = src_imgs[img_i, :, :, dim_i]
-            divided_imgs[img_i * src_imgs.shape[3] + dim_i] = divided_img
+    divided_imgs = np.empty((src_imgs.shape[2], src_imgs.shape[0], src_imgs.shape[1]))
+    for dim_i in range(src_imgs.shape[2]):
+        divided_img = src_imgs[:, :, dim_i]
+        divided_imgs[dim_i] = divided_img
     return divided_imgs
 
 

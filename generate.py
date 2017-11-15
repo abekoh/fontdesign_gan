@@ -150,7 +150,9 @@ class GeneratingFontDesignGAN():
                                                          self.char_ids_x: self.char_gen_ids_x,
                                                          self.char_ids_y: self.char_gen_ids_y,
                                                          self.char_ids_alpha: self.char_gen_ids_alpha})
-        for i, intermediate_imgs in enumerate(all_intermediate_imgs):
-            imgs = divide_img_dims(intermediate_imgs)
-            # imgs = (imgs - np.mean(imgs)) / np.std(imgs)
-            save_heatmap(imgs, 'intermediate layer{}'.format(i), os.path.join(self.dst_generated, '{}_{}.{}'.format(filename, i, ext)))
+        for layer_i, intermediate_imgs in enumerate(all_intermediate_imgs):
+            vmin = np.min(intermediate_imgs)
+            vmax = np.max(intermediate_imgs)
+            for img_i in range(intermediate_imgs.shape[0]):
+                imgs = divide_img_dims(intermediate_imgs[img_i])
+                save_heatmap(imgs, 'intermediate layer{}'.format(layer_i), os.path.join(self.dst_generated, '{}_{}_layer{}.{}'.format(filename, img_i, layer_i, ext)), vmin=vmin, vmax=vmax)
