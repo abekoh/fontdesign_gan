@@ -143,7 +143,7 @@ class GeneratingFontDesignGAN():
         pil_img.save(os.path.join(self.dst_generated, '{}.{}'.format(filename, ext)))
 
     def visualize_intermediate(self, filename='intermediate', ext='png'):
-        assert self.font_gen_ids_x.shape[0] == 0, 'Image num should be 1 if you want to visualize intermediate layers'
+        assert self.font_gen_ids_x.shape[0] == 1, 'Image num should be 1 if you want to visualize intermediate layers'
         all_intermediate_imgs = self.sess.run(self.intermediate_imgs,
                                               feed_dict={self.font_ids_x: self.font_gen_ids_x,
                                                          self.font_ids_y: self.font_gen_ids_y,
