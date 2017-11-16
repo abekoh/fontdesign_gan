@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 from models import Generator
-from utils import set_embedding_chars, concat_imgs, divide_img_dims, save_heatmap
+from utils import set_embedding_chars, concat_imgs, divide_img_dims, save_heatmap, save_bargraph
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -142,7 +142,7 @@ class GeneratingFontDesignGAN():
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(os.path.join(self.dst_generated, '{}.{}'.format(filename, ext)))
 
-    def visualize_intermediate(self, filename='intermediate', ext='png'):
+    def visualize_intermediate(self, filename='intermediate', ext='png', is_img=True, is_variance=False):
         all_intermediate_imgs = self.sess.run(self.intermediate_imgs,
                                               feed_dict={self.font_ids_x: self.font_gen_ids_x,
                                                          self.font_ids_y: self.font_gen_ids_y,
@@ -150,9 +150,18 @@ class GeneratingFontDesignGAN():
                                                          self.char_ids_x: self.char_gen_ids_x,
                                                          self.char_ids_y: self.char_gen_ids_y,
                                                          self.char_ids_alpha: self.char_gen_ids_alpha})
+        vmaxs = [0.2, 15, 500, 250000]
         for layer_i, intermediate_imgs in enumerate(all_intermediate_imgs):
-            vmin = np.min(intermediate_imgs)
-            vmax = np.max(intermediate_imgs)
-            for img_i in range(intermediate_imgs.shape[0]):
-                imgs = divide_img_dims(intermediate_imgs[img_i])
-                save_heatmap(imgs, 'intermediate layer{}'.format(layer_i), os.path.join(self.dst_generated, '{}_{}_layer{}.{}'.format(filename, img_i, layer_i, ext)), vmin=vmin, vmax=vmax)
+            if is_img:
+                vmin = np.min(intermediate_imgs)
+                vmax = np.max(intermediate_imgs)
+                for img_i in range(intermediate_imgs.shape[0]):
+                    imgs = divide_img_dims(intermediate_imgs[img_i])
+                    save_heatmap(imgs, 'intermediate layer{}'.format(layer_i),
+                                 os.path.join(self.dst_generated, '{}_{}_layer{}.{}'.format(filename, img_i, layer_i, ext)), vmin=vmin, vmax=vmax)
+            if is_variance:
+                variances = np.empty((intermediate_imgs.shape[3],))
+                for unit_i in range(intermediate_imgs.shape[3]):
+                    variances[unit_i] = np.var(intermediate_imgs[:, :, :, unit_i])
+                save_bargraph(variances, 'intermediate layer{} variances'.format(layer_i),
+                              os.path.join(self.dst_generated, '{}_var_layer{}.{}'.format(filename, layer_i, ext)), vmin=0, vmax=vmaxs[layer_i])

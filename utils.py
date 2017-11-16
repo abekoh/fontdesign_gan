@@ -62,6 +62,26 @@ def save_heatmap(imgs, title, dst_path, vmin=None, vmax=None):
     plt.savefig(dst_path, dpi=100)
 
 
+def save_bargraph(arr, title, dst_path, vmin=None, vmax=None):
+    edge_n = get_imgs_edge_n(arr.shape[0])
+    if not vmin:
+        vmin = np.min(arr)
+    if not vmax:
+        vmax = np.max(arr)
+    if arr.shape[0] < edge_n ** 2:
+        arr = np.concatenate((arr, np.zeros((edge_n ** 2 - arr.shape[0]))))
+    fig, axes = plt.subplots(edge_n, figsize=(10, 10))
+    for i in range(edge_n):
+        first = i * edge_n
+        last = (i + 1) * edge_n
+        index = np.arange(first, last)
+        axes[i].bar(index, arr[first:last])
+        axes[i].set_ylim([vmin, vmax])
+        axes[i].tick_params(labelbottom='off', bottom='off')
+    plt.suptitle(title)
+    plt.savefig(dst_path, dpi=100)
+
+
 def get_imgs_edge_n(img_n):
     return math.ceil(math.sqrt(img_n))
 
