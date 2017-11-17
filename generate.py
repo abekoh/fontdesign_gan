@@ -115,9 +115,15 @@ class GeneratingFontDesignGAN():
         else:
             self.generated_imgs = generator(z, is_train=False)
 
-        sess_config = tf.ConfigProto(
-            gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
-        )
+        if FLAGS.gpu_ids == "":
+            sess_config = tf.ConfigProto(
+                device_count={"GPU": 0},
+                log_device_placement=True
+            )
+        else:
+            sess_config = tf.ConfigProto(
+                gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
+            )
         self.sess = tf.Session(config=sess_config)
 
         self.saver = tf.train.Saver()
