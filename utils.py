@@ -60,6 +60,7 @@ def save_heatmap(imgs, title, dst_path, vmin=None, vmax=None):
         axes[row_i, col_i].set_xticklabels([])
     plt.suptitle(title)
     plt.savefig(dst_path, dpi=100)
+    plt.close()
 
 
 def save_bargraph(arr, title, dst_path, vmin=None, vmax=None):
@@ -80,6 +81,7 @@ def save_bargraph(arr, title, dst_path, vmin=None, vmax=None):
         axes[i].tick_params(labelbottom='off', bottom='off')
     plt.suptitle(title)
     plt.savefig(dst_path, dpi=100)
+    plt.close()
 
 
 def get_imgs_edge_n(img_n):
