@@ -83,9 +83,16 @@ class TrainingClassifier():
             gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
         )
         self.sess = tf.Session(config=sess_config)
-        self.sess.run(tf.global_variables_initializer())
-
         self.saver = tf.train.Saver()
+        checkpoint = tf.train.get_checkpoint_state(self.dst_log)
+        if checkpoint:
+            saver_resume = tf.train.Saver()
+            saver_resume.restore(self.sess, checkpoint.model_checkpoint_path)
+            self.epoch_start = int(checkpoint.model_checkpoint_path.split('-')[-1]) + 1
+            print('restore ckpt')
+        else:
+            self.sess.run(tf.global_variables_initializer())
+            self.epoch_start = 0
 
     def _load_dataset(self):
         self.dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
@@ -98,7 +105,7 @@ class TrainingClassifier():
         self._init_csv()
         train_batch_n = self.train_data_n // FLAGS.batch_size
         test_batch_n = self.test_data_n // FLAGS.batch_size
-        for epoch_i in tqdm(range(FLAGS.c_epoch_n)):
+        for epoch_i in tqdm(range(self.epoch_start, FLAGS.c_epoch_n), initial=self.epoch_start, total=FLAGS.c_epoch_n):
             # train
             losses, accs = list(), list()
             for batch_i in tqdm(range(train_batch_n)):
