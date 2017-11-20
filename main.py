@@ -35,7 +35,7 @@ def define_flags():
     # Train Classifier
     dst_classifier = 'result/classifier/' + now_str
     tf.app.flags.DEFINE_string('dst_classifier', dst_classifier, 'path of result\'s destination')
-    tf.app.flags.DEFINE_integer('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
+    tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
     tf.app.flags.DEFINE_integer('c_epoch_n', 10, 'num of epoch for training classifier')
 
     # Train GAN

@@ -211,7 +211,7 @@ class TrainingFontDesignGAN():
         if checkpoint:
             saver_resume = tf.train.Saver()
             saver_resume.restore(self.sess, checkpoint.model_checkpoint_path)
-            self.epoch_start = int(checkpoint.model_checkpoint_path.split('-')[-1]) + 1
+            self.epoch_start = int(checkpoint.model_checkpoint_path.split('-')[-1])
             print('restore ckpt')
         else:
             self.sess.run(tf.global_variables_initializer())
