@@ -60,6 +60,8 @@ def define_flags():
     tf.app.flags.DEFINE_string('src_ids', '', 'path of ids settings\' json')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'filename of saveing image')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
+    tf.app.flags.DEFINE_boolean('recogtest', False, 'for recognition test')
+    tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')
 
 
 def main(argv=None):
@@ -83,12 +85,16 @@ def main(argv=None):
         gan.train()
     elif FLAGS.mode == 'generate':
         assert FLAGS.src_gan != '', 'have to set --src_gan'
-        assert FLAGS.src_ids != '', 'have to set --src_ids'
+        assert FLAGS.recogtest or FLAGS.src_ids != '', 'have to set --src_ids'
+        assert not FLAGS.recogtest or FLAGS.font_h5 != '', 'have to set --font_h5'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        gan.generate(filename=FLAGS.gen_name)
-        if FLAGS.intermediate:
-            gan.visualize_intermediate(filename=FLAGS.gen_name)
+        if FLAGS.recogtest:
+            gan.generate_for_recognition_test()
+        else:
+            gan.generate(filename=FLAGS.gen_name)
+            if FLAGS.intermediate:
+                gan.visualize_intermediate(filename=FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

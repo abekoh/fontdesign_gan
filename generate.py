@@ -5,7 +5,9 @@ import math
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
+from dataset import Dataset
 from models import Generator
 from utils import set_embedding_chars, concat_imgs, divide_img_dims, save_heatmap, save_bargraph
 
@@ -48,13 +50,21 @@ class GeneratingFontDesignGAN():
     def __init__(self):
         global FLAGS
         self._setup_dirs()
-        self._setup_json()
-        self._setup_inputs()
+        if FLAGS.recogtest:
+            assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
+            self.batch_size = FLAGS.batch_size
+            self._load_dataset()
+        else:
+            self._setup_json()
+            self._setup_inputs()
         self._prepare_generating()
 
     def _setup_dirs(self):
         self.src_log = os.path.join(FLAGS.src_gan, 'log')
-        self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
+        if FLAGS.recogtest:
+            self.dst_generated = os.path.join(FLAGS.src_gan, 'recognition_test')
+        else:
+            self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
 
@@ -71,6 +81,10 @@ class GeneratingFontDesignGAN():
         self.batch_size = self.font_gen_ids_x.shape[0]
         self.col_n = self.json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
+
+    def _load_dataset(self):
+        self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
+        self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
         generator = Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
@@ -101,11 +115,20 @@ class GeneratingFontDesignGAN():
         self.char_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids_y')
         self.char_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='char_ids_alpha')
 
-        font_z_x = tf.nn.embedding_lookup(font_embedding, self.font_ids_x)
-        font_z_y = tf.nn.embedding_lookup(font_embedding, self.font_ids_y)
+        # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
+        font_z_x = tf.cond(tf.less(tf.reduce_sum(self.font_ids_x), 0),
+                           lambda: tf.random_uniform((self.batch_size, self.font_z_size), -1, 1),
+                           lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_x))
+        font_z_y = tf.cond(tf.less(tf.reduce_sum(self.font_ids_y), 0),
+                           lambda: tf.random_uniform((self.batch_size, self.font_z_size), -1, 1),
+                           lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_y))
         font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
-        char_z_x = tf.nn.embedding_lookup(char_embedding, self.char_ids_x)
-        char_z_y = tf.nn.embedding_lookup(char_embedding, self.char_ids_y)
+        char_z_x = tf.cond(tf.less(tf.reduce_sum(self.char_ids_x), 0),
+                           lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
+                           lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_x))
+        char_z_y = tf.cond(tf.less(tf.reduce_sum(self.char_ids_y), 0),
+                           lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
+                           lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_y))
         char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
 
         z = tf.concat([font_z, char_z], axis=1)
@@ -147,6 +170,26 @@ class GeneratingFontDesignGAN():
             concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(os.path.join(self.dst_generated, '{}.{}'.format(filename, ext)))
+
+    def generate_for_recognition_test(self, ext='png'):
+        for c in tqdm(self.embedding_chars):
+            dst_dir = os.path.join(self.dst_generated, c)
+            if not os.path.exists(dst_dir):
+                os.mkdir(dst_dir)
+            c_id = self.real_dataset.get_ids_from_labels([c])[0]
+            for batch_i in range(self.batch_size // FLAGS.char_img_n):
+                generated_imgs = self.sess.run(self.generated_imgs,
+                                               feed_dict={self.font_ids_x: np.ones(self.batch_size) * -1,
+                                                          self.font_ids_y: np.ones(self.batch_size) * -1,
+                                                          self.font_ids_alpha: np.zeros(self.batch_size),
+                                                          self.char_ids_x: np.repeat(c_id, self.batch_size),
+                                                          self.char_ids_y: np.repeat(c_id, self.batch_size),
+                                                          self.char_ids_alpha: np.zeros(self.batch_size)})
+                for img_i in range(generated_imgs.shape[0]):
+                    img = generated_imgs[img_i]
+                    img = (img + 1.) * 127.5
+                    pil_img = Image.fromarray(np.uint8(img))
+                    pil_img.save(os.path.join(dst_dir, '{}.{}'.format(batch_i * self.batch_size + img_i, ext)))
 
     def visualize_intermediate(self, filename='intermediate', ext='png', is_img=True, is_variance=False):
         all_intermediate_imgs = self.sess.run(self.intermediate_imgs,
