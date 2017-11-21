@@ -49,9 +49,12 @@ class Dataset():
                 pil_img = Image.open(img_path)
                 np_img = np.asarray(pil_img)
                 np_img = (np_img.astype(np.float32) / 127.5) - 1.
-                np_img = np_img[np.newaxis, :, :, np.newaxis]
-                if self.img_dim == 3:
-                    np_img = np.repeat(np_img, 3, axis=3)
+                if len(np_img.shape) == 2:
+                    np_img = np_img[np.newaxis, :, :, np.newaxis]
+                    if self.img_dim == 3:
+                        np_img = np.repeat(np_img, 3, axis=3)
+                elif len(np_img.shape) == 3:
+                    np_img = np_img[np.newaxis, :, :, :]
                 imgs[i] = np_img
                 fontnames[i] = os.path.basename(img_path).replace('.png', '')
             self._save(os.path.basename(dir_path), imgs, fontnames)
