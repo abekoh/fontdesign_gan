@@ -37,6 +37,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('dst_classifier', dst_classifier, 'path of result\'s destination')
     tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
     tf.app.flags.DEFINE_integer('c_epoch_n', 10, 'num of epoch for training classifier')
+    tf.app.flags.DEFINE_boolean('labelacc', False, 'accuracy by labels')
 
     # Train GAN
     dst_gan = 'result/gan/' + now_str
