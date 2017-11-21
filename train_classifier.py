@@ -101,39 +101,38 @@ class TrainingClassifier():
         self.train_data_n = self.dataset.get_data_n()
         self.test_data_n = self.dataset.get_data_n(is_test=True)
 
+    def _run(self, is_test=False):
+        losses = list()
+        accs = list()
+        if is_test:
+            batch_n = self.test_data_n // FLAGS.batch_size
+            fetches = [self.c_loss, self.c_acc]
+        else:
+            batch_n = self.train_data_n // FLAGS.batch_size
+            fetches = [self.c_train, self.c_loss, self.c_acc]
+        for batch_i in tqdm(range(batch_n)):
+            imgs, labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_label=True, is_test=is_test)
+            categorical_labels = np.eye(26)[self.dataset.get_ids_from_labels(labels)]
+            rets = self.sess.run(fetches,
+                                 feed_dict={self.imgs: imgs,
+                                            self.labels: categorical_labels,
+                                            self.is_train: not is_test})
+            if not is_test:
+                del rets[0]
+            losses.append(rets[0])
+            accs.append(rets[1])
+        loss_avg = sum(losses) / len(losses)
+        acc_avg = sum(accs) / len(accs)
+        return loss_avg, acc_avg
+
     def train(self):
         self._init_csv()
-        train_batch_n = self.train_data_n // FLAGS.batch_size
-        test_batch_n = self.test_data_n // FLAGS.batch_size
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.c_epoch_n), initial=self.epoch_start, total=FLAGS.c_epoch_n):
-            # train
-            losses, accs = list(), list()
-            for batch_i in tqdm(range(train_batch_n)):
-                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_label=True)
-                batched_categorical_labels = np.eye(26)[self.dataset.get_ids_from_labels(batched_labels)]
-                _, loss, acc = self.sess.run([self.c_train, self.c_loss, self.c_acc],
-                                             feed_dict={self.imgs: batched_imgs,
-                                                        self.labels: batched_categorical_labels,
-                                                        self.is_train: True})
-                losses.append(loss)
-                accs.append(acc)
-            train_loss_avg = sum(losses) / len(losses)
-            train_acc_avg = sum(accs) / len(accs)
-            print('[train] loss: {}, acc: {}\n'.format(train_loss_avg, train_acc_avg))
-            # test
-            accs = list()
-            for batch_i in tqdm(range(test_batch_n)):
-                batched_imgs, batched_labels = self.dataset.get_batch(batch_i, FLAGS.batch_size, is_test=True, is_label=True)
-                batched_categorical_labels = np.eye(26)[self.dataset.get_ids_from_labels(batched_labels)]
-                loss, acc = self.sess.run([self.c_loss, self.c_acc],
-                                          feed_dict={self.imgs: batched_imgs,
-                                                     self.labels: batched_categorical_labels,
-                                                     self.is_train: False})
-                losses.append(loss)
-                accs.append(acc)
-            test_loss_avg = sum(losses) / len(losses)
-            test_acc_avg = sum(accs) / len(accs)
-            print('[test] loss: {}, acc: {}\n'.format(test_loss_avg, test_acc_avg))
+            train_loss_avg, train_acc_avg = self._run(is_test=False)
+            print('[train] loss: {}, accuracy: {}'.format(train_loss_avg, train_acc_avg))
+            test_loss_avg, test_acc_avg = self._run(is_test=True)
+            print('[test] loss: {}, accuracy: {}'.format(test_loss_avg, test_acc_avg))
+
             self.saver.save(self.sess, os.path.join(self.dst_log, 'result.ckpt'), global_step=epoch_i + 1)
             self.csv_writer.writerow([epoch_i + 1, train_loss_avg, train_acc_avg, test_loss_avg, test_acc_avg])
 
