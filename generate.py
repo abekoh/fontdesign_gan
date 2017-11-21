@@ -177,7 +177,7 @@ class GeneratingFontDesignGAN():
             if not os.path.exists(dst_dir):
                 os.mkdir(dst_dir)
             c_id = self.real_dataset.get_ids_from_labels([c])[0]
-            for batch_i in range(self.batch_size // FLAGS.char_img_n):
+            for batch_i in range(FLAGS.char_img_n // self.batch_size):
                 generated_imgs = self.sess.run(self.generated_imgs,
                                                feed_dict={self.font_ids_x: np.ones(self.batch_size) * -1,
                                                           self.font_ids_y: np.ones(self.batch_size) * -1,
