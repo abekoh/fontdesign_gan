@@ -15,7 +15,7 @@ def get_gpu_n():
 def define_flags():
     now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     # Mode
-    tf.app.flags.DEFINE_string('mode', '', 'make_dataset or train_c or train_g or generate')
+    tf.app.flags.DEFINE_string('mode', '', 'make_dataset or train_c or test_c or train_g or generate')
 
     # Common
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
@@ -76,7 +76,12 @@ def main(argv=None):
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
-        cl.train()
+        cl.train_and_test()
+    elif FLAGS.mode == 'test_c':
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        from train_classifier import TrainingClassifier
+        cl = TrainingClassifier()
+        cl.test()
     elif FLAGS.mode == 'train_g':
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         if FLAGS.c_penalty != 0.:

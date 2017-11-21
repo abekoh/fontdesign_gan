@@ -141,7 +141,7 @@ class TrainingClassifier():
             return results + acc_by_labels.tolist()
         return results
 
-    def train(self):
+    def train_and_test(self):
         train_metrics = list()
         test_metrics = list()
         try:
@@ -159,6 +159,14 @@ class TrainingClassifier():
         finally:
             self._write_csv('train', train_metrics)
             self._write_csv('test', test_metrics)
+
+    def test(self):
+        test_metrics = list()
+        for epoch_i in tqdm(range(FLAGS.c_epoch_n)):
+            test_rets = self._run(is_test=True)
+            print('[test] loss: {}, accuracy: {}'.format(test_rets[0], test_rets[1]))
+            test_metrics.append([epoch_i + 1] + test_rets)
+        self._write_csv('test', test_metrics)
 
     def _write_csv(self, name, metrics):
         csv_file = open(os.path.join(self.dst_log, '{}.csv'.format(name)), 'w')
