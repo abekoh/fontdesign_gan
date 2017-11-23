@@ -66,7 +66,8 @@ class VisualizationFontDesignGAN():
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
         pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
-        self.saver = tf.train.Saver()
+        intermediate_vars = [var for var in tf.global_variables() if 'intermediate' in var.name]
+        self.saver = tf.train.Saver(var_list=intermediate_vars)
         self.writer = tf.summary.FileWriter(self.dst_visualization)
 
     def _embed(self):
