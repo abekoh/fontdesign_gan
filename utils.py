@@ -25,6 +25,30 @@ def concat_imgs(src_imgs, row_n, col_n):
     return concated_img
 
 
+def deconcat_imgs(src_img, img_width, img_height, img_dim):
+    if len(src_img.shape) == 2:
+        src_img = src_img[:, :, np.newaxis]
+        if img_dim == 3:
+            src_img = np.repeat(src_img, 3, axis=2)
+    row_n = src_img.shape[0] // img_width
+    col_n = src_img.shape[1] // img_height
+    dst_imgs = np.empty((row_n * col_n, img_width, img_height, img_dim))
+    for row_i in range(row_n):
+        for col_i in range(col_n):
+            count = row_i * col_n + col_i
+            dst_imgs[count] = src_img[row_i * img_width:(row_i + 1) * img_width, col_i * img_height:(col_i + 1) * img_height, :]
+    return dst_imgs
+
+
+def remove_white_imgs(src_imgs, white_val):
+    delete_indices = list()
+    for img_i in range(src_imgs.shape[0]):
+        if False not in (src_imgs[img_i] == white_val):
+            delete_indices.append(img_i)
+    dst_imgs = np.delete(src_imgs, delete_indices, axis=0)
+    return dst_imgs
+
+
 def divide_img_dims(src_imgs):
     divided_imgs = np.empty((src_imgs.shape[2], src_imgs.shape[0], src_imgs.shape[1]))
     for dim_i in range(src_imgs.shape[2]):
