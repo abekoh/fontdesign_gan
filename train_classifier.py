@@ -108,6 +108,7 @@ class TrainingClassifier():
         self.dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.dataset.set_load_data(train_rate=FLAGS.train_rate)
         self.dataset.shuffle()
+        self.dataset.shuffle(True)
         self.train_data_n = self.dataset.get_data_n()
         self.test_data_n = self.dataset.get_data_n(is_test=True)
 
@@ -135,7 +136,7 @@ class TrainingClassifier():
             loss_avg += rets[0] / batch_n
             acc_avg += rets[1] / batch_n
             if FLAGS.labelacc:
-                acc_by_labels = acc_by_labels + np.nan_to_num(rets[2]) / batch_n
+                acc_by_labels += np.nan_to_num(rets[2]) / batch_n
         results = [loss_avg, acc_avg]
         if FLAGS.labelacc:
             return results + acc_by_labels.tolist()
