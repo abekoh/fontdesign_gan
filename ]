@@ -35,18 +35,22 @@ class VisualizationFontDesignGAN():
 
     def _prepare_visualization(self):
         self.imgs = tf.placeholder(tf.float32, (self.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='imgs')
+
         discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                       img_dim=FLAGS.img_dim,
                                       layer_n=4,
                                       k_size=3,
                                       smallest_hidden_unit_n=64,
                                       is_bn=FLAGS.batchnorm)
-        _, intermediate_xs = discriminator(self.src_imgs, is_train=False, is_intermediate=True)
+        _, intermediate_xs = discriminator(self.imgs, is_train=False, is_intermediate=True)
 
-        self.intermediate_tensors = list()
         with tf.variable_scope('intermediate'):
-            for i, intermediate_x in enumerate(intermediate_xs):
-                self.intermediate_tensors.append(tf.Variable(intermediate_x, name='layer{}'.format(i)))
+            self.intermediate_tensors = tf.Variable(intermediate_x, name='layer{}'.format(i))
+        # self.intermediate_tensors = [0] * 4
+        #
+        # for i, intermediate_x in enumerate(intermediate_xs):
+        #     with tf.variable_scope('intermediate'):
+        #         self.intermediate_tensors[i] = tf.Variable(intermediate_x, name='layer{}'.format(i))
 
         if FLAGS.gpu_ids == "":
             sess_config = tf.ConfigProto(
@@ -58,29 +62,26 @@ class VisualizationFontDesignGAN():
                 gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
             )
         self.sess = tf.Session(config=sess_config)
-        self.sess.run(tf.global_variables_initializer(), feed_dict={self.imgs: self.src_imgs})
+        self.sess.run(tf.global_variables_initializer())
 
-        d_vars = [var for var in tf.global_variables() if 'discriminator' in var.name]
-        pretrained_saver = tf.train.Saver(var_list=d_vars)
+        d_vars = [var for var in tf.trainable_variables() if 'discriminator' in var.name]
+        self.saver = tf.train.Saver(var_list=d_vars)
         checkpoint = tf.train.get_checkpoint_state(self.src_log)
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
-        pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
+        self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
-        self.saver = tf.train.Saver()
-        self.writer = tf.summary.FileWriter(self.dst_visualization)
-
-    def _embed(self):
+    def _embed(self, layer_n):
         summary_writer = tf.summary.FileWriter(self.dst_visualization)
         config = projector.ProjectorConfig()
-        config.model_checkpoint_path = os.path.realpath(os.path.join(self.dst_visualization, 'result.ckpt'))
-        for i in range(4):
+        for i in range(layer_n):
             embedding_config = config.embeddings.add()
-            embedding_config.tensor_name = 'intermediate/layer{}'.format(i)
+            embedding_config.tensor_name = 'disc_intermediate/layer{}'.format(i)
             embedding_config.sprite.image_path = os.path.realpath(FLAGS.vis_imgs_path)
-            embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
+            embedding_config.sprite.single_image_dim_extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
 
     def visualize(self):
-        self.sess.run(self.intermediate_tensors, feed_dict={self.imgs: self.src_imgs})
-        self.saver.save(self.sess, os.path.join(self.dst_visualization, 'result.ckpt'))
+        print(self.src_imgs.shape)
+        print(self.src_imgs.dtype)
+        self.sess.run([self.intermediate_tensors[i] for i in range(4)], feed_dict={self.imgs: self.src_imgs})
         self._embed()

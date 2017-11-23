@@ -71,13 +71,15 @@ class Discriminator():
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.is_bn = is_bn
 
-    def __call__(self, x, is_reuse=False, is_train=True):
+    def __call__(self, x, is_reuse=False, is_train=True, is_intermediate=False):
         with tf.variable_scope('discriminator') as scope:
             if is_reuse:
                 scope.reuse_variables()
 
             unit_n = self.smallest_hidden_unit_n
             batch_size = int(x.shape[0])
+            if is_intermediate:
+                intermediate_xs = list()
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i + 1)):
@@ -85,11 +87,16 @@ class Discriminator():
                     if self.is_bn and i != 0:
                         x = batch_norm(x, is_train)
                     x = lrelu(x)
+                    if is_intermediate:
+                        y = tf.reshape(x, (batch_size, -1))
+                        intermediate_xs.append(y)
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
             x = tf.reshape(x, (batch_size, -1))
             x = linear(x, 1)
 
+            if is_intermediate:
+                return x, intermediate_xs
             return x
 
 

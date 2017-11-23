@@ -108,6 +108,7 @@ def main(argv=None):
     elif FLAGS.mode == 'visualize':
         from visualize import VisualizationFontDesignGAN
         vis = VisualizationFontDesignGAN()
+        vis.visualize()
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

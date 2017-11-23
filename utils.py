@@ -32,7 +32,7 @@ def deconcat_imgs(src_img, img_width, img_height, img_dim):
             src_img = np.repeat(src_img, 3, axis=2)
     row_n = src_img.shape[0] // img_width
     col_n = src_img.shape[1] // img_height
-    dst_imgs = np.empty((row_n * col_n, img_width, img_height, img_dim))
+    dst_imgs = np.empty((row_n * col_n, img_width, img_height, img_dim), dtype=np.float32)
     for row_i in range(row_n):
         for col_i in range(col_n):
             count = row_i * col_n + col_i
