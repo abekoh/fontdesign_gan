@@ -4,6 +4,8 @@ import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
+from sklearn.manifold import TSNE
+from matplotlib import pyplot as plt
 
 from models import Discriminator
 from utils import deconcat_imgs, remove_white_imgs
@@ -18,6 +20,7 @@ class VisualizationFontDesignGAN():
         self._setup_dirs()
         self._get_imgs()
         self._prepare_visualization()
+        self._extract_intermediate()
 
     def _setup_dirs(self):
         self.src_log = os.path.join(FLAGS.src_gan, 'log')
@@ -37,7 +40,7 @@ class VisualizationFontDesignGAN():
         self.imgs = tf.placeholder(tf.float32, (self.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='imgs')
         discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                       img_dim=FLAGS.img_dim,
-                                      layer_n=4,
+                                      layer_n=self.layer_n,
                                       k_size=3,
                                       smallest_hidden_unit_n=64,
                                       is_bn=FLAGS.batchnorm)
@@ -47,6 +50,8 @@ class VisualizationFontDesignGAN():
         with tf.variable_scope('intermediate'):
             for i, intermediate_x in enumerate(intermediate_xs):
                 self.intermediate_tensors.append(tf.Variable(intermediate_x, name='layer{}'.format(i)))
+
+        self.layer_n = len(intermediate_xs)
 
         if FLAGS.gpu_ids == "":
             sess_config = tf.ConfigProto(
@@ -70,18 +75,22 @@ class VisualizationFontDesignGAN():
         self.saver = tf.train.Saver(var_list=intermediate_vars)
         self.writer = tf.summary.FileWriter(self.dst_visualization)
 
-    def _embed(self):
+    def _extract_intermediate(self):
+        self.intermediate_tensors_nps = self.sess.run([self.intermediate_tensors[i] for i in range(self.layer_n)], feed_dict={self.imgs: self.src_imgs})
+        self.saver.save(self.sess, os.path.join(self.dst_visualization, 'result.ckpt'))
+
+    def project_tensorboard(self):
         summary_writer = tf.summary.FileWriter(self.dst_visualization)
         config = projector.ProjectorConfig()
         config.model_checkpoint_path = os.path.realpath(os.path.join(self.dst_visualization, 'result.ckpt'))
-        for i in range(4):
+        for i in range(self.layer_n):
             embedding_config = config.embeddings.add()
             embedding_config.tensor_name = 'intermediate/layer{}'.format(i)
             embedding_config.sprite.image_path = os.path.realpath(FLAGS.vis_imgs_path)
             embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
 
-    def visualize(self):
-        self.sess.run(self.intermediate_tensors, feed_dict={self.imgs: self.src_imgs})
-        self.saver.save(self.sess, os.path.join(self.dst_visualization, 'result.ckpt'))
-        self._embed()
+    def calc_tsne(self):
+        print(self.intermediate_tensors_nps.shape)
+        reduced = TSNE.fit_transform(self.intermediate_tensors_nps[3])
+        print(reduced.shape)
