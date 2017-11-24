@@ -40,7 +40,7 @@ class VisualizationFontDesignGAN():
         self.imgs = tf.placeholder(tf.float32, (self.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='imgs')
         discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                       img_dim=FLAGS.img_dim,
-                                      layer_n=self.layer_n,
+                                      layer_n=4,
                                       k_size=3,
                                       smallest_hidden_unit_n=64,
                                       is_bn=FLAGS.batchnorm)
@@ -77,6 +77,7 @@ class VisualizationFontDesignGAN():
 
     def _extract_intermediate(self):
         self.intermediate_tensors_nps = self.sess.run([self.intermediate_tensors[i] for i in range(self.layer_n)], feed_dict={self.imgs: self.src_imgs})
+        self.concated_intermediate_tensor_np = np.concatenate([v for v in self.intermediate_tensors_nps], axis=1)
         self.saver.save(self.sess, os.path.join(self.dst_visualization, 'result.ckpt'))
 
     def project_tensorboard(self):
@@ -91,6 +92,15 @@ class VisualizationFontDesignGAN():
         projector.visualize_embeddings(summary_writer, config)
 
     def calc_tsne(self):
-        print(self.intermediate_tensors_nps.shape)
-        reduced = TSNE.fit_transform(self.intermediate_tensors_nps[3])
-        print(reduced.shape)
+        font_n = self.batch_size // 26
+        char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), font_n).tolist()]
+        style_labels = np.repeat(np.arange(0, font_n), 26)
+        for layer_i in range(self.layer_n):
+            reduced = TSNE(n_components=2, verbose=3, perplexity=40, n_iter=5000).fit_transform(self.intermediate_tensors_nps[layer_i])
+            plt.figure(figsize=(16, 9))
+            plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for _ in char_labels])
+            cmap = plt.get_cmap('hsv')
+            for i in range(reduced.shape[0]):
+                plt.text(reduced[i][0], reduced[i][1], char_labels[i], fontdict={'size': 10, 'color': cmap(style_labels[i] / np.max(style_labels))})
+            plt.savefig(os.path.join(self.dst_visualization, 'tsne_disc_layer{}.png'.format(layer_i)))
+            plt.close()
