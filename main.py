@@ -66,7 +66,7 @@ def define_flags():
 
     # Intermediate
     tf.app.flags.DEFINE_string('plot_method', 'TSNE', 'TSNE or MDS')
-    tf.app.flags.DEFINE_integer('tsne_p', 40, 'TNSE\'s perplexity')
+    tf.app.flags.DEFINE_integer('tsne_p', 30, 'TNSE\'s perplexity')
 
 
 def main(argv=None):

@@ -255,7 +255,7 @@ class GeneratingFontDesignGAN():
             self._plot_tsne(rets[1:], filename)
 
     def _project_tensorboard(self, img_path, filename):
-        ckpt_path = os.path.join(self.dst_intermediate, '{}.ckpt'.filename)
+        ckpt_path = os.path.join(self.dst_intermediate, '{}.ckpt'.format(filename))
         self.saver.save(self.sess, ckpt_path)
         summary_writer = tf.summary.FileWriter(self.dst_intermediate)
         config = projector.ProjectorConfig()
