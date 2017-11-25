@@ -173,15 +173,11 @@ class GeneratingFontDesignGAN():
         else:
             self.generated_imgs = generator(z, is_train=False)
 
-        if FLAGS.gpu_ids == "":
-            sess_config = tf.ConfigProto(
-                device_count={"GPU": 0},
-                log_device_placement=True
-            )
-        else:
-            sess_config = tf.ConfigProto(
-                gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
-            )
+        sess_config = tf.ConfigProto(
+            device_count={"GPU": 0},
+            log_device_placement=True,
+            allow_soft_placement=True,
+        )
         self.sess = tf.Session(config=sess_config)
 
         if FLAGS.mode == 'intermediate':
@@ -254,12 +250,12 @@ class GeneratingFontDesignGAN():
         dst_path = os.path.join(self.dst_intermediate, '{}.png'.format(filename))
         self._concat_and_save_imgs(rets[0], dst_path)
         if is_tensorboard:
-            self._project_tensorboard(os.path.realpath(dst_path))
+            self._project_tensorboard(os.path.realpath(dst_path), filename)
         if is_plot:
             self._plot_tsne(rets[1:], filename)
 
-    def _project_tensorboard(self, img_path):
-        ckpt_path = os.path.join(self.dst_intermediate, 'result.ckpt')
+    def _project_tensorboard(self, img_path, filename):
+        ckpt_path = os.path.join(self.dst_intermediate, '{}.ckpt'.filename)
         self.saver.save(self.sess, ckpt_path)
         summary_writer = tf.summary.FileWriter(self.dst_intermediate)
         config = projector.ProjectorConfig()
@@ -282,7 +278,7 @@ class GeneratingFontDesignGAN():
             else:
                 reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p,
                                n_iter=5000).fit_transform(intermediate)
-                method_name = 'TSNE()'.format(FLAGS.tsne_p)
+                method_name = 'TSNE({})'.format(FLAGS.tsne_p)
             plt.figure(figsize=(16, 9))
             plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for i in char_labels])
             cmap = plt.get_cmap('hsv')
