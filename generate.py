@@ -6,6 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
+from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE, MDS
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -275,6 +276,9 @@ class GeneratingFontDesignGAN():
             if FLAGS.plot_method == 'MDS':
                 reduced = MDS(n_components=2, verbose=3, n_iter=5000).fit_transform(intermediate)
                 method_name = 'MDS'
+            elif FLAGS.plot_method == 'PCA':
+                reduced = PCA(n_components=2).fit_transform(intermediate)
+                method_name = 'PCA'
             else:
                 reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p,
                                n_iter=5000).fit_transform(intermediate)
@@ -287,4 +291,5 @@ class GeneratingFontDesignGAN():
                          fontdict={'size': 10, 'color': cmap(style_labels[i] / np.max(style_labels))})
             plt.savefig(os.path.join(self.dst_intermediate,
                                      '{}_{}_{}.png'.format(filename, method_name, intermediate_name)))
+            plt.colorbar(cmap)
             plt.close()
