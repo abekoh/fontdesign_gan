@@ -64,6 +64,10 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('recogtest', False, 'for recognition test')
     tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')
 
+    # Intermediate
+    tf.app.flags.DEFINE_string('plot_method', 'TSNE', 'TSNE or MDS')
+    tf.app.flags.DEFINE_integer('tsne_p', 40, 'TNSE\'s perplexity')
+
 
 def main(argv=None):
     if FLAGS.mode == 'make_dataset':
@@ -106,8 +110,7 @@ def main(argv=None):
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        # gan.project_tensorboard(FLAGS.gen_name)
-        gan.calc_tsne(FLAGS.gen_name)
+        gan.visualize_intermediate(FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

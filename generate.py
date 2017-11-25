@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
-from sklearn.manifold import TSNE
+from sklearn.manifold import TSNE, MDS
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 
@@ -151,15 +151,25 @@ class GeneratingFontDesignGAN():
         z = tf.concat([font_z, char_z], axis=1)
 
         if FLAGS.mode == 'intermediate':
-            self.generated_imgs, self.gen_intermediates = generator(z, is_train=False, is_intermediate=True)
-            _, self.disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
+            self.generated_imgs, gen_intermediates = generator(z, is_train=False, is_intermediate=True)
+            _, disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
             self.intermediates = list()
+            self.intermediate_names = list()
+            with tf.variable_scope('intermediate/z'):
+                self.intermediates.append(tf.Variable(z, name='0'))
+                self.intermediate_names.append('z')
             with tf.variable_scope('intermediate/gen'):
-                for i, intermediate in enumerate(self.gen_intermediates):
+                for i, intermediate in enumerate(gen_intermediates):
                     self.intermediates.append(tf.Variable(intermediate, name='{}'.format(i)))
+                    self.intermediate_names.append('gen{}'.format(i))
+            with tf.variable_scope('intermediate/pic'):
+                reshaped_generated_imgs = tf.reshape(self.generated_imgs, [self.batch_size, -1])
+                self.intermediates.append(tf.Variable(reshaped_generated_imgs, name='0'))
+                self.intermediate_names.append('pic')
             with tf.variable_scope('intermediate/disc'):
-                for i, intermediate in enumerate(self.disc_intermediates):
+                for i, intermediate in enumerate(disc_intermediates):
                     self.intermediates.append(tf.Variable(intermediate, name='{}'.format(i)))
+                    self.intermediate_names.append('disc{}'.format(i))
         else:
             self.generated_imgs = generator(z, is_train=False)
 
@@ -173,24 +183,24 @@ class GeneratingFontDesignGAN():
                 gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
             )
         self.sess = tf.Session(config=sess_config)
-        self.sess.run(tf.global_variables_initializer(),
-                      feed_dict={self.font_ids_x: self.font_gen_ids_x,
-                                 self.font_ids_y: self.font_gen_ids_y,
-                                 self.font_ids_alpha: self.font_gen_ids_alpha,
-                                 self.char_ids_x: self.char_gen_ids_x,
-                                 self.char_ids_y: self.char_gen_ids_y,
-                                 self.char_ids_alpha: self.char_gen_ids_alpha})
+
+        if FLAGS.mode == 'intermediate':
+            intermediate_vars = [var for var in tf.global_variables() if 'intermediate' in var.name]
+            self.sess.run(tf.variables_initializer(var_list=intermediate_vars),
+                          feed_dict={self.font_ids_x: self.font_gen_ids_x,
+                                     self.font_ids_y: self.font_gen_ids_y,
+                                     self.font_ids_alpha: self.font_gen_ids_alpha,
+                                     self.char_ids_x: self.char_gen_ids_x,
+                                     self.char_ids_y: self.char_gen_ids_y,
+                                     self.char_ids_alpha: self.char_gen_ids_alpha})
+            self.saver = tf.train.Saver(var_list=intermediate_vars)
+            self.writer = tf.summary.FileWriter(self.dst_intermediate)
 
         var_list = [var for var in tf.global_variables() if 'intermediate' not in var.name]
         pretrained_saver = tf.train.Saver(var_list=var_list)
         checkpoint = tf.train.get_checkpoint_state(self.src_log)
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
         pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
-
-        if FLAGS.mode == 'intermediate':
-            intermediate_vars = [var for var in tf.global_variables() if 'intermediate' in var.name]
-            self.saver = tf.train.Saver(var_list=intermediate_vars)
-            self.writer = tf.summary.FileWriter(self.dst_intermediate)
 
     def _concat_and_save_imgs(self, src_imgs, dst_path):
         concated_img = concat_imgs(src_imgs, self.row_n, self.col_n)
@@ -232,9 +242,9 @@ class GeneratingFontDesignGAN():
                     pil_img = Image.fromarray(np.uint8(img))
                     pil_img.save(os.path.join(dst_dir, '{}.png'.format(batch_i * self.batch_size + img_i)))
 
-    def _extract_intermediate(self, filename='intermediate'):
-        generated_imgs, gen_intermediates, disc_intermediates = \
-            self.sess.run([self.generated_imgs, self.gen_intermediates, self.disc_intermediates],
+    def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
+        rets = \
+            self.sess.run([self.generated_imgs] + [self.intermediates[i] for i in range(len(self.intermediates))],
                           feed_dict={self.font_ids_x: self.font_gen_ids_x,
                                      self.font_ids_y: self.font_gen_ids_y,
                                      self.font_ids_alpha: self.font_gen_ids_alpha,
@@ -242,11 +252,13 @@ class GeneratingFontDesignGAN():
                                      self.char_ids_y: self.char_gen_ids_y,
                                      self.char_ids_alpha: self.char_gen_ids_alpha})
         dst_path = os.path.join(self.dst_intermediate, '{}.png'.format(filename))
-        self._concat_and_save_imgs(generated_imgs, dst_path)
-        return gen_intermediates, disc_intermediates, os.path.realpath(dst_path)
+        self._concat_and_save_imgs(rets[0], dst_path)
+        if is_tensorboard:
+            self._project_tensorboard(os.path.realpath(dst_path))
+        if is_plot:
+            self._plot_tsne(rets[1:], filename)
 
-    def project_tensorboard(self, filename='intermediate'):
-        _, _, img_path = self._extract_intermediate(filename)
+    def _project_tensorboard(self, img_path):
         ckpt_path = os.path.join(self.dst_intermediate, 'result.ckpt')
         self.saver.save(self.sess, ckpt_path)
         summary_writer = tf.summary.FileWriter(self.dst_intermediate)
@@ -259,24 +271,24 @@ class GeneratingFontDesignGAN():
             embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
 
-    def calc_tsne(self, filename='intermediate'):
-        gen_intermediates, disc_intermediates, _, = self._extract_intermediate(filename)
+    def _plot_tsne(self, intermediates, filename):
         font_n = self.batch_size // 26
         char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), font_n).tolist()]
         style_labels = np.repeat(np.arange(0, font_n), 26)
-
-        def plot(intermediates, name):
-            for layer_i, intermediate in enumerate(intermediates):
-                reduced = TSNE(n_components=2, verbose=3, perplexity=40, n_iter=5000).fit_transform(intermediate)
-                plt.figure(figsize=(16, 9))
-                plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for _ in char_labels])
-                cmap = plt.get_cmap('hsv')
-                for i in range(reduced.shape[0]):
-                    plt.text(reduced[i][0], reduced[i][1], char_labels[i],
-                             fontdict={'size': 10, 'color': cmap(style_labels[i] / np.max(style_labels))})
-                plt.savefig(os.path.join(self.dst_intermediate,
-                                         '{}_{}_layer{}.png'.format(filename, name, layer_i)))
-                plt.close()
-
-        plot(gen_intermediates, 'generator')
-        plot(disc_intermediates, 'discriminator')
+        for intermediate, intermediate_name in zip(intermediates, self.intermediate_names):
+            if FLAGS.plot_method == 'MDS':
+                reduced = MDS(n_components=2, verbose=3, n_iter=5000).fit_transform(intermediate)
+                method_name = 'MDS'
+            else:
+                reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p,
+                               n_iter=5000).fit_transform(intermediate)
+                method_name = 'TSNE()'.format(FLAGS.tsne_p)
+            plt.figure(figsize=(16, 9))
+            plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for i in char_labels])
+            cmap = plt.get_cmap('hsv')
+            for i in range(reduced.shape[0]):
+                plt.text(reduced[i][0], reduced[i][1], char_labels[i],
+                         fontdict={'size': 10, 'color': cmap(style_labels[i] / np.max(style_labels))})
+            plt.savefig(os.path.join(self.dst_intermediate,
+                                     '{}_{}_{}.png'.format(filename, method_name, intermediate_name)))
+            plt.close()
