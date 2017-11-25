@@ -3,13 +3,14 @@ import json
 import math
 
 import tensorflow as tf
+from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
 from dataset import Dataset
-from models import Generator
-from utils import set_embedding_chars, concat_imgs, divide_img_dims, save_heatmap, save_bargraph
+from models import Generator, Discriminator
+from utils import set_embedding_chars, concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -61,12 +62,17 @@ class GeneratingFontDesignGAN():
 
     def _setup_dirs(self):
         self.src_log = os.path.join(FLAGS.src_gan, 'log')
-        if FLAGS.recogtest:
-            self.dst_generated = os.path.join(FLAGS.src_gan, 'recognition_test')
-        else:
-            self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
+        self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
+        if FLAGS.recogtest:
+            self.dst_recognition_test = os.path.join(FLAGS.src_gan, 'recognition_test')
+            if not os.path.exists(self.dst_recognition_test):
+                os.makedirs(self.dst_recognition_test)
+        if FLAGS.mode == 'intermediate':
+            self.dst_intermediate = os.path.join(FLAGS.src_gan, 'intermediate')
+            if not os.path.exists(self.dst_intermediate):
+                os.makedirs(self.dst_intermediate)
 
     def _setup_json(self):
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
@@ -96,6 +102,13 @@ class GeneratingFontDesignGAN():
                               is_transpose=FLAGS.transpose,
                               is_bn=FLAGS.batchnorm)
 
+        discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                      img_dim=FLAGS.img_dim,
+                                      layer_n=4,
+                                      k_size=3,
+                                      smallest_hidden_unit_n=64,
+                                      is_bn=FLAGS.batchnorm)
+
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
         self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
@@ -122,19 +135,29 @@ class GeneratingFontDesignGAN():
         font_z_y = tf.cond(tf.less(tf.reduce_sum(self.font_ids_y), 0),
                            lambda: tf.random_uniform((self.batch_size, self.font_z_size), -1, 1),
                            lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_y))
-        font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
+        font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) \
+            + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
         char_z_x = tf.cond(tf.less(tf.reduce_sum(self.char_ids_x), 0),
                            lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
                            lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_x))
         char_z_y = tf.cond(tf.less(tf.reduce_sum(self.char_ids_y), 0),
                            lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
                            lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_y))
-        char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
+        char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) \
+            + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
 
         z = tf.concat([font_z, char_z], axis=1)
 
-        if FLAGS.intermediate:
-            self.generated_imgs, self.intermediate_imgs = generator(z, is_train=False, is_intermediate=True)
+        if FLAGS.mode == 'intermediate':
+            self.generated_imgs, self.gen_intermediates = generator(z, is_train=False, is_intermediate=True)
+            _, self.disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
+            self.intermediates = list()
+            with tf.variable_scope('intermediate/gen'):
+                for i, intermediate in enumerate(self.gen_intermediates):
+                    self.intermediates.append(tf.Variable(intermediate, name='{}'.format(i)))
+            with tf.variable_scope('intermediate/disc'):
+                for i, intermediate in enumerate(self.disc_intermediates):
+                    self.intermediates.append(tf.Variable(intermediate, name='{}'.format(i)))
         else:
             self.generated_imgs = generator(z, is_train=False)
 
@@ -148,13 +171,36 @@ class GeneratingFontDesignGAN():
                 gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
             )
         self.sess = tf.Session(config=sess_config)
+        self.sess.run(tf.global_variables_initializer(),
+                      feed_dict={self.font_ids_x: self.font_gen_ids_x,
+                                 self.font_ids_y: self.font_gen_ids_y,
+                                 self.font_ids_alpha: self.font_gen_ids_alpha,
+                                 self.char_ids_x: self.char_gen_ids_x,
+                                 self.char_ids_y: self.char_gen_ids_y,
+                                 self.char_ids_alpha: self.char_gen_ids_alpha})
 
-        self.saver = tf.train.Saver()
+        var_list = [var for var in tf.global_variables() if 'intermediate' not in var.name]
+        pretrained_saver = tf.train.Saver(var_list=var_list)
         checkpoint = tf.train.get_checkpoint_state(self.src_log)
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
-        self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
+        pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
-    def generate(self, filename='generated', ext='png'):
+        if FLAGS.mode == 'intermediate':
+            intermediate_vars = [var for var in tf.global_variables() if 'intermediate' in var.name]
+            self.saver = tf.train.Saver(var_list=intermediate_vars)
+            self.writer = tf.summary.FileWriter(self.dst_intermediate)
+
+    def _concat_and_save_imgs(self, src_imgs, dst_path):
+        concated_img = concat_imgs(src_imgs, self.row_n, self.col_n)
+        concated_img = (concated_img + 1.) * 127.5
+        if FLAGS.img_dim == 1:
+            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
+        else:
+            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
+        pil_img = Image.fromarray(np.uint8(concated_img))
+        pil_img.save(dst_path)
+
+    def generate(self, filename='generated'):
         generated_imgs = self.sess.run(self.generated_imgs,
                                        feed_dict={self.font_ids_x: self.font_gen_ids_x,
                                                   self.font_ids_y: self.font_gen_ids_y,
@@ -162,18 +208,11 @@ class GeneratingFontDesignGAN():
                                                   self.char_ids_x: self.char_gen_ids_x,
                                                   self.char_ids_y: self.char_gen_ids_y,
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
-        concated_img = concat_imgs(generated_imgs, self.row_n, self.col_n)
-        concated_img = (concated_img + 1.) * 127.5
-        if FLAGS.img_dim == 1:
-            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
-        else:
-            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
-        pil_img = Image.fromarray(np.uint8(concated_img))
-        pil_img.save(os.path.join(self.dst_generated, '{}.{}'.format(filename, ext)))
+        self._concat_and_save_imgs(generated_imgs, os.path.join(self.dst_generated, '{}.png'.format(filename)))
 
-    def generate_for_recognition_test(self, ext='png'):
+    def generate_for_recognition_test(self):
         for c in tqdm(self.embedding_chars):
-            dst_dir = os.path.join(self.dst_generated, c)
+            dst_dir = os.path.join(self.dst_recognition_test, c)
             if not os.path.exists(dst_dir):
                 os.mkdir(dst_dir)
             c_id = self.real_dataset.get_ids_from_labels([c])[0]
@@ -189,28 +228,31 @@ class GeneratingFontDesignGAN():
                     img = generated_imgs[img_i]
                     img = (img + 1.) * 127.5
                     pil_img = Image.fromarray(np.uint8(img))
-                    pil_img.save(os.path.join(dst_dir, '{}.{}'.format(batch_i * self.batch_size + img_i, ext)))
+                    pil_img.save(os.path.join(dst_dir, '{}.png'.format(batch_i * self.batch_size + img_i)))
 
-    def visualize_intermediate(self, filename='intermediate', ext='png', is_img=True, is_variance=False):
-        all_intermediate_imgs = self.sess.run(self.intermediate_imgs,
-                                              feed_dict={self.font_ids_x: self.font_gen_ids_x,
-                                                         self.font_ids_y: self.font_gen_ids_y,
-                                                         self.font_ids_alpha: self.font_gen_ids_alpha,
-                                                         self.char_ids_x: self.char_gen_ids_x,
-                                                         self.char_ids_y: self.char_gen_ids_y,
-                                                         self.char_ids_alpha: self.char_gen_ids_alpha})
-        vmaxs = [0.2, 15, 500, 250000]
-        for layer_i, intermediate_imgs in enumerate(all_intermediate_imgs):
-            if is_img:
-                vmin = np.min(intermediate_imgs)
-                vmax = np.max(intermediate_imgs)
-                for img_i in range(intermediate_imgs.shape[0]):
-                    imgs = divide_img_dims(intermediate_imgs[img_i])
-                    save_heatmap(imgs, 'intermediate layer{}'.format(layer_i),
-                                 os.path.join(self.dst_generated, '{}_{}_layer{}.{}'.format(filename, img_i, layer_i, ext)), vmin=vmin, vmax=vmax)
-            if is_variance:
-                variances = np.empty((intermediate_imgs.shape[3],))
-                for unit_i in range(intermediate_imgs.shape[3]):
-                    variances[unit_i] = np.var(intermediate_imgs[:, :, :, unit_i])
-                save_bargraph(variances, 'intermediate layer{} variances'.format(layer_i),
-                              os.path.join(self.dst_generated, '{}_var_layer{}.{}'.format(filename, layer_i, ext)), vmin=0, vmax=vmaxs[layer_i])
+    def _extract_intermediate(self, filename='intermediate'):
+        generated_imgs, gen_intermediates, disc_intermediates = \
+            self.sess.run([self.generated_imgs, self.gen_intermediates, self.disc_intermediates],
+                          feed_dict={self.font_ids_x: self.font_gen_ids_x,
+                                     self.font_ids_y: self.font_gen_ids_y,
+                                     self.font_ids_alpha: self.font_gen_ids_alpha,
+                                     self.char_ids_x: self.char_gen_ids_x,
+                                     self.char_ids_y: self.char_gen_ids_y,
+                                     self.char_ids_alpha: self.char_gen_ids_alpha})
+        dst_path = os.path.join(self.dst_intermediate, '{}.png'.format(filename))
+        self._concat_and_save_imgs(generated_imgs, dst_path)
+        return gen_intermediates, disc_intermediates, os.path.realpath(dst_path)
+
+    def project_tensorboard(self, filename='intermediate'):
+        _, _, img_path = self._extract_intermediate(filename)
+        ckpt_path = os.path.join(self.dst_intermediate, 'result.ckpt')
+        self.saver.save(self.sess, ckpt_path)
+        summary_writer = tf.summary.FileWriter(self.dst_intermediate)
+        config = projector.ProjectorConfig()
+        config.model_checkpoint_path = ckpt_path
+        for intermediate in self.intermediates:
+            embedding_config = config.embeddings.add()
+            embedding_config.tensor_name = intermediate.name
+            embedding_config.sprite.image_path = img_path
+            embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
+        projector.visualize_embeddings(summary_writer, config)

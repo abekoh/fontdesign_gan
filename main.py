@@ -64,10 +64,6 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('recogtest', False, 'for recognition test')
     tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')
 
-    # Visualize
-    tf.app.flags.DEFINE_string('vis_imgs_path', '', '')
-    tf.app.flags.DEFINE_string('dst_visualization', '', '')
-
 
 def main(argv=None):
     if FLAGS.mode == 'make_dataset':
@@ -105,10 +101,12 @@ def main(argv=None):
             gan.generate(filename=FLAGS.gen_name)
             if FLAGS.intermediate:
                 gan.visualize_intermediate(filename=FLAGS.gen_name)
-    elif FLAGS.mode == 'visualize':
-        from visualize import VisualizationFontDesignGAN
-        vis = VisualizationFontDesignGAN()
-        vis.calc_tsne()
+    elif FLAGS.mode == 'intermediate':
+        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        assert FLAGS.src_ids != '', 'have to set --src_ids'
+        from generate import GeneratingFontDesignGAN
+        gan = GeneratingFontDesignGAN()
+        gan.project_tensorboard(FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

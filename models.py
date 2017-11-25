@@ -34,7 +34,8 @@ class Generator():
                     x = batch_norm(x, is_train)
                 x = tf.nn.relu(x)
                 if is_intermediate:
-                    intermediate_xs.append(x)
+                    y = tf.reshape(x, (batch_size, -1))
+                    intermediate_xs.append(y)
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i)):
@@ -53,7 +54,8 @@ class Generator():
                             x = batch_norm(x, is_train)
                         x = tf.nn.relu(x)
                         if is_intermediate:
-                            intermediate_xs.append(x)
+                            y = tf.reshape(x, (batch_size, -1))
+                            intermediate_xs.append(y)
             x = tf.nn.tanh(x)
 
             if is_intermediate:
