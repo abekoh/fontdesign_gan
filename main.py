@@ -106,7 +106,8 @@ def main(argv=None):
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        gan.project_tensorboard(FLAGS.gen_name)
+        # gan.project_tensorboard(FLAGS.gen_name)
+        gan.calc_tsne(FLAGS.gen_name)
     else:
         print('set --mode {make_dataset train_c train_g generate}')
 

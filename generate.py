@@ -6,6 +6,8 @@ import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
+from sklearn.manifold import TSNE
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from dataset import Dataset
@@ -256,3 +258,25 @@ class GeneratingFontDesignGAN():
             embedding_config.sprite.image_path = img_path
             embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
         projector.visualize_embeddings(summary_writer, config)
+
+    def calc_tsne(self, filename='intermediate'):
+        gen_intermediates, disc_intermediates, _, = self._extract_intermediate(filename)
+        font_n = self.batch_size // 26
+        char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), font_n).tolist()]
+        style_labels = np.repeat(np.arange(0, font_n), 26)
+
+        def plot(intermediates, name):
+            for layer_i, intermediate in enumerate(intermediates):
+                reduced = TSNE(n_components=2, verbose=3, perplexity=40, n_iter=5000).fit_transform(intermediate)
+                plt.figure(figsize=(16, 9))
+                plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for _ in char_labels])
+                cmap = plt.get_cmap('hsv')
+                for i in range(reduced.shape[0]):
+                    plt.text(reduced[i][0], reduced[i][1], char_labels[i],
+                             fontdict={'size': 10, 'color': cmap(style_labels[i] / np.max(style_labels))})
+                plt.savefig(os.path.join(self.dst_intermediate,
+                                         '{}_{}_layer{}.png'.format(filename, name, layer_i)))
+                plt.close()
+
+        plot(gen_intermediates, 'generator')
+        plot(disc_intermediates, 'discriminator')
