@@ -280,10 +280,11 @@ class GeneratingFontDesignGAN():
                 splitted.append(cmap(style_labels[i] / font_n))
                 plt.text(reduced[i][0], reduced[i][1], char_labels[i],
                          fontdict={'size': 10, 'color': splitted[i]})
-            splitted_cmap = ListedColormap(splitted)
+                splitted_cmap = ListedColormap(splitted)
             sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=0.5, vmax=font_n + 0.5))
             sm._A = []
-            plt.colorbar(sm, ticks=[i for i in range(font_n + 1)])
+            cbar = plt.colorbar(sm, ticks=[i for i in range(font_n + 1)])
+            cbar.ax.invert_yaxis()
             plt.savefig(os.path.join(self.dst_intermediate,
                                      '{}_{}_{}_{}.png'.format(filename, method_name, intermediate_i, intermediate_name)))
             plt.close()
