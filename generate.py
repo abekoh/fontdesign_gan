@@ -274,14 +274,14 @@ class GeneratingFontDesignGAN():
                 method_name = 'TSNE({})'.format(FLAGS.tsne_p)
             plt.figure(figsize=(16, 9))
             plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for i in char_labels])
-            cmap = plt.get_cmap('hsv')
+            cmap = plt.get_cmap('jet')
             splitted = list()
             for i in range(reduced.shape[0]):
                 splitted.append(cmap(style_labels[i] / font_n))
                 plt.text(reduced[i][0], reduced[i][1], char_labels[i],
                          fontdict={'size': 10, 'color': splitted[i]})
                 splitted_cmap = ListedColormap(splitted)
-            sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=0.5, vmax=font_n + 0.5))
+            sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=-0.5, vmax=font_n - 0.5))
             sm._A = []
             cbar = plt.colorbar(sm, ticks=[i for i in range(font_n + 1)])
             cbar.ax.invert_yaxis()
