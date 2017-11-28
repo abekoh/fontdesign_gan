@@ -20,6 +20,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('test_c', False, 'test with classifier')
     tf.app.flags.DEFINE_boolean('train_g', False, 'train GAN')
     tf.app.flags.DEFINE_boolean('generate', False, 'generate images')
+    tf.app.flags.DEFINE_boolean('generate_test', False, 'for recognition test')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
 
     # Common
@@ -65,7 +66,6 @@ def define_flags():
     tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')
     tf.app.flags.DEFINE_string('src_ids', '', 'path of ids settings\' json')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'filename of saveing image')
-    tf.app.flags.DEFINE_boolean('recogtest', False, 'for recognition test')
     tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')
 
     # Intermediate
@@ -74,7 +74,6 @@ def define_flags():
 
 
 def main(argv=None):
-    # if FLAGS.mode == 'make_dataset':
     if FLAGS.make_dataset:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         assert FLAGS.font_imgs != '', 'have to set --font_imgs'
@@ -100,14 +99,15 @@ def main(argv=None):
         gan.train()
     if FLAGS.generate:
         assert FLAGS.src_gan != '', 'have to set --src_gan'
-        assert FLAGS.recogtest or FLAGS.src_ids != '', 'have to set --src_ids'
-        assert not FLAGS.recogtest or FLAGS.font_h5 != '', 'have to set --font_h5'
+        assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
-        if FLAGS.recogtest:
-            gan.generate_for_recognition_test()
-        else:
-            gan.generate(filename=FLAGS.gen_name)
+        gan.generate(filename=FLAGS.gen_name)
+    if FLAGS.generate_test:
+        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        from generate import GeneratingFontDesignGAN
+        gan = GeneratingFontDesignGAN()
+        gan.generate_for_recognition_test()
     if FLAGS.intermediate:
         assert FLAGS.src_gan != '', 'have to set --src_gan'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
