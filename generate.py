@@ -56,6 +56,7 @@ class GeneratingFontDesignGAN():
     def __init__(self):
         global FLAGS
         self._setup_dirs()
+        self._setup_params()
         if FLAGS.recogtest:
             assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
             self.batch_size = FLAGS.batch_size
@@ -78,6 +79,14 @@ class GeneratingFontDesignGAN():
             if not os.path.exists(self.dst_intermediate):
                 os.makedirs(self.dst_intermediate)
 
+    def _setup_params(self):
+        with open(os.path.join(self.src_log, 'flags.json'), 'r') as json_file:
+            json_dict = json.load(json_file)
+        keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'z_size', 'font_h5',
+                'font_embedding_n', 'font_embedding_rate', 'batchnorm', 'transpose']
+        for key in keys:
+            setattr(self, key, json_dict[key])
+
     def _setup_inputs(self):
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
         with open(FLAGS.src_ids, 'r') as json_file:
@@ -91,33 +100,33 @@ class GeneratingFontDesignGAN():
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
     def _load_dataset(self):
-        self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
+        self.real_dataset = Dataset(self.font_h5, 'r', self.img_width, self.img_height, self.img_dim)
         self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
-        generator = Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                              img_dim=FLAGS.img_dim,
-                              z_size=FLAGS.z_size,
+        generator = Generator(img_size=(self.img_width, self.img_height),
+                              img_dim=self.img_dim,
+                              z_size=self.z_size,
                               layer_n=4,
                               k_size=3,
                               smallest_hidden_unit_n=64,
-                              is_transpose=FLAGS.transpose,
-                              is_bn=FLAGS.batchnorm)
+                              is_transpose=self.transpose,
+                              is_bn=self.batchnorm)
 
-        discriminator = Discriminator(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                      img_dim=FLAGS.img_dim,
+        discriminator = Discriminator(img_size=(self.img_width, self.img_height),
+                                      img_dim=self.img_dim,
                                       layer_n=4,
                                       k_size=3,
                                       smallest_hidden_unit_n=64,
-                                      is_bn=FLAGS.batchnorm)
+                                      is_bn=self.batchnorm)
 
-        self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
-        self.char_z_size = FLAGS.z_size - self.font_z_size
-        self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
+        self.font_z_size = int(self.z_size * self.font_embedding_rate)
+        self.char_z_size = self.z_size - self.font_z_size
+        self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
 
-        font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
+        font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
         char_embedding_np = np.random.uniform(-1, 1, (self.char_embedding_n, self.char_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
@@ -189,10 +198,10 @@ class GeneratingFontDesignGAN():
     def _concat_and_save_imgs(self, src_imgs, dst_path):
         concated_img = concat_imgs(src_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
-        if FLAGS.img_dim == 1:
-            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height))
+        if self.img_dim == 1:
+            concated_img = np.reshape(concated_img, (-1, self.col_n * self.img_height))
         else:
-            concated_img = np.reshape(concated_img, (-1, self.col_n * FLAGS.img_height, FLAGS.img_dim))
+            concated_img = np.reshape(concated_img, (-1, self.col_n * self.img_height, self.img_dim))
         pil_img = Image.fromarray(np.uint8(concated_img))
         pil_img.save(dst_path)
 
@@ -252,7 +261,7 @@ class GeneratingFontDesignGAN():
             embedding_config = config.embeddings.add()
             embedding_config.tensor_name = intermediate.name
             embedding_config.sprite.image_path = img_path
-            embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
+            embedding_config.sprite.single_image_dim.extend([self.img_width, self.img_height])
         projector.visualize_embeddings(summary_writer, config)
 
     def _plot_tsne(self, intermediates, filename):
