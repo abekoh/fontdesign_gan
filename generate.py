@@ -61,7 +61,6 @@ class GeneratingFontDesignGAN():
             self.batch_size = FLAGS.batch_size
             self._load_dataset()
         else:
-            self._setup_json()
             self._setup_inputs()
         self._prepare_generating()
 
@@ -79,18 +78,16 @@ class GeneratingFontDesignGAN():
             if not os.path.exists(self.dst_intermediate):
                 os.makedirs(self.dst_intermediate)
 
-    def _setup_json(self):
+    def _setup_inputs(self):
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
         with open(FLAGS.src_ids, 'r') as json_file:
-            self.json_dict = json.load(json_file)
-
-    def _setup_inputs(self):
-        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = construct_ids(self.json_dict['font_ids'])
-        self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = construct_ids(self.json_dict['char_ids'])
+            json_dict = json.load(json_file)
+        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = construct_ids(json_dict['font_ids'])
+        self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = construct_ids(json_dict['char_ids'])
         assert self.font_gen_ids_x.shape[0] == self.char_gen_ids_x.shape[0], \
             'font_ids.shape is not equal char_ids.shape'
         self.batch_size = self.font_gen_ids_x.shape[0]
-        self.col_n = self.json_dict['col_n']
+        self.col_n = json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
     def _load_dataset(self):
