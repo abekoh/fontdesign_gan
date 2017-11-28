@@ -15,7 +15,12 @@ def get_gpu_n():
 def define_flags():
     now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     # Mode
-    tf.app.flags.DEFINE_string('mode', '', 'make_dataset or train_c or test_c or train_g or generate')
+    tf.app.flags.DEFINE_boolean('make_dataset', False, 'make dataset')
+    tf.app.flags.DEFINE_boolean('train_c', False, 'train classifier')
+    tf.app.flags.DEFINE_boolean('test_c', False, 'test with classifier')
+    tf.app.flags.DEFINE_boolean('train_g', False, 'train GAN')
+    tf.app.flags.DEFINE_boolean('generate', False, 'generate images')
+    tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
 
     # Common
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
@@ -60,7 +65,6 @@ def define_flags():
     tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')
     tf.app.flags.DEFINE_string('src_ids', '', 'path of ids settings\' json')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'filename of saveing image')
-    tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
     tf.app.flags.DEFINE_boolean('recogtest', False, 'for recognition test')
     tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')
 
@@ -70,30 +74,31 @@ def define_flags():
 
 
 def main(argv=None):
-    if FLAGS.mode == 'make_dataset':
+    # if FLAGS.mode == 'make_dataset':
+    if FLAGS.make_dataset:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         assert FLAGS.font_imgs != '', 'have to set --font_imgs'
         from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         dataset.load_imgs(FLAGS.font_imgs)
-    elif FLAGS.mode == 'train_c':
+    if FLAGS.train_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
         cl.train_and_test()
-    elif FLAGS.mode == 'test_c':
+    if FLAGS.test_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
         cl.test()
-    elif FLAGS.mode == 'train_g':
+    if FLAGS.train_g:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         if FLAGS.c_penalty != 0.:
             assert FLAGS.src_classifier != '', 'have to set --src_classifier'
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.train()
-    elif FLAGS.mode == 'generate':
+    if FLAGS.generate:
         assert FLAGS.src_gan != '', 'have to set --src_gan'
         assert FLAGS.recogtest or FLAGS.src_ids != '', 'have to set --src_ids'
         assert not FLAGS.recogtest or FLAGS.font_h5 != '', 'have to set --font_h5'
@@ -103,16 +108,12 @@ def main(argv=None):
             gan.generate_for_recognition_test()
         else:
             gan.generate(filename=FLAGS.gen_name)
-            if FLAGS.intermediate:
-                gan.visualize_intermediate(filename=FLAGS.gen_name)
-    elif FLAGS.mode == 'intermediate':
+    if FLAGS.intermediate:
         assert FLAGS.src_gan != '', 'have to set --src_gan'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.visualize_intermediate(FLAGS.gen_name)
-    else:
-        print('set --mode {make_dataset train_c train_g generate}')
 
 
 if __name__ == '__main__':

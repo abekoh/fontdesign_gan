@@ -74,7 +74,7 @@ class GeneratingFontDesignGAN():
             self.dst_recognition_test = os.path.join(FLAGS.src_gan, 'recognition_test')
             if not os.path.exists(self.dst_recognition_test):
                 os.makedirs(self.dst_recognition_test)
-        if FLAGS.mode == 'intermediate':
+        if FLAGS.intermediate:
             self.dst_intermediate = os.path.join(FLAGS.src_gan, 'intermediate')
             if not os.path.exists(self.dst_intermediate):
                 os.makedirs(self.dst_intermediate)
@@ -159,7 +159,7 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([font_z, char_z], axis=1)
 
-        if FLAGS.mode == 'intermediate':
+        if FLAGS.intermediate:
             self.generated_imgs, gen_intermediates = generator(z, is_train=False, is_intermediate=True)
             _, disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
             self.intermediates = list()
@@ -179,7 +179,7 @@ class GeneratingFontDesignGAN():
         else:
             self.generated_imgs = generator(z, is_train=False)
 
-        if FLAGS.mode == 'intermediate' or FLAGS.gpu_ids == "":
+        if FLAGS.intermediate or FLAGS.gpu_ids == "":
             sess_config = tf.ConfigProto(
                 device_count={"GPU": 0},
                 log_device_placement=True
