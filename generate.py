@@ -7,7 +7,8 @@ from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE, MDS
+from sklearn.manifold import MDS
+from MulticoreTSNE import MulticoreTSNE as TSNE
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 from tqdm import tqdm
@@ -269,7 +270,7 @@ class GeneratingFontDesignGAN():
                 reduced = PCA(n_components=2).fit_transform(intermediate)
                 method_name = 'PCA'
             else:
-                reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p,
+                reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p, n_jobs=8,
                                n_iter=5000).fit_transform(intermediate)
                 method_name = 'TSNE({})'.format(FLAGS.tsne_p)
             plt.figure(figsize=(16, 9))
