@@ -57,7 +57,7 @@ class GeneratingFontDesignGAN():
         global FLAGS
         self._setup_dirs()
         self._setup_params()
-        if FLAGS.recogtest:
+        if FLAGS.generate_test:
             assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
             self.batch_size = FLAGS.batch_size
             self._load_dataset()
@@ -70,7 +70,7 @@ class GeneratingFontDesignGAN():
         self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
-        if FLAGS.recogtest:
+        if FLAGS.generate_test:
             self.dst_recognition_test = os.path.join(FLAGS.src_gan, 'recognition_test')
             if not os.path.exists(self.dst_recognition_test):
                 os.makedirs(self.dst_recognition_test)
