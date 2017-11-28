@@ -22,7 +22,6 @@ class TrainingFontDesignGAN():
 
     def __init__(self):
         global FLAGS
-        self._check_params()
         self._setup_dirs()
         self._save_flags()
         self._prepare_training()
@@ -33,12 +32,6 @@ class TrainingFontDesignGAN():
         Reset graph
         '''
         tf.reset_default_graph()
-
-    def _check_params(self):
-        '''
-        Check parameters
-        '''
-        assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
 
     def _setup_dirs(self):
         '''
@@ -73,6 +66,7 @@ class TrainingFontDesignGAN():
         '''
         Prepare Training
         '''
+        assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
         self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
         self.char_z_size = FLAGS.z_size - self.font_z_size
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
