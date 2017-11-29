@@ -15,7 +15,8 @@ def get_gpu_n():
 def define_flags():
     now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
     # Mode
-    tf.app.flags.DEFINE_boolean('make_dataset', False, 'make dataset')
+    tf.app.flags.DEFINE_boolean('ttf2png', False, 'make dataset')
+    tf.app.flags.DEFINE_boolean('png2dataset', False, 'make dataset')
     tf.app.flags.DEFINE_boolean('train_c', False, 'train classifier')
     tf.app.flags.DEFINE_boolean('test_c', False, 'test with classifier')
     tf.app.flags.DEFINE_boolean('train_g', False, 'train GAN')
@@ -24,8 +25,6 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
 
     # Common
-    gan_dir = 'result/gan/' + now_str
-    classifier_dir = 'result/classifier/' + now_str
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
     tf.app.flags.DEFINE_string('font_h5', '', 'path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
@@ -36,11 +35,19 @@ def define_flags():
     tf.app.flags.DEFINE_float('font_embedding_rate', 0.5, 'rate of font embedding')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
+
+    # Directories
+    gan_dir = 'result/gan/' + now_str
+    classifier_dir = 'result/classifier/' + now_str
+    font_pngs_dir = 'src/pngs' + now_str
     tf.app.flags.DEFINE_string('gan_dir', gan_dir, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('dst_classifier', classifier_dir, 'path of result\'s destination')
+    tf.app.flags.DEFINE_string('font_pngs', font_pngs_dir, 'path of font images\' directory')
 
-    # Make Dataset
-    tf.app.flags.DEFINE_string('font_imgs', '', 'path of font images\' directory')
+    # ttf to png
+    tf.app.flags.DEFINE_string('font_ttfs', '', 'path of font files\' directory')
+
+    # png to dataset
 
     # Train Classifier
     tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
@@ -72,12 +79,31 @@ def define_flags():
 
 
 def main(argv=None):
-    if FLAGS.make_dataset:
+    if FLAGS.ttf2png:
+        assert FLAGS.font_ttfs != '', 'have to set --font_ttfs'
+        from font2img.font2img import font2img
+        if 'hiragana' in FLAGS.embedding_chars_type:
+            src_chars_txt_path = 'font2img/src_chars_txt/hiragana_seion.txt'
+        else:
+            src_chars_txt_path = 'font2img/src_chars_txt/alphabets_hankaku_caps.txt'
+        f2i = font2img(src_font_dir_path=FLAGS.font_ttfs,
+                       src_chars_txt_path=src_chars_txt_path,
+                       dst_dir_path=FLAGS.font_pngs,
+                       canvas_size=FLAGS.img_height,
+                       font_size=0,
+                       output_ext='png',
+                       is_center=True,
+                       is_maximum=False,
+                       is_binary=False,
+                       is_unicode=False,
+                       is_by_char=True,
+                       is_recursive=True)
+        f2i.run()
+    if FLAGS.png2dataset:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
-        assert FLAGS.font_imgs != '', 'have to set --font_imgs'
         from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
-        dataset.load_imgs(FLAGS.font_imgs)
+        dataset.load_imgs(FLAGS.font_pngs)
         del dataset
     if FLAGS.train_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
