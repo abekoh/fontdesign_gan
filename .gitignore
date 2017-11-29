@@ -106,10 +106,6 @@ ENV/
 *.html
 *.json
 *.ttf
-output*/
-result*/
-old*/
-test/
 /run.py
-/search_hyper_params.py
-result*/
+result/
+src/
