@@ -219,24 +219,16 @@ class TrainingFontDesignGAN():
         # Setup writer for tensorboard
         self.writer = tf.summary.FileWriter(self.dst_log)
 
-    def _get_ids(self, font_selector=None, char_selector=None):
+    def _get_ids(self, char_selector=''):
         '''
         Get embedding ids
         '''
-        if type(font_selector) == int:
-            font_ids = np.repeat(0, font_selector, (FLAGS.batch_size), dtype=np.int32)
-        elif font_selector == 'random':
-            font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
-        else:
-            # All ids are -1 -> z is generated from uniform distribution when calculate graph
-            font_ids = np.ones(FLAGS.batch_size) * -1
+        # All ids are -1 -> z is generated from uniform distribution when calculate graph
+        font_ids = np.ones(FLAGS.batch_size) * -1
         if type(char_selector) == str and len(char_selector) == 1:
             char_ids = np.repeat(self.real_dataset.get_ids_from_labels(char_selector)[0], FLAGS.batch_size).astype(np.int32)
-        elif char_selector == 'random':
-            char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
         else:
-            # All ids are -1 -> z is generated from uniform distribution when calculate graph
-            char_ids = np.ones(FLAGS.batch_size) * -1
+            char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
         return font_ids, char_ids
 
     def train(self):
@@ -252,14 +244,14 @@ class TrainingFontDesignGAN():
                 # Approximate wasserstein distance
                 for critic_i in range(FLAGS.critic_n):
                     real_imgs = self.real_dataset.get_random_by_labels(FLAGS.batch_size, [embedding_char])
-                    font_ids, char_ids = self._get_ids(None, embedding_char)
+                    font_ids, char_ids = self._get_ids(embedding_char)
                     self.sess.run(self.d_train, feed_dict={self.font_ids: font_ids,
                                                            self.char_ids: char_ids,
                                                            self.real_imgs: real_imgs,
                                                            self.is_train: True})
 
                 # Minimize wasserstein distance
-                font_ids, char_ids = self._get_ids(None, embedding_char)
+                font_ids, char_ids = self._get_ids(embedding_char)
                 self.sess.run(self.g_train, feed_dict={self.font_ids: font_ids,
                                                        self.char_ids: char_ids,
                                                        self.is_train: True})
@@ -274,7 +266,7 @@ class TrainingFontDesignGAN():
 
             # Calculate losses for tensorboard
             real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
-            font_ids, char_ids = self._get_ids(None, 'random')
+            font_ids, char_ids = self._get_ids()
             feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
             if FLAGS.c_penalty != 0.:
                 labels = np.eye(self.char_embedding_n)[char_ids]
