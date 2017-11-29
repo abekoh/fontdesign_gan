@@ -66,16 +66,16 @@ class GeneratingFontDesignGAN():
         self._prepare_generating()
 
     def _setup_dirs(self):
-        self.src_log = os.path.join(FLAGS.src_gan, 'log')
-        self.dst_generated = os.path.join(FLAGS.src_gan, 'generated')
+        self.src_log = os.path.join(FLAGS.gan_dir, 'log')
+        self.dst_generated = os.path.join(FLAGS.gan_dir, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
         if FLAGS.generate_test:
-            self.dst_recognition_test = os.path.join(FLAGS.src_gan, 'recognition_test')
+            self.dst_recognition_test = os.path.join(FLAGS.gan_dir, 'recognition_test')
             if not os.path.exists(self.dst_recognition_test):
                 os.makedirs(self.dst_recognition_test)
         if FLAGS.intermediate:
-            self.dst_intermediate = os.path.join(FLAGS.src_gan, 'intermediate')
+            self.dst_intermediate = os.path.join(FLAGS.gan_dir, 'intermediate')
             if not os.path.exists(self.dst_intermediate):
                 os.makedirs(self.dst_intermediate)
 

@@ -24,6 +24,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
 
     # Common
+    gan_dir = 'result/gan/' + now_str
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
     tf.app.flags.DEFINE_string('font_h5', '', 'path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
@@ -34,6 +35,7 @@ def define_flags():
     tf.app.flags.DEFINE_float('font_embedding_rate', 0.5, 'rate of font embedding')
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
+    tf.app.flags.DEFINE_string('gan_dir', gan_dir, 'path of result\'s destination')
 
     # Make Dataset
     tf.app.flags.DEFINE_string('font_imgs', '', 'path of font images\' directory')
@@ -46,8 +48,6 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('labelacc', False, 'accuracy by labels')
 
     # Train GAN
-    dst_gan = 'result/gan/' + now_str
-    tf.app.flags.DEFINE_string('dst_gan', dst_gan, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('src_classifier', '', 'path of trained classifier\'s result directory')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'training penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0001, 'training rate of generator with classifier')
@@ -63,7 +63,6 @@ def define_flags():
     tf.app.flags.DEFINE_integer('tensorboard_port', 6006, 'port of tensorboard')
 
     # Generate GAN
-    tf.app.flags.DEFINE_string('src_gan', '', 'path of trained gan\'s result directory')
     tf.app.flags.DEFINE_string('src_ids', '', 'path of ids settings\' json')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'filename of saveing image')
     tf.app.flags.DEFINE_integer('char_img_n', 256, 'one chars\' img num for recognition test')

@@ -37,11 +37,11 @@ class TrainingFontDesignGAN():
         '''
         Setup output directories
         '''
-        if not os.path.exists(FLAGS.dst_gan):
-            os.makedirs(FLAGS.dst_gan)
-        self.dst_log = os.path.join(FLAGS.dst_gan, 'log')
+        if not os.path.exists(FLAGS.gan_dir):
+            os.makedirs(FLAGS.gan_dir)
+        self.dst_log = os.path.join(FLAGS.gan_dir, 'log')
         self.dst_log_fontemb = os.path.join(self.dst_log, 'font_embedding')
-        self.dst_samples = os.path.join(FLAGS.dst_gan, 'sample')
+        self.dst_samples = os.path.join(FLAGS.gan_dir, 'sample')
         if not os.path.exists(self.dst_log_fontemb):
             os.makedirs(self.dst_log_fontemb)
         if not os.path.exists(self.dst_samples):
