@@ -78,16 +78,19 @@ def main(argv=None):
         from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         dataset.load_imgs(FLAGS.font_imgs)
+        del dataset
     if FLAGS.train_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
         cl.train_and_test()
+        del cl
     if FLAGS.test_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from train_classifier import TrainingClassifier
         cl = TrainingClassifier()
         cl.test()
+        del cl
     if FLAGS.train_g:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         if FLAGS.c_penalty != 0.:
@@ -95,23 +98,27 @@ def main(argv=None):
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.train()
+        del gan
     if FLAGS.generate:
         assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.generate(filename=FLAGS.gen_name)
+        del gan
     if FLAGS.generate_test:
         assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.generate_for_recognition_test()
+        del gan
     if FLAGS.intermediate:
         assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.visualize_intermediate(FLAGS.gen_name)
+        del gan
 
 
 if __name__ == '__main__':
