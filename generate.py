@@ -3,7 +3,6 @@ import json
 import math
 
 import tensorflow as tf
-from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
 from sklearn.decomposition import PCA
@@ -248,21 +247,6 @@ class GeneratingFontDesignGAN():
         self._concat_and_save_imgs(rets[0], dst_path)
         if is_plot:
             self._plot_tsne(rets[1:], filename)
-        # if is_tensorboard:
-        #     self._project_tensorboard(os.path.realpath(dst_path), filename)
-
-    def _project_tensorboard(self, img_path, filename):
-        ckpt_path = os.path.join(self.dst_intermediate, '{}.ckpt'.format(filename))
-        self.saver.save(self.sess, ckpt_path)
-        summary_writer = tf.summary.FileWriter(self.dst_intermediate)
-        config = projector.ProjectorConfig()
-        config.model_checkpoint_path = ckpt_path
-        for intermediate in self.intermediates:
-            embedding_config = config.embeddings.add()
-            embedding_config.tensor_name = intermediate.name
-            embedding_config.sprite.image_path = img_path
-            embedding_config.sprite.single_image_dim.extend([self.img_width, self.img_height])
-        projector.visualize_embeddings(summary_writer, config)
 
     def _plot_tsne(self, intermediates, filename):
         font_n = self.batch_size // 26
