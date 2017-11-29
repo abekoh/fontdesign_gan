@@ -211,7 +211,7 @@ class TrainingFontDesignGAN():
             self.sess.run(tf.global_variables_initializer())
             # Load Classifier's weight
             if FLAGS.c_penalty != 0:
-                src_log = os.path.join(FLAGS.src_classifier, 'log')
+                src_log = os.path.join(FLAGS.classifier_dir, 'log')
                 classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
                 assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
                 c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]

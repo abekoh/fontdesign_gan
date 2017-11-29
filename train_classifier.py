@@ -26,9 +26,9 @@ class TrainingClassifier():
         '''
         Setup output directories
         '''
-        if not os.path.exists(FLAGS.dst_classifier):
-            os.makedirs(FLAGS.dst_classifier)
-        self.dst_log = os.path.join(FLAGS.dst_classifier, 'log')
+        if not os.path.exists(FLAGS.classifier_dir):
+            os.makedirs(FLAGS.classifier_dir)
+        self.dst_log = os.path.join(FLAGS.classifier_dir, 'log')
         if not os.path.exists(self.dst_log):
             os.mkdir(self.dst_log)
 

@@ -25,6 +25,7 @@ def define_flags():
 
     # Common
     gan_dir = 'result/gan/' + now_str
+    classifier_dir = 'result/classifier/' + now_str
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
     tf.app.flags.DEFINE_string('font_h5', '', 'path of real fonts hdf5')
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
@@ -36,19 +37,17 @@ def define_flags():
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
     tf.app.flags.DEFINE_string('gan_dir', gan_dir, 'path of result\'s destination')
+    tf.app.flags.DEFINE_string('dst_classifier', classifier_dir, 'path of result\'s destination')
 
     # Make Dataset
     tf.app.flags.DEFINE_string('font_imgs', '', 'path of font images\' directory')
 
     # Train Classifier
-    dst_classifier = 'result/classifier/' + now_str
-    tf.app.flags.DEFINE_string('dst_classifier', dst_classifier, 'path of result\'s destination')
     tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
     tf.app.flags.DEFINE_integer('c_epoch_n', 10, 'num of epoch for training classifier')
     tf.app.flags.DEFINE_boolean('labelacc', False, 'accuracy by labels')
 
     # Train GAN
-    tf.app.flags.DEFINE_string('src_classifier', '', 'path of trained classifier\'s result directory')
     tf.app.flags.DEFINE_float('c_penalty', 0.01, 'training penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0001, 'training rate of generator with classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')
@@ -92,23 +91,23 @@ def main(argv=None):
     if FLAGS.train_g:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         if FLAGS.c_penalty != 0.:
-            assert FLAGS.src_classifier != '', 'have to set --src_classifier'
+            assert FLAGS.classifier_dir != '', 'have to set --classifier_dir'
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.train()
     if FLAGS.generate:
-        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.generate(filename=FLAGS.gen_name)
     if FLAGS.generate_test:
-        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.generate_for_recognition_test()
     if FLAGS.intermediate:
-        assert FLAGS.src_gan != '', 'have to set --src_gan'
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         assert FLAGS.src_ids != '', 'have to set --src_ids'
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
