@@ -105,6 +105,7 @@ ENV/
 *.h5
 *.html
 *.json
+*.ttf
 output*/
 result*/
 old*/
