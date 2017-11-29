@@ -1,3 +1,4 @@
+import os
 import tensorflow as tf
 from datetime import datetime
 import subprocess
@@ -39,7 +40,7 @@ def define_flags():
     # Directories
     gan_dir = 'result/gan/' + now_str
     classifier_dir = 'result/classifier/' + now_str
-    font_pngs_dir = 'src/pngs' + now_str
+    font_pngs_dir = 'src/pngs/' + now_str
     tf.app.flags.DEFINE_string('gan_dir', gan_dir, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('dst_classifier', classifier_dir, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('font_pngs', font_pngs_dir, 'path of font images\' directory')
@@ -86,6 +87,8 @@ def main(argv=None):
             src_chars_txt_path = 'font2img/src_chars_txt/hiragana_seion.txt'
         else:
             src_chars_txt_path = 'font2img/src_chars_txt/alphabets_hankaku_caps.txt'
+        if not os.path.exists(FLAGS.font_pngs):
+            os.makedirs(FLAGS.font_pngs)
         f2i = font2img(src_font_dir_path=FLAGS.font_ttfs,
                        src_chars_txt_path=src_chars_txt_path,
                        dst_dir_path=FLAGS.font_pngs,
