@@ -64,20 +64,17 @@ class TrainingFontDesignGAN():
         Prepare Training
         '''
         assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
-        self.font_z_size = int(FLAGS.z_size * FLAGS.font_embedding_rate)
-        self.char_z_size = FLAGS.z_size - self.font_z_size
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
         self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
+        self.z_size = FLAGS.font_z_size + self.char_embedding_n
 
         with tf.device('/cpu:0'):
             # Set embeddings from uniform distribution
-            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, self.font_z_size)).astype(np.float32)
-            char_embedding_np = np.random.uniform(-1, 1, (self.char_embedding_n, self.char_z_size)).astype(np.float32)
+            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, FLAGS.font_z_size)).astype(np.float32)
             with tf.variable_scope('embeddings'):
                 self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
-                self.char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
 
             self.font_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='font_ids')
             self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
@@ -110,7 +107,7 @@ class TrainingFontDesignGAN():
             with tf.device('/gpu:{}'.format(i)):
                 generator = Generator(img_size=(FLAGS.img_width, FLAGS.img_height),
                                       img_dim=FLAGS.img_dim,
-                                      z_size=FLAGS.z_size,
+                                      z_size=self.z_size,
                                       layer_n=4,
                                       k_size=3,
                                       smallest_hidden_unit_n=64,
@@ -130,11 +127,9 @@ class TrainingFontDesignGAN():
 
                 # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
                 font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids[batch_start:batch_end]), 0),
-                                 lambda: tf.random_uniform((divided_batch_size, self.font_z_size), -1, 1),
+                                 lambda: tf.random_uniform((divided_batch_size, FLAGS.font_z_size), -1, 1),
                                  lambda: tf.nn.embedding_lookup(self.font_embedding, self.font_ids[batch_start:batch_end]))
-                char_z = tf.cond(tf.less(tf.reduce_sum(self.char_ids[batch_start:batch_end]), 0),
-                                 lambda: tf.random_uniform((divided_batch_size, self.char_z_size), -1, 1),
-                                 lambda: tf.nn.embedding_lookup(self.char_embedding, self.char_ids[batch_start:batch_end]))
+                char_z = tf.one_hot(self.char_ids[batch_start:batch_end], self.char_embedding_n)
                 z = tf.concat([font_z, char_z], axis=1)
 
                 # Generate fake images
