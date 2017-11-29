@@ -1,7 +1,6 @@
 import os
 import json
 import time
-import math
 from subprocess import Popen, PIPE
 
 import tensorflow as tf
@@ -39,10 +38,9 @@ class TrainingFontDesignGAN():
         if not os.path.exists(FLAGS.gan_dir):
             os.makedirs(FLAGS.gan_dir)
         self.dst_log = os.path.join(FLAGS.gan_dir, 'log')
-        self.dst_log_fontemb = os.path.join(self.dst_log, 'font_embedding')
         self.dst_samples = os.path.join(FLAGS.gan_dir, 'sample')
-        if not os.path.exists(self.dst_log_fontemb):
-            os.makedirs(self.dst_log_fontemb)
+        if not os.path.exists(self.dst_log):
+            os.mkdir(self.dst_log)
         if not os.path.exists(self.dst_samples):
             os.mkdir(self.dst_samples)
 
@@ -313,20 +311,13 @@ class TrainingFontDesignGAN():
             combined_img = np.reshape(combined_img, (-1, col_n * FLAGS.img_height, FLAGS.img_dim))
         return Image.fromarray(np.uint8(combined_img))
 
-    def _init_save_imgs_edge_n(self):
-        '''
-        Initialize save images' num of edge
-        '''
-        self.save_imgs_edge_n = math.ceil(math.sqrt(FLAGS.batch_size))
-
     def _init_sample_imgs_inputs(self):
         '''
         Initialize inputs for generating sample images
         '''
-        if not hasattr(self, 'save_imgs_edge_n'):
-            self._init_save_imgs_edge_n()
-        self.sample_font_ids = np.random.randint(0, FLAGS.font_embedding_n, (FLAGS.batch_size), dtype=np.int32)
-        self.sample_char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
+        self.sample_row_n = FLAGS.batch_size // FLAGS.sample_col_n
+        self.sample_font_ids = np.repeat(np.arange(0, FLAGS.font_embedding_n), self.char_embedding_n)[:FLAGS.batch_size]
+        self.sample_char_ids = np.tile(np.arange(0, self.char_embedding_n), FLAGS.font_embedding_n)[:FLAGS.batch_size]
 
     def _save_sample_imgs(self, epoch_i):
         '''
@@ -335,5 +326,5 @@ class TrainingFontDesignGAN():
         if not hasattr(self, 'sample_font_ids'):
             self._init_sample_imgs_inputs()
         concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
-                                          self.save_imgs_edge_n, self.save_imgs_edge_n)
+                                          self.sample_row_n, FLAGS.sample_col_n)
         concated_img.save(os.path.join(self.dst_samples, '{}.png'.format(epoch_i)))

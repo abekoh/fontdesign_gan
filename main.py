@@ -37,12 +37,12 @@ def define_flags():
     tf.app.flags.DEFINE_integer('z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
 
-    # Directories
+    # Common Directories
     gan_dir = 'result/gan/' + now_str
     classifier_dir = 'result/classifier/' + now_str
     font_pngs_dir = 'src/pngs/' + now_str
     tf.app.flags.DEFINE_string('gan_dir', gan_dir, 'path of result\'s destination')
-    tf.app.flags.DEFINE_string('dst_classifier', classifier_dir, 'path of result\'s destination')
+    tf.app.flags.DEFINE_string('classifier_dir', classifier_dir, 'path of result\'s destination')
     tf.app.flags.DEFINE_string('font_pngs', font_pngs_dir, 'path of font images\' directory')
 
     # ttf to png
@@ -56,11 +56,12 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('labelacc', False, 'accuracy by labels')
 
     # Train GAN
-    tf.app.flags.DEFINE_float('c_penalty', 0.01, 'training penalty of classifier')
+    tf.app.flags.DEFINE_float('c_penalty', 0, 'training penalty of classifier')
     tf.app.flags.DEFINE_float('c_lr', 0.0001, 'training rate of generator with classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'num of critics to approximate wasserstein distance')
     tf.app.flags.DEFINE_integer('sample_imgs_interval', 1, 'interval epochs of saving images')
+    tf.app.flags.DEFINE_integer('sample_col_n', 26, 'sample images\' column num')
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 4, 'hours of keeping ckpts')
     tf.app.flags.DEFINE_boolean('transpose', False, 'use conv2d_transpose or resize_bilinear')
