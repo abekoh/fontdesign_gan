@@ -5,7 +5,6 @@ import math
 from subprocess import Popen, PIPE
 
 import tensorflow as tf
-from tensorflow.contrib.tensorboard.plugins import projector
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
@@ -293,10 +292,6 @@ class TrainingFontDesignGAN():
             if (epoch_i + 1) % FLAGS.sample_imgs_interval == 0:
                 self._save_sample_imgs(epoch_i + 1)
 
-            # Save images for tensorboard projector
-            if (epoch_i + 1) % FLAGS.embedding_imgs_interval == 0:
-                self._save_embedding_imgs(epoch_i + 1)
-
     def _run_tensorboard(self):
         '''
         Run tensorboard
@@ -342,34 +337,3 @@ class TrainingFontDesignGAN():
         concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
                                           self.save_imgs_edge_n, self.save_imgs_edge_n)
         concated_img.save(os.path.join(self.dst_samples, '{}.png'.format(epoch_i)))
-
-    def _init_embedding_imgs_inputs(self):
-        '''
-        Initialize inputs for generating embedding images
-        '''
-        if not hasattr(self, 'save_imgs_edge_n'):
-            self._init_save_imgs_edge_n()
-        self.embedding_font_ids = np.arange(0, FLAGS.font_embedding_n, dtype=np.int32)
-        self.embedding_char_ids = np.repeat(np.array([0], dtype=np.int32), FLAGS.font_embedding_n)
-        if FLAGS.batch_size > FLAGS.font_embedding_n:
-            expand_ids = np.repeat(np.array([0], dtype=np.int32), FLAGS.batch_size - FLAGS.font_embedding_n)
-            self.embedding_font_ids = np.concatenate((self.embedding_font_ids, expand_ids), axis=0)
-            self.embedding_char_ids = np.concatenate((self.embedding_char_ids, expand_ids), axis=0)
-
-    def _save_embedding_imgs(self, epoch_i):
-        '''
-        Save embedding images
-        '''
-        if not hasattr(self, 'embedding_font_ids'):
-            self._init_embedding_imgs_inputs()
-        embedding_img_path = os.path.realpath(os.path.join(self.dst_log_fontemb, '{}.png'.format(epoch_i)))
-        embedding_img = self._generate_img(self.embedding_font_ids, self.embedding_char_ids,
-                                           self.save_imgs_edge_n, self.save_imgs_edge_n)
-        embedding_img.save(embedding_img_path)
-        summary_writer = tf.summary.FileWriter(self.dst_log)
-        config = projector.ProjectorConfig()
-        embedding_config = config.embeddings.add()
-        embedding_config.tensor_name = 'embeddings/font_embedding'
-        embedding_config.sprite.image_path = embedding_img_path
-        embedding_config.sprite.single_image_dim.extend([FLAGS.img_width, FLAGS.img_height])
-        projector.visualize_embeddings(summary_writer, config)
