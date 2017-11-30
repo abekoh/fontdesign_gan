@@ -81,8 +81,8 @@ class GeneratingFontDesignGAN():
     def _setup_params(self):
         with open(os.path.join(self.src_log, 'flags.json'), 'r') as json_file:
             json_dict = json.load(json_file)
-        keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'z_size', 'font_h5',
-                'font_embedding_n', 'font_embedding_rate', 'batchnorm', 'transpose']
+        keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'font_z_size', 'font_h5',
+                'font_embedding_n', 'batchnorm', 'transpose']
         for key in keys:
             setattr(self, key, json_dict[key])
 
@@ -103,6 +103,11 @@ class GeneratingFontDesignGAN():
         self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
+        self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
+        assert self.embedding_chars != [], 'embedding_chars is empty'
+        self.char_embedding_n = len(self.embedding_chars)
+        self.z_size = self.font_z_size + self.char_embedding_n
+
         generator = Generator(img_size=(self.img_width, self.img_height),
                               img_dim=self.img_dim,
                               z_size=self.z_size,
@@ -119,18 +124,10 @@ class GeneratingFontDesignGAN():
                                       smallest_hidden_unit_n=64,
                                       is_bn=self.batchnorm)
 
-        self.font_z_size = int(self.z_size * self.font_embedding_rate)
-        self.char_z_size = self.z_size - self.font_z_size
-        self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
-        assert self.embedding_chars != [], 'embedding_chars is empty'
-        self.char_embedding_n = len(self.embedding_chars)
-
         font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
-        char_embedding_np = np.random.uniform(-1, 1, (self.char_embedding_n, self.char_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
             font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
-            char_embedding = tf.Variable(char_embedding_np, name='char_embedding')
         self.font_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_x')
         self.font_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_y')
         self.font_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='font_ids_alpha')
@@ -147,12 +144,8 @@ class GeneratingFontDesignGAN():
                            lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_y))
         font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) \
             + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
-        char_z_x = tf.cond(tf.less(tf.reduce_sum(self.char_ids_x), 0),
-                           lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
-                           lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_x))
-        char_z_y = tf.cond(tf.less(tf.reduce_sum(self.char_ids_y), 0),
-                           lambda: tf.random_uniform((self.batch_size, self.char_z_size), -1, 1),
-                           lambda: tf.nn.embedding_lookup(char_embedding, self.char_ids_y))
+        char_z_x = tf.one_hot(self.char_ids_x, self.char_embedding_n)
+        char_z_y = tf.one_hot(self.char_ids_y, self.char_embedding_n)
         char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) \
             + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
 
