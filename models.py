@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from ops import lrelu, batch_norm, linear, conv2d, deconv2d, maxpool2d, fc
+from ops import lrelu, batch_norm, linear, conv2d, deconv2d, maxpool2d, avgpool2d, fc
 
 
 class Generator():
@@ -34,7 +34,8 @@ class Generator():
                     x = batch_norm(x, is_train)
                 x = tf.nn.relu(x)
                 if is_intermediate:
-                    y = tf.reshape(x, (batch_size, -1))
+                    y = avgpool2d(x, unit_size, 1, 'VALID')
+                    y = tf.reshape(y, (batch_size, -1))
                     intermediate_xs.append(y)
 
             for i in range(self.layer_n):

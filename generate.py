@@ -237,6 +237,8 @@ class GeneratingFontDesignGAN():
                                      self.char_ids_y: self.char_gen_ids_y,
                                      self.char_ids_alpha: self.char_gen_ids_alpha})
         dst_path = os.path.join(self.dst_intermediate, '{}.png'.format(filename))
+        for ret in rets:
+            print(ret.shape)
         self._concat_and_save_imgs(rets[0], dst_path)
         if is_plot:
             self._plot_tsne(rets[1:], filename)
@@ -247,7 +249,7 @@ class GeneratingFontDesignGAN():
         style_labels = np.repeat(np.arange(0, font_n), 26)
         for intermediate_i, (intermediate, intermediate_name) in enumerate(zip(intermediates, self.intermediate_names)):
             if FLAGS.plot_method == 'MDS':
-                reduced = MDS(n_components=2, verbose=3, n_iter=5000).fit_transform(intermediate)
+                reduced = MDS(n_components=2, verbose=3, n_jobs=8).fit_transform(intermediate)
                 method_name = 'MDS'
             elif FLAGS.plot_method == 'PCA':
                 reduced = PCA(n_components=2).fit_transform(intermediate)
