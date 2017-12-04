@@ -105,6 +105,14 @@ class Dataset():
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
 
+    def get_data_n_by_labels(self, labels, is_test=False):
+        if is_test:
+            keys_queue = self.keys_queue_test
+        else:
+            keys_queue = self.keys_queue_train
+        filtered_keys_queue = list(filter(lambda x: x[0] in labels, keys_queue))
+        return len(filtered_keys_queue)
+
     def get_ids_from_labels(self, labels):
         ids = list()
         for label in labels:
@@ -118,6 +126,17 @@ class Dataset():
                 keys_list.append(self.keys_queue_test[i])
             else:
                 keys_list.append(self.keys_queue_train[i])
+        return self._get(keys_list, is_label)
+
+    def get_batch_by_labels(self, batch_i, batch_size, labels, is_test=False, is_label=False):
+        if is_test:
+            keys_queue = self.keys_queue_test
+        else:
+            keys_queue = self.keys_queue_train
+        filtered_keys_queue = list(filter(lambda x: x[0] in labels, keys_queue))
+        keys_list = list()
+        for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
+            keys_list.append(filtered_keys_queue[i])
         return self._get(keys_list, is_label)
 
     def get_random(self, batch_size, is_test=False, is_label=False):
