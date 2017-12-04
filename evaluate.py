@@ -40,13 +40,12 @@ class Evaluating():
         def plot(distances, filename):
             fig = plt.figure(figsize=(16, 9))
             ax = fig.add_subplot(1, 1, 1)
-            ax.hist(distances, bins=20, range=(0, 2000))
-            ax.set_ylim(0, 150)
+            ax.hist(distances, bins=50, range=(0, 2000))
             plt.savefig(os.path.join(self.dst_evaluated, '{}.png'.format(filename)))
             plt.close()
 
         min_distances_list = list()
-        for c in self.embedding_chars:
+        for c in tqdm(self.embedding_chars):
             generated_n = self.generated_dataset.get_data_n_by_labels([c])
             real_n = self.real_dataset.get_data_n_by_labels([c])
             generated_imgs = np.mean(self.generated_dataset.get_batch_by_labels(0, generated_n, [c]), axis=3)

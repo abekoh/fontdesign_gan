@@ -242,7 +242,7 @@ class GeneratingFontDesignGAN():
                 pil_img = Image.fromarray(np.uint8(img))
                 pil_img.save(os.path.join(self.dst_recognition_test,
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
-                             '{}.png'.format(font_id_start + img_i // self.char_embedding_n)))
+                             '{:05d}.png'.format(font_id_start + img_i // self.char_embedding_n)))
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
         rets = \
