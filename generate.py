@@ -10,6 +10,7 @@ from sklearn.manifold import MDS
 from MulticoreTSNE import MulticoreTSNE as TSNE
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
+from tqdm import tqdm
 
 from dataset import Dataset
 from models import Generator, Discriminator
@@ -129,7 +130,7 @@ class GeneratingFontDesignGAN():
                                       smallest_hidden_unit_n=64,
                                       is_bn=self.batchnorm)
 
-        font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
+        font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.font_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
             font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
@@ -186,8 +187,13 @@ class GeneratingFontDesignGAN():
                 gpu_options=tf.GPUOptions(visible_device_list=FLAGS.gpu_ids)
             )
         self.sess = tf.Session(config=sess_config)
+        self.sess.run(tf.global_variables_initializer())
 
-        pretrained_saver = tf.train.Saver()
+        if FLAGS.char_img_n != self.font_embedding_n:
+            var_list = [var for var in tf.trainable_variables() if 'embedding' not in var.name]
+        else:
+            var_list = [var for var in tf.trainable_variables()]
+        pretrained_saver = tf.train.Saver(var_list=var_list)
         checkpoint = tf.train.get_checkpoint_state(self.src_log)
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
         pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
@@ -219,10 +225,13 @@ class GeneratingFontDesignGAN():
                 os.mkdir(dst_dir)
         batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
         c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
-        for batch_i in range(batch_n):
+        for batch_i in tqdm(range(batch_n)):
+            batch_font_n = self.batch_size // self.char_embedding_n
+            font_id_start = batch_i * batch_font_n
+            font_id_end = (batch_i + 1) * batch_font_n
             generated_imgs = self.sess.run(self.generated_imgs,
-                                           feed_dict={self.font_ids_x: np.ones(self.batch_size) * -1,
-                                                      self.font_ids_y: np.ones(self.batch_size) * -1,
+                                           feed_dict={self.font_ids_x: np.repeat(np.arange(font_id_start, font_id_end), self.char_embedding_n),
+                                                      self.font_ids_y: np.repeat(np.arange(font_id_start, font_id_end), self.char_embedding_n),
                                                       self.font_ids_alpha: np.zeros(self.batch_size),
                                                       self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
                                                       self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
@@ -233,8 +242,7 @@ class GeneratingFontDesignGAN():
                 pil_img = Image.fromarray(np.uint8(img))
                 pil_img.save(os.path.join(self.dst_recognition_test,
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
-                             '{}.png'.format(batch_i * (self.batch_size // self.char_embedding_n)
-                                             + img_i // self.char_embedding_n)))
+                             '{}.png'.format(font_id_start + img_i // self.char_embedding_n)))
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
         rets = \
