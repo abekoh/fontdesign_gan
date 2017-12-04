@@ -24,6 +24,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('generate', False, 'generate images')
     tf.app.flags.DEFINE_boolean('generate_test', False, 'for recognition test')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
+    tf.app.flags.DEFINE_boolean('evaluate', False, 'evaluate fonts')
 
     # Common
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
@@ -76,6 +77,9 @@ def define_flags():
     # Intermediate
     tf.app.flags.DEFINE_string('plot_method', 'TSNE', 'TSNE or MDS')
     tf.app.flags.DEFINE_integer('tsne_p', 30, 'TNSE\'s perplexity')
+
+    # Evaluate
+    tf.app.flags.DEFINE_string('generated_h5', '', 'path of generated fonts hdf5')
 
 
 def main(argv=None):
@@ -147,6 +151,13 @@ def main(argv=None):
         gan = GeneratingFontDesignGAN()
         gan.visualize_intermediate(FLAGS.gen_name)
         del gan
+    if FLAGS.evaluate:
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        assert FLAGS.generated_h5 != '', 'have to set --generated_h5'
+        from evaluate import Evaluating
+        evaluating = Evaluating()
+        evaluating.calc_hamming_distance()
+        del evaluating
 
 
 if __name__ == '__main__':
