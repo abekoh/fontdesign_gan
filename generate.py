@@ -10,7 +10,6 @@ from sklearn.manifold import MDS
 from MulticoreTSNE import MulticoreTSNE as TSNE
 from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
-from tqdm import tqdm
 
 from dataset import Dataset
 from models import Generator, Discriminator
@@ -56,9 +55,13 @@ class GeneratingFontDesignGAN():
         global FLAGS
         self._setup_dirs()
         self._setup_params()
+        self._setup_embedding_chars()
         if FLAGS.generate_test:
-            assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
+            # assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
             self.batch_size = FLAGS.batch_size
+            while ((FLAGS.char_img_n * self.char_embedding_n) % self.batch_size != 0) or (self.batch_size % self.char_embedding_n != 0):
+                self.batch_size -= 1
+            print('batch_size: {}'.format(self.batch_size))
             self._load_dataset()
         else:
             self._setup_inputs()
@@ -86,6 +89,11 @@ class GeneratingFontDesignGAN():
         for key in keys:
             setattr(self, key, json_dict[key])
 
+    def _setup_embedding_chars(self):
+        self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
+        assert self.embedding_chars != [], 'embedding_chars is empty'
+        self.char_embedding_n = len(self.embedding_chars)
+
     def _setup_inputs(self):
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
         with open(FLAGS.src_ids, 'r') as json_file:
@@ -103,9 +111,6 @@ class GeneratingFontDesignGAN():
         self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
-        self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
-        assert self.embedding_chars != [], 'embedding_chars is empty'
-        self.char_embedding_n = len(self.embedding_chars)
         self.z_size = self.font_z_size + self.char_embedding_n
 
         generator = Generator(img_size=(self.img_width, self.img_height),
@@ -208,24 +213,28 @@ class GeneratingFontDesignGAN():
         self._concat_and_save_imgs(generated_imgs, os.path.join(self.dst_generated, '{}.png'.format(filename)))
 
     def generate_for_recognition_test(self):
-        for c in tqdm(self.embedding_chars):
+        for c in self.embedding_chars:
             dst_dir = os.path.join(self.dst_recognition_test, c)
             if not os.path.exists(dst_dir):
                 os.mkdir(dst_dir)
-            c_id = self.real_dataset.get_ids_from_labels([c])[0]
-            for batch_i in range(FLAGS.char_img_n // self.batch_size):
-                generated_imgs = self.sess.run(self.generated_imgs,
-                                               feed_dict={self.font_ids_x: np.ones(self.batch_size) * -1,
-                                                          self.font_ids_y: np.ones(self.batch_size) * -1,
-                                                          self.font_ids_alpha: np.zeros(self.batch_size),
-                                                          self.char_ids_x: np.repeat(c_id, self.batch_size),
-                                                          self.char_ids_y: np.repeat(c_id, self.batch_size),
-                                                          self.char_ids_alpha: np.zeros(self.batch_size)})
-                for img_i in range(generated_imgs.shape[0]):
-                    img = generated_imgs[img_i]
-                    img = (img + 1.) * 127.5
-                    pil_img = Image.fromarray(np.uint8(img))
-                    pil_img.save(os.path.join(dst_dir, '{}.png'.format(batch_i * self.batch_size + img_i)))
+        batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
+        c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
+        for batch_i in range(batch_n):
+            generated_imgs = self.sess.run(self.generated_imgs,
+                                           feed_dict={self.font_ids_x: np.ones(self.batch_size) * -1,
+                                                      self.font_ids_y: np.ones(self.batch_size) * -1,
+                                                      self.font_ids_alpha: np.zeros(self.batch_size),
+                                                      self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_alpha: np.zeros(self.batch_size)})
+            for img_i in range(generated_imgs.shape[0]):
+                img = generated_imgs[img_i]
+                img = (img + 1.) * 127.5
+                pil_img = Image.fromarray(np.uint8(img))
+                pil_img.save(os.path.join(self.dst_recognition_test,
+                             str(self.embedding_chars[img_i % self.char_embedding_n]),
+                             '{}.png'.format(batch_i * (self.batch_size // self.char_embedding_n)
+                                             + img_i // self.char_embedding_n)))
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
         rets = \
