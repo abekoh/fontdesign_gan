@@ -190,9 +190,9 @@ class GeneratingFontDesignGAN():
         self.sess.run(tf.global_variables_initializer())
 
         if FLAGS.char_img_n != self.font_embedding_n:
-            var_list = [var for var in tf.trainable_variables() if 'embedding' not in var.name]
+            var_list = [var for var in tf.global_variables() if 'embedding' not in var.name]
         else:
-            var_list = [var for var in tf.trainable_variables()]
+            var_list = [var for var in tf.global_variables()]
         pretrained_saver = tf.train.Saver(var_list=var_list)
         checkpoint = tf.train.get_checkpoint_state(self.src_log)
         assert checkpoint, 'cannot get checkpoint: {}'.format(self.src_log)
