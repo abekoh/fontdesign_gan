@@ -105,8 +105,12 @@ class TrainingClassifier():
             self.epoch_start = 0
 
     def _load_dataset(self):
+        if FLAGS.test_c:
+            train_rate = 0.
+        else:
+            train_rate = FLAGS.train_rate
         self.dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
-        self.dataset.set_load_data(train_rate=FLAGS.train_rate)
+        self.dataset.set_load_data(train_rate=train_rate)
         self.dataset.shuffle()
         self.dataset.shuffle(True)
         self.train_data_n = self.dataset.get_data_n()
@@ -163,11 +167,10 @@ class TrainingClassifier():
 
     def test(self):
         test_metrics = list()
-        for epoch_i in tqdm(range(FLAGS.c_epoch_n)):
-            test_rets = self._run(is_test=True)
-            print('[test] loss: {}, accuracy: {}'.format(test_rets[0], test_rets[1]))
-            test_metrics.append([epoch_i + 1] + test_rets)
-        self._write_csv('test', test_metrics)
+        test_rets = self._run(is_test=True)
+        print('[test] loss: {}, accuracy: {}'.format(test_rets[0], test_rets[1]))
+        test_metrics.append([1] + test_rets)
+        self._write_csv(os.path.basename(FLAGS.font_h5), test_metrics)
 
     def _write_csv(self, name, metrics):
         csv_file = open(os.path.join(self.dst_log, '{}.csv'.format(name)), 'w')
