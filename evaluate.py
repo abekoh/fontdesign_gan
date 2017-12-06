@@ -1,6 +1,5 @@
 import os
 import csv
-import sys
 
 import tensorflow as tf
 import numpy as np
@@ -56,28 +55,32 @@ class Evaluating():
             plt.close()
 
         min_distances_list = list()
-        for c in tqdm(self.embedding_chars):
-            generated_n = self.generated_dataset.get_data_n_by_labels([c])
-            generated_imgs = np.mean(self.generated_dataset.get_batch_by_labels(0, generated_n, [c]), axis=3)
-            bin_generated_imgs, dist_generated_imgs = transform_backgorund_distance(generated_imgs)
-            del generated_imgs
-            real_n = self.real_dataset.get_data_n_by_labels([c])
-            real_imgs = np.mean(self.real_dataset.get_batch_by_labels(0, real_n, [c]), axis=3)
-            bin_real_imgs, dist_real_imgs = transform_backgorund_distance(real_imgs)
-            del real_imgs
-            min_distances = list()
-            for generated_i in tqdm(range(generated_n)):
-                min_distance = float('inf')
-                for real_i in range(real_n):
-                    distance = np.sum(np.multiply(dist_generated_imgs[generated_i], bin_real_imgs[real_i]) +
-                                      np.multiply(dist_real_imgs[real_i], bin_generated_imgs[generated_i]))
-                    min_distance = min(min_distance, distance)
-                min_distances.append(min_distance)
-            plot(min_distances, c)
-            min_distances_list.append(min_distances)
-        mean_all_min_dinstances = np.mean(np.array(min_distances_list), axis=0).tolist()
-        plot(mean_all_min_dinstances, 'all')
-        self._write_csv(min_distances_list, mean_all_min_dinstances)
+        try:
+            for c in tqdm(self.embedding_chars):
+                generated_n = self.generated_dataset.get_data_n_by_labels([c])
+                generated_imgs = np.mean(self.generated_dataset.get_batch_by_labels(0, generated_n, [c]), axis=3)
+                bin_generated_imgs, dist_generated_imgs = transform_backgorund_distance(generated_imgs)
+                del generated_imgs
+                real_n = self.real_dataset.get_data_n_by_labels([c])
+                real_imgs = np.mean(self.real_dataset.get_batch_by_labels(0, real_n, [c]), axis=3)
+                bin_real_imgs, dist_real_imgs = transform_backgorund_distance(real_imgs)
+                del real_imgs
+                min_distances = list()
+                for generated_i in tqdm(range(generated_n)):
+                    min_distance = float('inf')
+                    for real_i in range(real_n):
+                        distance = np.sum(np.multiply(dist_generated_imgs[generated_i], bin_real_imgs[real_i]) +
+                                          np.multiply(dist_real_imgs[real_i], bin_generated_imgs[generated_i]))
+                        min_distance = min(min_distance, distance)
+                    min_distances.append(min_distance)
+                plot(min_distances, c)
+                min_distances_list.append(min_distances)
+        except KeyboardInterrupt:
+            print('cancelled. but write csv...')
+        finally:
+            mean_all_min_dinstances = np.mean(np.array(min_distances_list), axis=0).tolist()
+            plot(mean_all_min_dinstances, 'all')
+            self._write_csv(min_distances_list, mean_all_min_dinstances)
 
     def _write_csv(self, distances_list, all_distances):
         with open(os.path.join(self.dst_evaluated, 'evaluate.csv'), 'w') as csv_file:
