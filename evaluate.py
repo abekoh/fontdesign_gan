@@ -70,7 +70,7 @@ class Evaluating():
                 min_distance = float('inf')
                 for real_i in range(real_n):
                     distance = np.sum(np.multiply(dist_generated_imgs[generated_i], bin_real_imgs[real_i]) +
-                                      np.multiply(dist_real_imgs[generated_i], bin_generated_imgs[generated_i]))
+                                      np.multiply(dist_real_imgs[real_i], bin_generated_imgs[generated_i]))
                     min_distance = min(min_distance, distance)
                 min_distances.append(min_distance)
             plot(min_distances, c)
