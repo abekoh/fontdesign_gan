@@ -1,4 +1,6 @@
 import os
+import shutil
+from glob import glob
 import json
 import time
 from subprocess import Popen, PIPE
@@ -41,6 +43,9 @@ class TrainingFontDesignGAN():
         self.dst_samples = os.path.join(FLAGS.gan_dir, 'sample')
         if not os.path.exists(self.dst_log):
             os.mkdir(self.dst_log)
+        self.dst_log_keep = os.path.join(self.dst_log, 'keep')
+        if not os.path.exists(self.dst_log_keep):
+            os.mkdir(self.dst_log_keep)
         if not os.path.exists(self.dst_samples):
             os.mkdir(self.dst_samples)
 
@@ -271,7 +276,12 @@ class TrainingFontDesignGAN():
             self.writer.add_summary(summary, epoch_i)
 
             # Save model weights
-            self.saver.save(self.sess, os.path.join(self.dst_log, 'result.ckpt'), global_step=epoch_i + 1)
+            dst_model_path = os.path.join(self.dst_log, 'result.ckpt')
+            global_step = epoch_i + 1
+            self.saver.save(self.sess, dst_model_path, global_step=global_step)
+            if global_step % FLAGS.keep_ckpt_interval == 0:
+                for f in glob(dst_model_path + '-' + str(global_step) + '.*'):
+                    shutil.copy(f, self.dst_log_keep)
 
             # Save sample images
             if (epoch_i + 1) % FLAGS.sample_imgs_interval == 0:
