@@ -87,8 +87,8 @@ class TrainingFontDesignGAN():
             self.real_imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='real_imgs')
             self.labels = tf.placeholder(tf.float32, (FLAGS.batch_size, self.char_embedding_n), name='labels')
 
-            d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
-            g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0.5, beta2=0.9)
+            d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9)
+            g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9)
             c_opt = tf.train.AdamOptimizer(learning_rate=FLAGS.c_lr, beta1=0.5, beta2=0.9)
 
         # Initialize lists for multi gpu
