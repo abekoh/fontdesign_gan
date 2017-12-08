@@ -130,7 +130,10 @@ class GeneratingFontDesignGAN():
                                       smallest_hidden_unit_n=64,
                                       is_bn=self.batchnorm)
 
-        font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.font_z_size)).astype(np.float32)
+        if FLAGS.generate_test:
+            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.font_z_size)).astype(np.float32)
+        else:
+            font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
             font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
@@ -189,7 +192,7 @@ class GeneratingFontDesignGAN():
         self.sess = tf.Session(config=sess_config)
         self.sess.run(tf.global_variables_initializer())
 
-        if FLAGS.generate_test or (FLAGS.char_img_n != self.font_embedding_n):
+        if FLAGS.generate_test and (FLAGS.char_img_n != self.font_embedding_n):
             var_list = [var for var in tf.global_variables() if 'embedding' not in var.name]
         else:
             var_list = [var for var in tf.global_variables()]
