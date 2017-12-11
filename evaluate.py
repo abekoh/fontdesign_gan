@@ -1,5 +1,6 @@
 import os
 import csv
+from collections import Counter
 
 import tensorflow as tf
 import numpy as np
@@ -39,13 +40,13 @@ class Evaluating():
 
     def calc_hamming_distance(self):
         def transform_backgorund_distance(src_imgs):
-            bin_imgs = np.clip(-src_imgs, 0., 1.).astype(np.uint8)
-            src_imgs = ((src_imgs + 1.) * 127.5).astype(np.uint8)
+            bin_imgs = np.where(src_imgs > 0, 255, 0).astype(np.uint8)
+            mask_imgs = np.where(src_imgs > 0, 0, 1).astype(np.uint8)
             dist_imgs = np.empty(src_imgs.shape)
             img_n = src_imgs.shape[0]
             for i in range(img_n):
-                dist_imgs[i] = cv2.distanceTransform(src_imgs[i], cv2.DIST_L2, 3)
-            return bin_imgs, dist_imgs
+                dist_imgs[i] = cv2.distanceTransform(bin_imgs[i], cv2.DIST_L2, 3)
+            return mask_imgs, dist_imgs
 
         def plot(distances, filename):
             fig = plt.figure(figsize=(16, 9))
@@ -55,42 +56,55 @@ class Evaluating():
             plt.close()
 
         min_distances_list = list()
+        min_real_indices_list = list()
         try:
             for c in tqdm(self.embedding_chars):
                 generated_n = self.generated_dataset.get_data_n_by_labels([c])
                 generated_imgs = np.mean(self.generated_dataset.get_batch_by_labels(0, generated_n, [c]), axis=3)
-                bin_generated_imgs, dist_generated_imgs = transform_backgorund_distance(generated_imgs)
-                del generated_imgs
+                mask_generated_imgs, dist_generated_imgs = transform_backgorund_distance(generated_imgs)
                 real_n = self.real_dataset.get_data_n_by_labels([c])
                 real_imgs = np.mean(self.real_dataset.get_batch_by_labels(0, real_n, [c]), axis=3)
-                bin_real_imgs, dist_real_imgs = transform_backgorund_distance(real_imgs)
-                del real_imgs
+                mask_real_imgs, dist_real_imgs = transform_backgorund_distance(real_imgs)
                 min_distances = list()
+                min_real_indices = list()
                 for generated_i in tqdm(range(generated_n)):
                     min_distance = float('inf')
                     for real_i in range(real_n):
-                        distance = np.sum(np.multiply(dist_generated_imgs[generated_i], bin_real_imgs[real_i]) +
-                                          np.multiply(dist_real_imgs[real_i], bin_generated_imgs[generated_i]))
-                        min_distance = min(min_distance, distance)
+                        distance = np.sum(np.multiply(dist_generated_imgs[generated_i], mask_real_imgs[real_i]) +
+                                          np.multiply(dist_real_imgs[real_i], mask_generated_imgs[generated_i]))
+                        if distance < min_distance:
+                            min_distance = distance
+                            min_real_index = real_i
                     min_distances.append(min_distance)
+                    min_real_indices.append(min_real_index)
                 plot(min_distances, c)
                 min_distances_list.append(min_distances)
+                min_real_indices_list.append(min_real_indices)
         except KeyboardInterrupt:
             print('cancelled. but write csv...')
         finally:
             mean_all_min_dinstances = np.mean(np.array(min_distances_list), axis=0).tolist()
             plot(mean_all_min_dinstances, 'all')
-            self._write_csv(min_distances_list, mean_all_min_dinstances)
+            self._write_csv(min_distances_list, mean_all_min_dinstances, min_real_indices_list)
 
-    def _write_csv(self, distances_list, all_distances):
+    def _write_csv(self, distances_list, all_distances, real_indices_list):
         with open(os.path.join(self.dst_evaluated, 'evaluate.csv'), 'w') as csv_file:
             csv_writer = csv.writer(csv_file)
-            header = ['', 'all'] + self.embedding_chars
+            font_n = len(all_distances)
+            char_n = len(real_indices_list)
+            header = ['', 'all_dist', 'fontname', 'most_n'] + self.embedding_chars[:char_n] + ['index_' + char for char in self.embedding_chars[:char_n]]
             csv_writer.writerow(header)
-            for i in range(len(all_distances)):
+            for i in range(font_n):
                 line = list()
                 line.append(i)
                 line.append(all_distances[i])
-                for j in range(len(distances_list)):
+                real_indices = list()
+                for j in range(char_n):
+                    real_indices.append(real_indices_list[j][i])
+                count = Counter(real_indices)
+                line.append(self.real_dataset.get_fontname_by_label_id('A', count.most_common()[0][0]))
+                line.append(count.most_common()[0][1])
+                for j in range(char_n):
                     line.append(distances_list[j][i])
+                line += [self.real_dataset.get_fontname_by_label_id('A', real_index) for real_index in real_indices]
                 csv_writer.writerow(line)

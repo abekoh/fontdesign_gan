@@ -159,6 +159,10 @@ class Dataset():
             keys_list.append(random.choice(filtered_keys_queue))
         return self._get(keys_list, is_label)
 
+    def get_fontname_by_label_id(self, label, index):
+        assert self.is_mem, 'Sorry, this function is only available is_mem==True'
+        return str(self.fontnames[self.label_to_id[label]][index])
+
     def _get_from_file(self, keys_list, is_label=False):
         imgs = np.empty((len(keys_list), self.img_width, self.img_height, self.img_dim), np.float32)
         labels = list()
@@ -173,6 +177,7 @@ class Dataset():
     def _put_on_mem(self):
         print('putting data on memory...')
         self.imgs = np.empty((self.label_n, self.font_n, self.img_width, self.img_height, self.img_dim), np.float32)
+        self.fontnames = np.empty((self.label_n, self.font_n), np.object)
         self.label_to_font_n = dict()
         for i, key in enumerate(self.h5file.keys()):
             val = self.h5file[key + '/imgs'].value
@@ -180,6 +185,7 @@ class Dataset():
                 white_imgs = np.ones((self.font_n - len(val), self.img_width, self.img_height, self.img_dim), np.float32)
                 val = np.concatenate((val, white_imgs), axis=0)
             self.imgs[i] = val
+            self.fontnames[i] = self.h5file[key + '/fontnames'].value
             self.label_to_font_n[key] = len(self.imgs[i])
 
     def _get_from_mem(self, keys_list, is_label=False):
