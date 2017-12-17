@@ -36,6 +36,8 @@ class TrainingFontDesignGAN():
     def _setup_dirs(self):
         '''
         Setup output directories
+
+        If destinations are not existed, make directories.
         '''
         if not os.path.exists(FLAGS.gan_dir):
             os.makedirs(FLAGS.gan_dir)
@@ -52,6 +54,8 @@ class TrainingFontDesignGAN():
     def _save_flags(self):
         '''
         Save FLAGS as JSON
+
+        Write FLAGS paramaters as 'log/flsgs.json'.
         '''
         with open(os.path.join(self.dst_log, 'flags.json'), 'w') as f:
             json.dump(FLAGS.__dict__['__flags'], f, indent=4)
@@ -59,6 +63,8 @@ class TrainingFontDesignGAN():
     def _load_dataset(self):
         '''
         Load dataset
+
+        Set up dataset. All of data is for training, and they are shuffled.
         '''
         self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.real_dataset.set_load_data()
@@ -67,6 +73,11 @@ class TrainingFontDesignGAN():
     def _prepare_training(self):
         '''
         Prepare Training
+
+        Make tensorflow's graph.
+        To support Multi-GPU, divide mini-batch.
+        And this program has resume function.
+        If there is checkpoint file in FLAGS.gan_dir/log, load checkpoint file and restart training.
         '''
         assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
