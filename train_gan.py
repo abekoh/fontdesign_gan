@@ -11,7 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from dataset import Dataset
-from models import Generator, Discriminator, Classifier
+from models import Generator, Discriminator
 from ops import average_gradients
 from utils import set_embedding_chars, concat_imgs
 
@@ -100,18 +100,14 @@ class TrainingFontDesignGAN():
 
             d_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9)
             g_opt = tf.train.AdamOptimizer(learning_rate=0.0001, beta1=0., beta2=0.9)
-            c_opt = tf.train.AdamOptimizer(learning_rate=FLAGS.c_lr, beta1=0.5, beta2=0.9)
 
         # Initialize lists for multi gpu
         fake_imgs = [0] * self.gpu_n
         d_loss = [0] * self.gpu_n
         g_loss = [0] * self.gpu_n
-        c_loss = [0] * self.gpu_n
-        c_acc = [0] * self.gpu_n
 
         d_grads = [0] * self.gpu_n
         g_grads = [0] * self.gpu_n
-        c_grads = [0] * self.gpu_n
 
         divided_batch_size = FLAGS.batch_size // self.gpu_n
         is_not_first = False
@@ -135,11 +131,6 @@ class TrainingFontDesignGAN():
                                               k_size=3,
                                               smallest_hidden_unit_n=64,
                                               is_bn=FLAGS.batchnorm)
-                classifier = Classifier(img_size=(FLAGS.img_width, FLAGS.img_height),
-                                        img_dim=FLAGS.img_dim,
-                                        k_size=3,
-                                        class_n=26,
-                                        smallest_unit_n=64)
 
                 # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
                 font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids[batch_start:batch_end]), 0),
@@ -173,13 +164,6 @@ class TrainingFontDesignGAN():
                 d_grads[i] = d_opt.compute_gradients(d_loss[i], var_list=d_vars)
                 g_grads[i] = g_opt.compute_gradients(g_loss[i], var_list=g_vars)
 
-                # for training with Classifier
-                if FLAGS.c_penalty != 0.:
-                    c_fake = FLAGS.c_penalty * classifier(fake_imgs[i], is_reuse=is_not_first, is_train=self.is_train)
-                    c_loss[i] = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.labels[batch_start:batch_end], logits=c_fake))
-                    correct_pred = tf.equal(tf.argmax(c_fake, 1), tf.argmax(self.labels[batch_start:batch_end], 1))
-                    c_acc[i] = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-                    c_grads[i] = c_opt.compute_gradients(c_loss[i], var_list=g_vars)
             is_not_first = True
 
         with tf.device('/cpu:0'):
@@ -188,16 +172,10 @@ class TrainingFontDesignGAN():
             avg_g_grads = average_gradients(g_grads)
             self.d_train = d_opt.apply_gradients(avg_d_grads)
             self.g_train = g_opt.apply_gradients(avg_g_grads)
-            if FLAGS.c_penalty != 0:
-                avg_c_grads = average_gradients(c_grads)
-                self.c_train = c_opt.apply_gradients(avg_c_grads)
 
         # Calculate summary for tensorboard
         tf.summary.scalar('d_loss', -(sum(d_loss) / len(d_loss)))
         tf.summary.scalar('g_loss', -(sum(g_loss) / len(g_loss)))
-        if FLAGS.c_penalty != 0:
-            tf.summary.scalar('c_loss', sum(c_loss) / len(c_loss))
-            tf.summary.scalar('c_acc', sum(c_acc) / len(c_acc))
         self.summary = tf.summary.merge_all()
 
         # Setup session
@@ -217,14 +195,6 @@ class TrainingFontDesignGAN():
             print('restore ckpt')
         else:
             self.sess.run(tf.global_variables_initializer())
-            # Load Classifier's weight
-            if FLAGS.c_penalty != 0:
-                src_log = os.path.join(FLAGS.classifier_dir, 'log')
-                classifier_checkpoint = tf.train.get_checkpoint_state(src_log)
-                assert classifier_checkpoint, 'not found classifier\'s checkpoint: {}'.format(src_log)
-                c_vars = [var for var in tf.global_variables() if 'classifier' in var.name]
-                saver_pretrained = tf.train.Saver(var_list=c_vars)
-                saver_pretrained.restore(self.sess, classifier_checkpoint.model_checkpoint_path)
             self.epoch_start = 0
 
         # Setup writer for tensorboard
@@ -268,21 +238,14 @@ class TrainingFontDesignGAN():
                                                        self.is_train: True})
 
                 # Maximize character likelihood
-                if FLAGS.c_penalty != 0.:
-                    labels = np.eye(self.char_embedding_n)[char_ids]
-                    self.sess.run(self.c_train, feed_dict={self.font_ids: font_ids,
-                                                           self.char_ids: char_ids,
-                                                           self.labels: labels,
-                                                           self.is_train: True})
 
             # Calculate losses for tensorboard
             real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
             font_ids, char_ids = self._get_ids()
-            feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.real_imgs: real_imgs, self.is_train: True}
-            if FLAGS.c_penalty != 0.:
-                labels = np.eye(self.char_embedding_n)[char_ids]
-                feed[self.labels] = labels
-            summary = self.sess.run(self.summary, feed_dict=feed)
+            summary = self.sess.run(self.summary, feed_dict={self.font_ids: font_ids,
+                                                             self.char_ids: char_ids,
+                                                             self.real_imgs: real_imgs,
+                                                             self.is_train: True})
 
             self.writer.add_summary(summary, epoch_i)
 

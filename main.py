@@ -56,8 +56,6 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('labelacc', False, 'accuracy by labels')
 
     # Train GAN
-    tf.app.flags.DEFINE_float('c_penalty', 0, 'training penalty of classifier')
-    tf.app.flags.DEFINE_float('c_lr', 0.0001, 'training rate of generator with classifier')
     tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'num of critics to approximate wasserstein distance')
     tf.app.flags.DEFINE_integer('sample_imgs_interval', 1, 'interval epochs of saving images')
