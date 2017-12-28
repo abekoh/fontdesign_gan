@@ -58,7 +58,7 @@ def define_flags():
     # Train GAN
     tf.app.flags.DEFINE_integer('gan_epoch_n', 10000, 'num of epoch for training GAN')
     tf.app.flags.DEFINE_integer('critic_n', 5, 'num of critics to approximate wasserstein distance')
-    tf.app.flags.DEFINE_integer('sample_imgs_interval', 1, 'interval epochs of saving images')
+    tf.app.flags.DEFINE_integer('sample_imgs_interval', 10, 'interval epochs of saving images')
     tf.app.flags.DEFINE_integer('sample_col_n', 26, 'sample images\' column num')
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 12, 'hour of keeping ckpts')
@@ -124,8 +124,6 @@ def main(argv=None):
         del cl
     if FLAGS.train_g:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
-        if FLAGS.c_penalty != 0.:
-            assert FLAGS.classifier_dir != '', 'have to set --classifier_dir'
         from train_gan import TrainingFontDesignGAN
         gan = TrainingFontDesignGAN()
         gan.train()
