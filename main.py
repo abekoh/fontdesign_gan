@@ -63,6 +63,7 @@ def define_flags():
     tf.app.flags.DEFINE_integer('ckpt_keep_n', 5, 'num of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_hour', 12, 'hour of keeping ckpts')
     tf.app.flags.DEFINE_integer('keep_ckpt_interval', 250, 'interval of keeping ckpts')
+    tf.app.flags.DEFINE_string('arch', 'DCGAN', 'archtect of GAN')
     tf.app.flags.DEFINE_boolean('transpose', False, 'use conv2d_transpose or resize_bilinear')
     tf.app.flags.DEFINE_boolean('batchnorm', False, 'use batchnorm in Generator and Discriminator or not')
     tf.app.flags.DEFINE_boolean('run_tensorboard', True, 'run tensorboard or not')

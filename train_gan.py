@@ -11,7 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from dataset import Dataset
-from models import GeneratorResNet, DiscriminatorResNet
+from models import GeneratorDCGAN, DiscriminatorDCGAN, GeneratorResNet, DiscriminatorResNet
 from ops import average_gradients
 from utils import set_embedding_chars, concat_imgs
 
@@ -117,8 +117,24 @@ class TrainingFontDesignGAN():
             batch_start = i * divided_batch_size
             batch_end = (i + 1) * divided_batch_size
             with tf.device('/gpu:{}'.format(i)):
-                generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
-                discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
+                if FLAGS.arch == 'DCGAN':
+                    generator = GeneratorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                               img_dim=FLAGS.img_dim,
+                                               z_size=self.z_size,
+                                               layer_n=4,
+                                               k_size=3,
+                                               smallest_hidden_unit_n=64,
+                                               is_transpose=FLAGS.transpose,
+                                               is_bn=FLAGS.batchnorm)
+                    discriminator = DiscriminatorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                                       img_dim=FLAGS.img_dim,
+                                                       layer_n=4,
+                                                       k_size=3,
+                                                       smallest_hidden_unit_n=64,
+                                                       is_bn=FLAGS.batchnorm)
+                elif FLAGS.arch == 'ResNet':
+                    generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
+                    discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
 
                 # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
                 font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids[batch_start:batch_end]), 0),
