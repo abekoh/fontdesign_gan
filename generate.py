@@ -5,6 +5,7 @@ import math
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import h5py
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS
 from MulticoreTSNE import MulticoreTSNE as TSNE
@@ -172,6 +173,8 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([font_z, char_z], axis=1)
 
+        self.eigen_font_z = tf.strided_slice(font_z, (0, 0), (self.batch_size, self.font_z_size), (self.char_embedding_n, 1))
+
         if FLAGS.intermediate:
             self.generated_imgs, gen_intermediates = generator(z, is_train=False, is_intermediate=True)
             _, disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
@@ -266,19 +269,20 @@ class GeneratingFontDesignGAN():
                 os.mkdir(dst_dir)
         batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
         c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
+        all_eigen_font_z = np.empty((FLAGS.char_img_n, self.font_z_size))
         for batch_i in tqdm(range(batch_n)):
             font_id_start = batch_i
             if batch_i == batch_n - 1:
                 font_id_end = 0
             else:
                 font_id_end = batch_i + 1
-            generated_imgs = self.sess.run(self.generated_imgs,
-                                           feed_dict={self.font_ids_x: np.ones(self.batch_size) * font_id_start,
-                                                      self.font_ids_y: np.ones(self.batch_size) * font_id_end,
-                                                      self.font_ids_alpha: np.repeat(np.linspace(0., 1., num=self.walk_step, endpoint=False), self.char_embedding_n),
-                                                      self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
-                                                      self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
-                                                      self.char_ids_alpha: np.zeros(self.batch_size)})
+            generated_imgs, eigen_font_z = self.sess.run([self.generated_imgs, self.eigen_font_z],
+                                                         feed_dict={self.font_ids_x: np.ones(self.batch_size) * font_id_start,
+                                                                    self.font_ids_y: np.ones(self.batch_size) * font_id_end,
+                                                                    self.font_ids_alpha: np.repeat(np.linspace(0., 1., num=self.walk_step, endpoint=False), self.char_embedding_n),
+                                                                    self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                                    self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                                    self.char_ids_alpha: np.zeros(self.batch_size)})
             for img_i in range(generated_imgs.shape[0]):
                 img = generated_imgs[img_i]
                 img = (img + 1.) * 127.5
@@ -286,6 +290,12 @@ class GeneratingFontDesignGAN():
                 pil_img.save(os.path.join(self.dst_walk,
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
                              '{:05d}.png'.format((batch_i * self.batch_size + img_i) // self.char_embedding_n)))
+                for z_i in range(self.walk_step):
+                    all_eigen_font_z[batch_i * self.walk_step + z_i] = eigen_font_z[z_i]
+        h5file = h5py.File(os.path.join(self.dst_walk, 'eigen_font_z.h5'), 'w')
+        h5file.create_group('eigen_font_z')
+        h5file.create_dataset('eigen_font_z/params', data=all_eigen_font_z)
+        h5file.flush()
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
         rets = \
