@@ -13,7 +13,7 @@ from matplotlib.colors import ListedColormap
 from tqdm import tqdm
 
 from dataset import Dataset
-from models import Generator, Discriminator
+from models import GeneratorDCGAN, DiscriminatorDCGAN, GeneratorResNet, DiscriminatorResNet
 from utils import set_embedding_chars, concat_imgs
 
 FLAGS = tf.app.flags.FLAGS
@@ -57,12 +57,15 @@ class GeneratingFontDesignGAN():
         self._setup_dirs()
         self._setup_params()
         self._setup_embedding_chars()
-        if FLAGS.generate_test:
+        if FLAGS.generate_test or FLAGS.generate_walk:
             # assert FLAGS.char_img_n % FLAGS.batch_size == 0, 'FLAGS.batch_size mod FLAGS.img_n must be 0'
             self.batch_size = FLAGS.batch_size
             while ((FLAGS.char_img_n * self.char_embedding_n) % self.batch_size != 0) or (self.batch_size % self.char_embedding_n != 0):
                 self.batch_size -= 1
             print('batch_size: {}'.format(self.batch_size))
+            if FLAGS.generate_walk:
+                self.walk_step = self.batch_size // self.char_embedding_n
+                print('walk_step: {}'.format(self.walk_step))
             self._load_dataset()
         else:
             self._setup_inputs()
@@ -77,6 +80,10 @@ class GeneratingFontDesignGAN():
             self.dst_recognition_test = os.path.join(FLAGS.gan_dir, 'recognition_test')
             if not os.path.exists(self.dst_recognition_test):
                 os.makedirs(self.dst_recognition_test)
+        if FLAGS.generate_walk:
+            self.dst_walk = os.path.join(FLAGS.gan_dir, 'random_walking')
+            if not os.path.exists(self.dst_walk):
+                os.makedirs(self.dst_walk)
         if FLAGS.intermediate:
             self.dst_intermediate = os.path.join(FLAGS.gan_dir, 'intermediate')
             if not os.path.exists(self.dst_intermediate):
@@ -114,24 +121,29 @@ class GeneratingFontDesignGAN():
     def _prepare_generating(self):
         self.z_size = self.font_z_size + self.char_embedding_n
 
-        generator = Generator(img_size=(self.img_width, self.img_height),
-                              img_dim=self.img_dim,
-                              z_size=self.z_size,
-                              layer_n=4,
-                              k_size=3,
-                              smallest_hidden_unit_n=64,
-                              is_transpose=self.transpose,
-                              is_bn=self.batchnorm)
-
-        discriminator = Discriminator(img_size=(self.img_width, self.img_height),
-                                      img_dim=self.img_dim,
-                                      layer_n=4,
-                                      k_size=3,
-                                      smallest_hidden_unit_n=64,
-                                      is_bn=self.batchnorm)
+        if FLAGS.arch == 'DCGAN':
+            generator = GeneratorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                       img_dim=FLAGS.img_dim,
+                                       z_size=self.z_size,
+                                       layer_n=4,
+                                       k_size=3,
+                                       smallest_hidden_unit_n=64,
+                                       is_transpose=FLAGS.transpose,
+                                       is_bn=FLAGS.batchnorm)
+            discriminator = DiscriminatorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                               img_dim=FLAGS.img_dim,
+                                               layer_n=4,
+                                               k_size=3,
+                                               smallest_hidden_unit_n=64,
+                                               is_bn=FLAGS.batchnorm)
+        elif FLAGS.arch == 'ResNet':
+            generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
+            discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
 
         if FLAGS.generate_test:
             font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.font_z_size)).astype(np.float32)
+        elif FLAGS.generate_walk:
+            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n // self.walk_step, self.font_z_size)).astype(np.float32)
         else:
             font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
 
@@ -192,7 +204,7 @@ class GeneratingFontDesignGAN():
         self.sess = tf.Session(config=sess_config)
         self.sess.run(tf.global_variables_initializer())
 
-        if FLAGS.generate_test and (FLAGS.char_img_n != self.font_embedding_n):
+        if FLAGS.generate_test or FLAGS.generate_walk:
             var_list = [var for var in tf.global_variables() if 'embedding' not in var.name]
         else:
             var_list = [var for var in tf.global_variables()]
@@ -246,6 +258,34 @@ class GeneratingFontDesignGAN():
                 pil_img.save(os.path.join(self.dst_recognition_test,
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
                              '{:05d}.png'.format(font_id_start + img_i // self.char_embedding_n)))
+
+    def generate_random_walking(self):
+        for c in self.embedding_chars:
+            dst_dir = os.path.join(self.dst_walk, c)
+            if not os.path.exists(dst_dir):
+                os.mkdir(dst_dir)
+        batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
+        c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
+        for batch_i in tqdm(range(batch_n)):
+            font_id_start = batch_i
+            if batch_i == batch_n - 1:
+                font_id_end = 0
+            else:
+                font_id_end = batch_i + 1
+            generated_imgs = self.sess.run(self.generated_imgs,
+                                           feed_dict={self.font_ids_x: np.ones(self.batch_size) * font_id_start,
+                                                      self.font_ids_y: np.ones(self.batch_size) * font_id_end,
+                                                      self.font_ids_alpha: np.repeat(np.linspace(0., 1., num=self.walk_step, endpoint=False), self.char_embedding_n),
+                                                      self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_alpha: np.zeros(self.batch_size)})
+            for img_i in range(generated_imgs.shape[0]):
+                img = generated_imgs[img_i]
+                img = (img + 1.) * 127.5
+                pil_img = Image.fromarray(np.uint8(img))
+                pil_img.save(os.path.join(self.dst_walk,
+                             str(self.embedding_chars[img_i % self.char_embedding_n]),
+                             '{:05d}.png'.format((batch_i * self.batch_size + img_i) // self.char_embedding_n)))
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
         rets = \

@@ -23,6 +23,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('train_g', False, 'train GAN')
     tf.app.flags.DEFINE_boolean('generate', False, 'generate images')
     tf.app.flags.DEFINE_boolean('generate_test', False, 'for recognition test')
+    tf.app.flags.DEFINE_boolean('generate_walk', False, 'for random walking')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
     tf.app.flags.DEFINE_boolean('evaluate', False, 'evaluate fonts')
 
@@ -141,6 +142,12 @@ def main(argv=None):
         from generate import GeneratingFontDesignGAN
         gan = GeneratingFontDesignGAN()
         gan.generate_for_recognition_test()
+        del gan
+    if FLAGS.generate_walk:
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
+        from generate import GeneratingFontDesignGAN
+        gan = GeneratingFontDesignGAN()
+        gan.generate_random_walking()
         del gan
     if FLAGS.intermediate:
         assert FLAGS.gan_dir != '', 'have to set --gan_dir'
