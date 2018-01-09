@@ -26,6 +26,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('generate_walk', False, 'for random walking')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'visualize intermediate layers')
     tf.app.flags.DEFINE_boolean('evaluate', False, 'evaluate fonts')
+    tf.app.flags.DEFINE_boolean('cca', False, 'run CCA')
 
     # Common
     tf.app.flags.DEFINE_string('gpu_ids', ', '.join([str(i) for i in range(get_gpu_n())]), 'using GPU ids')
@@ -163,6 +164,12 @@ def main(argv=None):
         evaluating = Evaluating()
         evaluating.calc_hamming_distance()
         del evaluating
+    if FLAGS.cca:
+        assert FLAGS.generated_h5 != '', 'have to set --generated_h5'
+        from cca import RunningCCA
+        cca = RunningCCA()
+        cca.run_CCA('A')
+        del cca
 
 
 if __name__ == '__main__':
