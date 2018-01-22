@@ -113,12 +113,12 @@ def get_imgs_edge_n(img_n):
 
 
 def make_gif(src_imgs_dir_path, dst_img_path):
-    img_paths = glob('{}/*_10.png'.format(src_imgs_dir_path))
-    img_filenames = sorted([os.path.basename(path) for path in img_paths],
-                           key=lambda x: int(x.split('_')[0]))
-    skipped_img_filenames = [img_filenames[i] for i in range(0, 200)]
-    sorted_img_paths = [os.path.join(src_imgs_dir_path, filename) for filename in skipped_img_filenames]
-    imgs = [imageio.imread(f) for f in sorted_img_paths]
+    img_paths = sorted(glob('{}/*.png'.format(src_imgs_dir_path)))
+    # img_filenames = sorted([os.path.basename(path) for path in img_paths],
+    #                        key=lambda x: int(x.split('_')[0]))
+    # skipped_img_filenames = [img_filenames[i] for i in range(0, 200)]
+    # sorted_img_paths = [os.path.join(src_imgs_dir_path, filename) for filename in skipped_img_filenames]
+    imgs = [imageio.imread(f) for f in img_paths]
     # for i in range(len(imgs)):
     #     imgs[i] = imgs[i][512:, :, :]
     imageio.mimsave(dst_img_path, imgs)
@@ -131,3 +131,8 @@ def set_embedding_chars(embedding_chars_type):
     if 'hiragana' in embedding_chars_type:
         embedding_chars.extend(HIRAGANA_SEION)
     return embedding_chars
+
+
+if __name__ == '__main__':
+    for c in ALPHABET_CAPS:
+        make_gif('./result/gan_pickup/20171207_onehot_fix_adam/random_walking/{}/'.format(c), 'walking/{}.gif'.format(c))

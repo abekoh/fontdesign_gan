@@ -106,6 +106,7 @@ ENV/
 *.html
 *.json
 *.ttf
+*.gif
 /run.py
 result/
 src/
