@@ -12,6 +12,15 @@ from tqdm import tqdm
 class Dataset():
 
     def __init__(self, h5_path, mode, img_width, img_height, img_dim, is_mem=True):
+        """For inputting/outputting font images' dataset.
+
+        Use hdf5 files.
+        Notes:
+            self.mode == 'r' -> read mode
+                         'w' -> write mode
+            self.is_mem == True -> put data on memory. Very fast, but use a lot of memory space.
+                           False -> read data from storage. Very slow, not recommended.
+        """
         self.mode = mode
         self.img_width = img_width
         self.img_height = img_height
@@ -37,7 +46,29 @@ class Dataset():
             else:
                 self._get = self._get_from_file
 
-    def load_imgs(self, src_dir_path):
+    def load_imgs_into_h5(self, src_dir_path):
+        """Load png images, and save into hdf5 file.
+
+        Load png images.
+        Directory tree have to be like this:
+            src_dir_path
+            ├ A
+            │ ├ foo.png
+            │ ├ bar.png
+            │ └ baz.png
+            ├ B
+            │ ├ foo.png
+            │ └ bar.png
+            └ C
+              ├ foo.png
+              ├ bar.png
+              └ baz.png
+        Don't have to put all character's image.
+        but image's size have to be same.
+
+        Args:
+            src_dir_path: source directory
+        """
         dir_paths = sorted(glob('{}/*'.format(src_dir_path)))
         for dir_path in tqdm(dir_paths):
             if not os.path.isdir(dir_path):
@@ -59,13 +90,29 @@ class Dataset():
                 fontnames[i] = os.path.basename(img_path).replace('.png', '')
             self._save(os.path.basename(dir_path), imgs, fontnames)
 
-    def _save(self, group_name, imgs, fontnames):
-        self.h5file.create_group(group_name)
-        self.h5file.create_dataset(group_name + '/imgs', data=imgs)
-        self.h5file.create_dataset(group_name + '/fontnames', data=fontnames, dtype=h5py.special_dtype(vlen=str))
+    def _save(self, char, imgs, fontnames):
+        """Save images into hdf5 file.
+
+        Args:
+            char: character name
+            imgs: image data
+            fontname: font names
+        """
+        self.h5file.create_group(char)
+        self.h5file.create_dataset(char + '/imgs', data=imgs)
+        self.h5file.create_dataset(char + '/fontnames', data=fontnames, dtype=h5py.special_dtype(vlen=str))
         self.h5file.flush()
 
     def set_load_data(self, train_rate=1.):
+        """Setup data for outputting.
+
+        Make data queue for training(testing).
+        also make label_to_id dictionary.
+
+        Args:
+            train_rate: Rate of training data.
+                        If train_rate == 1., testing data aren't prepared.
+        """
         print('preparing dataset...')
         self.keys_queue_train = list()
         self.label_to_id = dict()
@@ -95,17 +142,33 @@ class Dataset():
             self._put_on_mem()
 
     def shuffle(self, is_test=False):
+        """Shuffle data queue.
+
+        Args:
+            is_test: If you want to shuffle test data queue, set True.
+        """
         if is_test:
             random.shuffle(self.keys_queue_test)
         else:
             random.shuffle(self.keys_queue_train)
 
     def get_data_n(self, is_test=False):
+        """Get # of data.
+
+        Args:
+            is_test: If you want to get # of test data queue, set True.
+        """
         if is_test:
             return len(self.keys_queue_test)
         return len(self.keys_queue_train)
 
     def get_data_n_by_labels(self, labels, is_test=False):
+        """Get # of data of selected labels.
+
+        Args:
+            labels: List of label names
+            is_test: If you want to get # of test data queue, set True.
+        """
         if is_test:
             keys_queue = self.keys_queue_test
         else:
@@ -114,12 +177,27 @@ class Dataset():
         return len(filtered_keys_queue)
 
     def get_ids_from_labels(self, labels):
+        """Get label's id from selected labels.
+
+        Args:
+            labels: List of label names.
+        """
         ids = list()
         for label in labels:
             ids.append(self.label_to_id[label])
         return ids
 
     def get_batch(self, batch_i, batch_size, is_test=False, is_label=False):
+        """Get data of a batch.
+
+        Divide data by batch_size, and get batch_i/batch_size data.
+
+        Args:
+            batch_i: index of batches.
+            batch_size: Batch size.
+            is_test: If you want to get from test data, set True.
+            is_label: If you want labels too, set True.
+        """
         keys_list = list()
         for i in range(batch_i * batch_size, (batch_i + 1) * batch_size):
             if is_test:
@@ -129,6 +207,18 @@ class Dataset():
         return self._get(keys_list, is_label)
 
     def get_batch_by_labels(self, batch_i, batch_size, labels, is_test=False, is_label=False):
+        """Get data of a batch, from selected labels.
+
+        Divide data by batch_size, and get batch_i/batch_size data.
+        But only get from selected labels.
+
+        Args:
+            batch_i: index of batches.
+            batch_size: Batch size.
+            labels: List of label names.
+            is_test: If you want to get from test data, set True.
+            is_label: If you want labels too, set True.
+        """
         if is_test:
             keys_queue = self.keys_queue_test
         else:
@@ -140,6 +230,13 @@ class Dataset():
         return self._get(keys_list, is_label)
 
     def get_random(self, batch_size, is_test=False, is_label=False):
+        """Get data randomly.
+
+        Args:
+            batch_size: Batch size.
+            is_test: If you want to get from test data, set True.
+            is_label: If you want labels too, set True.
+        """
         keys_list = list()
         for _ in range(batch_size):
             if is_test:
@@ -149,6 +246,14 @@ class Dataset():
         return self._get(keys_list, is_label)
 
     def get_random_by_labels(self, batch_size, labels, is_test=False, is_label=False):
+        """Get data randomly, from selected labels.
+
+        Args:
+            batch_size: Batch size.
+            labels: List of label names.
+            is_test: If you want to get from test data, set True.
+            is_label: If you want labels too, set True.
+        """
         if is_test:
             keys_queue = self.keys_queue_test
         else:
@@ -160,10 +265,24 @@ class Dataset():
         return self._get(keys_list, is_label)
 
     def get_fontname_by_label_id(self, label, index):
+        """Get fontname by label id.
+
+        Args:
+            label: String of label.
+            index: index of fontnames.
+        """
         assert self.is_mem, 'Sorry, this function is only available is_mem==True'
         return str(self.fontnames[self.label_to_id[label]][index])
 
     def _get_from_file(self, keys_list, is_label=False):
+        """Get data from file in storage.
+
+        If self.is_mem == False, this function is called.
+
+        Args:
+            keys_list: List of keys that you get.
+            is_label: If this is true, you also get labels.
+        """
         imgs = np.empty((len(keys_list), self.img_width, self.img_height, self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):
@@ -175,7 +294,11 @@ class Dataset():
         return imgs
 
     def _put_on_mem(self):
-        print('putting data on memory...')
+        """Put data on RAM.
+
+        If self.is_mem == True, this function is called.
+        """
+        print('putting data on RAM...')
         self.imgs = np.empty((self.label_n, self.font_n, self.img_width, self.img_height, self.img_dim), np.float32)
         self.fontnames = np.empty((self.label_n, self.font_n), np.object)
         self.label_to_font_n = dict()
@@ -189,6 +312,14 @@ class Dataset():
             self.label_to_font_n[key] = len(self.imgs[i])
 
     def _get_from_mem(self, keys_list, is_label=False):
+        """Get data from RAM.
+
+        If self.is_mem == True, this function is called.
+
+        Args:
+            keys_list: List of keys that you get.
+            is_label: If this is true, you also get labels.
+        """
         imgs = np.empty((len(keys_list), self.img_width, self.img_height, self.img_dim), np.float32)
         labels = list()
         for i, keys in enumerate(keys_list):

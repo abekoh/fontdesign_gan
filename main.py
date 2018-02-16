@@ -111,7 +111,7 @@ def main(argv=None):
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
         from dataset import Dataset
         dataset = Dataset(FLAGS.font_h5, 'w', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
-        dataset.load_imgs(FLAGS.font_pngs)
+        dataset.load_imgs_into_h5(FLAGS.font_pngs)
         del dataset
     if FLAGS.train_c:
         assert FLAGS.font_h5 != '', 'have to set --font_h5'
