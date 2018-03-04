@@ -205,7 +205,7 @@ class TrainingFontDesignGAN():
     def _get_ids(self, char_selector=''):
         """Get IDs for Generator's input.
 
-        Generator's input z is made from font_z and char_z.
+        Generator's input 'z' is made from font_z and char_z.
         font_z is always given from random uniform distribution.
         char_z is one-hot encoded shape. It correspond with its character.
         In this function, prepare IDs(font_ids, char_ids) for font_z and char_z.
@@ -249,7 +249,6 @@ class TrainingFontDesignGAN():
                                                        self.char_ids: char_ids,
                                                        self.is_train: True})
 
-
             # Calculate losses for tensorboard
             real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
             font_ids, char_ids = self._get_ids()
@@ -287,6 +286,10 @@ class TrainingFontDesignGAN():
         This function is used for generating samples.
 
         Args:
+            font_ids: ID of font_z. This paramaters are initialized when training started.
+            char_ids: ID of char_z. ex. A->0, B->1...
+            row_n: # of images in 1 row.
+            col_n: # of images in 1 column.
         """
         feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.is_train: False}
         generated_imgs = self.sess.run(self.fake_imgs, feed_dict=feed)
@@ -299,16 +302,19 @@ class TrainingFontDesignGAN():
         return Image.fromarray(np.uint8(combined_img))
 
     def _init_sample_imgs_inputs(self):
-        """
-        Initialize inputs for generating sample images
+        """Initialize inputs for generating sample images
+
+        Sample images are generated once every FLAGS.sample_imgs_interval times.
+        These' inputs are given by this method.
         """
         self.sample_row_n = FLAGS.batch_size // FLAGS.sample_col_n
         self.sample_font_ids = np.repeat(np.arange(0, FLAGS.font_embedding_n), self.char_embedding_n)[:FLAGS.batch_size]
         self.sample_char_ids = np.tile(np.arange(0, self.char_embedding_n), FLAGS.font_embedding_n)[:FLAGS.batch_size]
 
     def _save_sample_imgs(self, epoch_i):
-        """
-        Save sample images
+        """Save sample images
+
+        Generate and save sample images in 'FLAGS.gan_dir/sample'.
         """
         if not hasattr(self, 'sample_font_ids'):
             self._init_sample_imgs_inputs()
