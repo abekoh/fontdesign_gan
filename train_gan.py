@@ -19,6 +19,10 @@ FLAGS = tf.app.flags.FLAGS
 
 
 class TrainingFontDesignGAN():
+    """Training font design GAN.
+
+    This is main parts of our programs.
+    """
 
     def __init__(self):
         global FLAGS
@@ -27,18 +31,15 @@ class TrainingFontDesignGAN():
         self._prepare_training()
         self._load_dataset()
 
-    def reset(self):
-        '''
-        Reset graph
-        '''
-        tf.reset_default_graph()
-
     def _setup_dirs(self):
-        '''
-        Setup output directories
+        """Setup output directories
 
-        If destinations are not existed, make directories.
-        '''
+        If destinations are not existed, make directories like this:
+            FLAGS.gan_dir
+            ├ log
+            │ └ keep
+            └ sample
+        """
         if not os.path.exists(FLAGS.gan_dir):
             os.makedirs(FLAGS.gan_dir)
         self.dst_log = os.path.join(FLAGS.gan_dir, 'log')
@@ -52,33 +53,30 @@ class TrainingFontDesignGAN():
             os.mkdir(self.dst_samples)
 
     def _save_flags(self):
-        '''
-        Save FLAGS as JSON
+        """Save FLAGS as JSON
 
-        Write FLAGS paramaters as 'log/flsgs.json'.
-        '''
+        Write FLAGS paramaters as 'FLAGS.gan_dir/log/flsgs.json'.
+        """
         with open(os.path.join(self.dst_log, 'flags.json'), 'w') as f:
             json.dump(FLAGS.__dict__['__flags'], f, indent=4)
 
     def _load_dataset(self):
-        '''
-        Load dataset
+        """Load dataset
 
         Set up dataset. All of data is for training, and they are shuffled.
-        '''
+        """
         self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.real_dataset.set_load_data()
         self.real_dataset.shuffle()
 
     def _prepare_training(self):
-        '''
-        Prepare Training
+        """Prepare Training
 
         Make tensorflow's graph.
         To support Multi-GPU, divide mini-batch.
         And this program has resume function.
         If there is checkpoint file in FLAGS.gan_dir/log, load checkpoint file and restart training.
-        '''
+        """
         assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
         self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
@@ -205,9 +203,18 @@ class TrainingFontDesignGAN():
         self.writer = tf.summary.FileWriter(self.dst_log)
 
     def _get_ids(self, char_selector=''):
-        '''
-        Get embedding ids
-        '''
+        """Get IDs for Generator's input.
+
+        Generator's input z is made from font_z and char_z.
+        font_z is always given from random uniform distribution.
+        char_z is one-hot encoded shape. It correspond with its character.
+        In this function, prepare IDs(font_ids, char_ids) for font_z and char_z.
+        Ids will converted font_z and char_z in _prepare_training().
+
+        Args:
+            char_selector: If this is only 1 character, set char_ids of this character.
+                           Else, char_ids will be random IDs.
+        """
         # All ids are -1 -> z is generated from uniform distribution when calculate graph
         font_ids = np.ones(FLAGS.batch_size) * -1
         if type(char_selector) == str and len(char_selector) == 1:
@@ -217,16 +224,17 @@ class TrainingFontDesignGAN():
         return font_ids, char_ids
 
     def train(self):
-        '''
-        Train GAN
-        '''
+        """Train GAN
+
+        Run training GAN program.
+        """
         # Start tensorboard
         if FLAGS.run_tensorboard:
             self._run_tensorboard()
 
         for epoch_i in tqdm(range(self.epoch_start, FLAGS.gan_epoch_n), initial=self.epoch_start, total=FLAGS.gan_epoch_n):
             for embedding_char in self.embedding_chars:
-                # Approximate wasserstein distance
+                # Calculate wasserstein distance
                 for critic_i in range(FLAGS.critic_n):
                     real_imgs = self.real_dataset.get_random_by_labels(FLAGS.batch_size, [embedding_char])
                     font_ids, char_ids = self._get_ids(embedding_char)
@@ -241,7 +249,6 @@ class TrainingFontDesignGAN():
                                                        self.char_ids: char_ids,
                                                        self.is_train: True})
 
-                # Maximize character likelihood
 
             # Calculate losses for tensorboard
             real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
@@ -266,16 +273,21 @@ class TrainingFontDesignGAN():
                 self._save_sample_imgs(epoch_i + 1)
 
     def _run_tensorboard(self):
-        '''
-        Run tensorboard
-        '''
+        """Run tensorboard
+
+        Run tensorboard for visualization of losses.
+        To show progress-bar clearly in command line, sleep only 1 sec.
+        """
         Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log)), '--port', '{}'.format(FLAGS.tensorboard_port)], stdout=PIPE)
         time.sleep(1)
 
     def _generate_img(self, font_ids, char_ids, row_n, col_n):
-        '''
-        Generate image
-        '''
+        """Generate image
+
+        This function is used for generating samples.
+
+        Args:
+        """
         feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.is_train: False}
         generated_imgs = self.sess.run(self.fake_imgs, feed_dict=feed)
         combined_img = concat_imgs(generated_imgs, row_n, col_n)
@@ -287,17 +299,17 @@ class TrainingFontDesignGAN():
         return Image.fromarray(np.uint8(combined_img))
 
     def _init_sample_imgs_inputs(self):
-        '''
+        """
         Initialize inputs for generating sample images
-        '''
+        """
         self.sample_row_n = FLAGS.batch_size // FLAGS.sample_col_n
         self.sample_font_ids = np.repeat(np.arange(0, FLAGS.font_embedding_n), self.char_embedding_n)[:FLAGS.batch_size]
         self.sample_char_ids = np.tile(np.arange(0, self.char_embedding_n), FLAGS.font_embedding_n)[:FLAGS.batch_size]
 
     def _save_sample_imgs(self, epoch_i):
-        '''
+        """
         Save sample images
-        '''
+        """
         if not hasattr(self, 'sample_font_ids'):
             self._init_sample_imgs_inputs()
         concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
