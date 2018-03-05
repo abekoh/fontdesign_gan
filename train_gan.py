@@ -77,20 +77,20 @@ class TrainingFontDesignGAN():
         And this program has resume function.
         If there is checkpoint file in FLAGS.gan_dir/log, load checkpoint file and restart training.
         """
-        assert FLAGS.batch_size >= FLAGS.font_embedding_n, 'batch_size must be greater equal than font_embedding_n'
+        assert FLAGS.batch_size >= FLAGS.style_embedding_n, 'batch_size must be greater equal than style_embedding_n'
         self.gpu_n = len(FLAGS.gpu_ids.split(','))
         self.embedding_chars = set_embedding_chars(FLAGS.embedding_chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
-        self.z_size = FLAGS.font_z_size + self.char_embedding_n
+        self.z_size = FLAGS.style_z_size + self.char_embedding_n
 
         with tf.device('/cpu:0'):
             # Set embeddings from uniform distribution
-            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.font_embedding_n, FLAGS.font_z_size)).astype(np.float32)
+            style_embedding_np = np.random.uniform(-1, 1, (FLAGS.style_embedding_n, FLAGS.style_z_size)).astype(np.float32)
             with tf.variable_scope('embeddings'):
-                self.font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
+                self.style_embedding = tf.Variable(style_embedding_np, name='style_embedding')
 
-            self.font_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='font_ids')
+            self.style_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='style_ids')
             self.char_ids = tf.placeholder(tf.int32, (FLAGS.batch_size,), name='char_ids')
             self.is_train = tf.placeholder(tf.bool, name='is_train')
             self.real_imgs = tf.placeholder(tf.float32, (FLAGS.batch_size, FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim), name='real_imgs')
@@ -134,12 +134,12 @@ class TrainingFontDesignGAN():
                     generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
                     discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
 
-                # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
-                font_z = tf.cond(tf.less(tf.reduce_sum(self.font_ids[batch_start:batch_end]), 0),
-                                 lambda: tf.random_uniform((divided_batch_size, FLAGS.font_z_size), -1, 1),
-                                 lambda: tf.nn.embedding_lookup(self.font_embedding, self.font_ids[batch_start:batch_end]))
+                # If sum of (style/char)_ids is less than -1, z is generated from uniform distribution
+                style_z = tf.cond(tf.less(tf.reduce_sum(self.style_ids[batch_start:batch_end]), 0),
+                                 lambda: tf.random_uniform((divided_batch_size, FLAGS.style_z_size), -1, 1),
+                                 lambda: tf.nn.embedding_lookup(self.style_embedding, self.style_ids[batch_start:batch_end]))
                 char_z = tf.one_hot(self.char_ids[batch_start:batch_end], self.char_embedding_n)
-                z = tf.concat([font_z, char_z], axis=1)
+                z = tf.concat([style_z, char_z], axis=1)
 
                 # Generate fake images
                 fake_imgs[i] = generator(z, is_reuse=is_not_first, is_train=self.is_train)
@@ -205,23 +205,23 @@ class TrainingFontDesignGAN():
     def _get_ids(self, char_selector=''):
         """Get IDs for Generator's input.
 
-        Generator's input 'z' is made from font_z and char_z.
-        font_z is always given from random uniform distribution.
+        Generator's input 'z' is made from style_z and char_z.
+        style_z is always given from random uniform distribution.
         char_z is one-hot encoded shape. It correspond with its character.
-        In this function, prepare IDs(font_ids, char_ids) for font_z and char_z.
-        Ids will converted font_z and char_z in _prepare_training().
+        In this function, prepare IDs(style_ids, char_ids) for style_z and char_z.
+        Ids will converted style_z and char_z in _prepare_training().
 
         Args:
             char_selector: If this is only 1 character, set char_ids of this character.
                            Else, char_ids will be random IDs.
         """
         # All ids are -1 -> z is generated from uniform distribution when calculate graph
-        font_ids = np.ones(FLAGS.batch_size) * -1
+        style_ids = np.ones(FLAGS.batch_size) * -1
         if type(char_selector) == str and len(char_selector) == 1:
             char_ids = np.repeat(self.real_dataset.get_ids_from_labels(char_selector)[0], FLAGS.batch_size).astype(np.int32)
         else:
             char_ids = np.random.randint(0, self.char_embedding_n, (FLAGS.batch_size), dtype=np.int32)
-        return font_ids, char_ids
+        return style_ids, char_ids
 
     def train(self):
         """Train GAN
@@ -237,22 +237,22 @@ class TrainingFontDesignGAN():
                 # Calculate wasserstein distance
                 for critic_i in range(FLAGS.critic_n):
                     real_imgs = self.real_dataset.get_random_by_labels(FLAGS.batch_size, [embedding_char])
-                    font_ids, char_ids = self._get_ids(embedding_char)
-                    self.sess.run(self.d_train, feed_dict={self.font_ids: font_ids,
+                    style_ids, char_ids = self._get_ids(embedding_char)
+                    self.sess.run(self.d_train, feed_dict={self.style_ids: style_ids,
                                                            self.char_ids: char_ids,
                                                            self.real_imgs: real_imgs,
                                                            self.is_train: True})
 
                 # Minimize wasserstein distance
-                font_ids, char_ids = self._get_ids(embedding_char)
-                self.sess.run(self.g_train, feed_dict={self.font_ids: font_ids,
+                style_ids, char_ids = self._get_ids(embedding_char)
+                self.sess.run(self.g_train, feed_dict={self.style_ids: style_ids,
                                                        self.char_ids: char_ids,
                                                        self.is_train: True})
 
             # Calculate losses for tensorboard
             real_imgs = self.real_dataset.get_random(FLAGS.batch_size, is_label=False)
-            font_ids, char_ids = self._get_ids()
-            summary = self.sess.run(self.summary, feed_dict={self.font_ids: font_ids,
+            style_ids, char_ids = self._get_ids()
+            summary = self.sess.run(self.summary, feed_dict={self.style_ids: style_ids,
                                                              self.char_ids: char_ids,
                                                              self.real_imgs: real_imgs,
                                                              self.is_train: True})
@@ -280,18 +280,18 @@ class TrainingFontDesignGAN():
         Popen(['tensorboard', '--logdir', '{}'.format(os.path.realpath(self.dst_log)), '--port', '{}'.format(FLAGS.tensorboard_port)], stdout=PIPE)
         time.sleep(1)
 
-    def _generate_img(self, font_ids, char_ids, row_n, col_n):
+    def _generate_img(self, style_ids, char_ids, row_n, col_n):
         """Generate image
 
         This function is used for generating samples.
 
         Args:
-            font_ids: ID of font_z. This paramaters are initialized when training started.
+            style_ids: ID of style_z. This paramaters are initialized when training started.
             char_ids: ID of char_z. ex. A->0, B->1...
             row_n: # of images in 1 row.
             col_n: # of images in 1 column.
         """
-        feed = {self.font_ids: font_ids, self.char_ids: char_ids, self.is_train: False}
+        feed = {self.style_ids: style_ids, self.char_ids: char_ids, self.is_train: False}
         generated_imgs = self.sess.run(self.fake_imgs, feed_dict=feed)
         combined_img = concat_imgs(generated_imgs, row_n, col_n)
         combined_img = (combined_img + 1.) * 127.5
@@ -308,16 +308,16 @@ class TrainingFontDesignGAN():
         These' inputs are given by this method.
         """
         self.sample_row_n = FLAGS.batch_size // FLAGS.sample_col_n
-        self.sample_font_ids = np.repeat(np.arange(0, FLAGS.font_embedding_n), self.char_embedding_n)[:FLAGS.batch_size]
-        self.sample_char_ids = np.tile(np.arange(0, self.char_embedding_n), FLAGS.font_embedding_n)[:FLAGS.batch_size]
+        self.sample_style_ids = np.repeat(np.arange(0, FLAGS.style_embedding_n), self.char_embedding_n)[:FLAGS.batch_size]
+        self.sample_char_ids = np.tile(np.arange(0, self.char_embedding_n), FLAGS.style_embedding_n)[:FLAGS.batch_size]
 
     def _save_sample_imgs(self, epoch_i):
         """Save sample images
 
         Generate and save sample images in 'FLAGS.gan_dir/sample'.
         """
-        if not hasattr(self, 'sample_font_ids'):
+        if not hasattr(self, 'sample_style_ids'):
             self._init_sample_imgs_inputs()
-        concated_img = self._generate_img(self.sample_font_ids, self.sample_char_ids,
+        concated_img = self._generate_img(self.sample_style_ids, self.sample_char_ids,
                                           self.sample_row_n, FLAGS.sample_col_n)
         concated_img.save(os.path.join(self.dst_samples, '{}.png'.format(epoch_i)))

@@ -122,8 +122,8 @@ class GeneratingFontDesignGAN():
         """
         with open(os.path.join(self.src_log, 'flags.json'), 'r') as json_file:
             json_dict = json.load(json_file)
-        keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'font_z_size', 'font_h5',
-                'font_embedding_n', 'batchnorm', 'transpose']
+        keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'style_z_size', 'font_h5',
+                'style_embedding_n', 'batchnorm', 'transpose']
         for key in keys:
             setattr(self, key, json_dict[key])
 
@@ -144,11 +144,11 @@ class GeneratingFontDesignGAN():
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
         with open(FLAGS.src_ids, 'r') as json_file:
             json_dict = json.load(json_file)
-        self.font_gen_ids_x, self.font_gen_ids_y, self.font_gen_ids_alpha = construct_ids(json_dict['font_ids'])
+        self.style_gen_ids_x, self.style_gen_ids_y, self.style_gen_ids_alpha = construct_ids(json_dict['style_ids'])
         self.char_gen_ids_x, self.char_gen_ids_y, self.char_gen_ids_alpha = construct_ids(json_dict['char_ids'])
-        assert self.font_gen_ids_x.shape[0] == self.char_gen_ids_x.shape[0], \
-            'font_ids.shape is not equal char_ids.shape'
-        self.batch_size = self.font_gen_ids_x.shape[0]
+        assert self.style_gen_ids_x.shape[0] == self.char_gen_ids_x.shape[0], \
+            'style_ids.shape is not equal char_ids.shape'
+        self.batch_size = self.style_gen_ids_x.shape[0]
         self.col_n = json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
@@ -165,7 +165,7 @@ class GeneratingFontDesignGAN():
 
         Make tensorflow's graph.
         """
-        self.z_size = self.font_z_size + self.char_embedding_n
+        self.z_size = self.style_z_size + self.char_embedding_n
 
         if FLAGS.arch == 'DCGAN':
             generator = GeneratorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
@@ -187,38 +187,38 @@ class GeneratingFontDesignGAN():
             discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
 
         if FLAGS.generate_test:
-            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.font_z_size)).astype(np.float32)
+            style_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.style_z_size)).astype(np.float32)
         elif FLAGS.generate_walk:
-            font_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n // self.walk_step, self.font_z_size)).astype(np.float32)
+            style_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n // self.walk_step, self.style_z_size)).astype(np.float32)
         else:
-            font_embedding_np = np.random.uniform(-1, 1, (self.font_embedding_n, self.font_z_size)).astype(np.float32)
+            style_embedding_np = np.random.uniform(-1, 1, (self.style_embedding_n, self.style_z_size)).astype(np.float32)
 
         with tf.variable_scope('embeddings'):
-            font_embedding = tf.Variable(font_embedding_np, name='font_embedding')
-        self.font_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_x')
-        self.font_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='font_ids_y')
-        self.font_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='font_ids_alpha')
+            style_embedding = tf.Variable(style_embedding_np, name='style_embedding')
+        self.style_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='style_ids_x')
+        self.style_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='style_ids_y')
+        self.style_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='style_ids_alpha')
         self.char_ids_x = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids_x')
         self.char_ids_y = tf.placeholder(tf.int32, (self.batch_size,), name='char_ids_y')
         self.char_ids_alpha = tf.placeholder(tf.float32, (self.batch_size,), name='char_ids_alpha')
 
-        # If sum of (font/char)_ids is less than -1, z is generated from uniform distribution
-        font_z_x = tf.cond(tf.less(tf.reduce_sum(self.font_ids_x), 0),
-                           lambda: tf.random_uniform((self.batch_size, self.font_z_size), -1, 1),
-                           lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_x))
-        font_z_y = tf.cond(tf.less(tf.reduce_sum(self.font_ids_y), 0),
-                           lambda: tf.random_uniform((self.batch_size, self.font_z_size), -1, 1),
-                           lambda: tf.nn.embedding_lookup(font_embedding, self.font_ids_y))
-        font_z = font_z_x * tf.expand_dims(1. - self.font_ids_alpha, 1) \
-            + font_z_y * tf.expand_dims(self.font_ids_alpha, 1)
+        # If sum of (style/char)_ids is less than -1, z is generated from uniform distribution
+        style_z_x = tf.cond(tf.less(tf.reduce_sum(self.style_ids_x), 0),
+                            lambda: tf.random_uniform((self.batch_size, self.style_z_size), -1, 1),
+                            lambda: tf.nn.embedding_lookup(style_embedding, self.style_ids_x))
+        style_z_y = tf.cond(tf.less(tf.reduce_sum(self.style_ids_y), 0),
+                            lambda: tf.random_uniform((self.batch_size, self.style_z_size), -1, 1),
+                            lambda: tf.nn.embedding_lookup(style_embedding, self.style_ids_y))
+        style_z = style_z_x * tf.expand_dims(1. - self.style_ids_alpha, 1) \
+            + style_z_y * tf.expand_dims(self.style_ids_alpha, 1)
         char_z_x = tf.one_hot(self.char_ids_x, self.char_embedding_n)
         char_z_y = tf.one_hot(self.char_ids_y, self.char_embedding_n)
         char_z = char_z_x * tf.expand_dims(1. - self.char_ids_alpha, 1) \
             + char_z_y * tf.expand_dims(self.char_ids_alpha, 1)
 
-        z = tf.concat([font_z, char_z], axis=1)
+        z = tf.concat([style_z, char_z], axis=1)
 
-        self.eigen_font_z = tf.strided_slice(font_z, (0, 0), (self.batch_size, self.font_z_size), (self.char_embedding_n, 1))
+        self.eigen_style_z = tf.strided_slice(style_z, (0, 0), (self.batch_size, self.style_z_size), (self.char_embedding_n, 1))
 
         if FLAGS.intermediate:
             self.generated_imgs, gen_intermediates = generator(z, is_train=False, is_intermediate=True)
@@ -285,9 +285,9 @@ class GeneratingFontDesignGAN():
         Generate fonts from JSON input.
         """
         generated_imgs = self.sess.run(self.generated_imgs,
-                                       feed_dict={self.font_ids_x: self.font_gen_ids_x,
-                                                  self.font_ids_y: self.font_gen_ids_y,
-                                                  self.font_ids_alpha: self.font_gen_ids_alpha,
+                                       feed_dict={self.style_ids_x: self.style_gen_ids_x,
+                                                  self.style_ids_y: self.style_gen_ids_y,
+                                                  self.style_ids_alpha: self.style_gen_ids_alpha,
                                                   self.char_ids_x: self.char_gen_ids_x,
                                                   self.char_ids_y: self.char_gen_ids_y,
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
@@ -305,13 +305,13 @@ class GeneratingFontDesignGAN():
         batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
         c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
         for batch_i in tqdm(range(batch_n)):
-            batch_font_n = self.batch_size // self.char_embedding_n
-            font_id_start = batch_i * batch_font_n
-            font_id_end = (batch_i + 1) * batch_font_n
+            batch_style_n = self.batch_size // self.char_embedding_n
+            style_id_start = batch_i * batch_style_n
+            style_id_end = (batch_i + 1) * batch_style_n
             generated_imgs = self.sess.run(self.generated_imgs,
-                                           feed_dict={self.font_ids_x: np.repeat(np.arange(font_id_start, font_id_end), self.char_embedding_n),
-                                                      self.font_ids_y: np.repeat(np.arange(font_id_start, font_id_end), self.char_embedding_n),
-                                                      self.font_ids_alpha: np.zeros(self.batch_size),
+                                           feed_dict={self.style_ids_x: np.repeat(np.arange(style_id_start, style_id_end), self.char_embedding_n),
+                                                      self.style_ids_y: np.repeat(np.arange(style_id_start, style_id_end), self.char_embedding_n),
+                                                      self.style_ids_alpha: np.zeros(self.batch_size),
                                                       self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
                                                       self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
                                                       self.char_ids_alpha: np.zeros(self.batch_size)})
@@ -321,7 +321,7 @@ class GeneratingFontDesignGAN():
                 pil_img = Image.fromarray(np.uint8(img))
                 pil_img.save(os.path.join(self.dst_recognition_test,
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
-                             '{:05d}.png'.format(font_id_start + img_i // self.char_embedding_n)))
+                             '{:05d}.png'.format(style_id_start + img_i // self.char_embedding_n)))
 
     def generate_random_walking(self):
         """Generate fonts with random walking
@@ -335,20 +335,20 @@ class GeneratingFontDesignGAN():
                 os.mkdir(dst_dir)
         batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
         c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
-        all_eigen_font_z = np.empty((FLAGS.char_img_n, self.font_z_size))
+        all_eigen_style_z = np.empty((FLAGS.char_img_n, self.style_z_size))
         for batch_i in tqdm(range(batch_n)):
-            font_id_start = batch_i
+            style_id_start = batch_i
             if batch_i == batch_n - 1:
-                font_id_end = 0
+                style_id_end = 0
             else:
-                font_id_end = batch_i + 1
-            generated_imgs, eigen_font_z = self.sess.run([self.generated_imgs, self.eigen_font_z],
-                                                         feed_dict={self.font_ids_x: np.ones(self.batch_size) * font_id_start,
-                                                                    self.font_ids_y: np.ones(self.batch_size) * font_id_end,
-                                                                    self.font_ids_alpha: np.repeat(np.linspace(0., 1., num=self.walk_step, endpoint=False), self.char_embedding_n),
-                                                                    self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
-                                                                    self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
-                                                                    self.char_ids_alpha: np.zeros(self.batch_size)})
+                style_id_end = batch_i + 1
+            generated_imgs, eigen_style_z = self.sess.run([self.generated_imgs, self.eigen_style_z],
+                                                          feed_dict={self.style_ids_x: np.ones(self.batch_size) * style_id_start,
+                                                                     self.style_ids_y: np.ones(self.batch_size) * style_id_end,
+                                                                     self.style_ids_alpha: np.repeat(np.linspace(0., 1., num=self.walk_step, endpoint=False), self.char_embedding_n),
+                                                                     self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                                     self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                                     self.char_ids_alpha: np.zeros(self.batch_size)})
             for img_i in range(generated_imgs.shape[0]):
                 img = generated_imgs[img_i]
                 img = (img + 1.) * 127.5
@@ -357,10 +357,10 @@ class GeneratingFontDesignGAN():
                              str(self.embedding_chars[img_i % self.char_embedding_n]),
                              '{:05d}.png'.format((batch_i * self.batch_size + img_i) // self.char_embedding_n)))
                 for z_i in range(self.walk_step):
-                    all_eigen_font_z[batch_i * self.walk_step + z_i] = eigen_font_z[z_i]
-        h5file = h5py.File(os.path.join(self.dst_walk, 'eigen_font_z.h5'), 'w')
-        h5file.create_group('eigen_font_z')
-        h5file.create_dataset('eigen_font_z/params', data=all_eigen_font_z)
+                    all_eigen_style_z[batch_i * self.walk_step + z_i] = eigen_style_z[z_i]
+        h5file = h5py.File(os.path.join(self.dst_walk, 'eigen_style_z.h5'), 'w')
+        h5file.create_group('eigen_style_z')
+        h5file.create_dataset('eigen_style_z/params', data=all_eigen_style_z)
         h5file.flush()
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
@@ -368,9 +368,9 @@ class GeneratingFontDesignGAN():
         """
         rets = \
             self.sess.run([self.generated_imgs] + [self.intermediates[i] for i in range(len(self.intermediates))],
-                          feed_dict={self.font_ids_x: self.font_gen_ids_x,
-                                     self.font_ids_y: self.font_gen_ids_y,
-                                     self.font_ids_alpha: self.font_gen_ids_alpha,
+                          feed_dict={self.style_ids_x: self.style_gen_ids_x,
+                                     self.style_ids_y: self.style_gen_ids_y,
+                                     self.style_ids_alpha: self.style_gen_ids_alpha,
                                      self.char_ids_x: self.char_gen_ids_x,
                                      self.char_ids_y: self.char_gen_ids_y,
                                      self.char_ids_alpha: self.char_gen_ids_alpha})
@@ -382,9 +382,9 @@ class GeneratingFontDesignGAN():
             self._plot_tsne(rets[1:], filename)
 
     def _plot_tsne(self, intermediates, filename):
-        font_n = self.batch_size // 26
-        char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), font_n).tolist()]
-        style_labels = np.repeat(np.arange(0, font_n), 26)
+        style_n = self.batch_size // 26
+        char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), style_n).tolist()]
+        style_labels = np.repeat(np.arange(0, style_n), 26)
         for intermediate_i, (intermediate, intermediate_name) in enumerate(zip(intermediates, self.intermediate_names)):
             if FLAGS.plot_method == 'MDS':
                 reduced = MDS(n_components=2, verbose=3, n_jobs=8).fit_transform(intermediate)
@@ -401,13 +401,13 @@ class GeneratingFontDesignGAN():
             cmap = plt.get_cmap('jet')
             splitted = list()
             for i in range(reduced.shape[0]):
-                splitted.append(cmap(style_labels[i] / font_n))
+                splitted.append(cmap(style_labels[i] / style_n))
                 plt.text(reduced[i][0], reduced[i][1], char_labels[i],
                          fontdict={'size': 10, 'color': splitted[i]})
                 splitted_cmap = ListedColormap(splitted)
-            sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=-0.5, vmax=font_n - 0.5))
+            sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=-0.5, vmax=style_n - 0.5))
             sm._A = []
-            cbar = plt.colorbar(sm, ticks=[i for i in range(font_n + 1)])
+            cbar = plt.colorbar(sm, ticks=[i for i in range(style_n + 1)])
             cbar.ax.invert_yaxis()
             plt.savefig(os.path.join(self.dst_intermediate,
                                      '{}_{}_{}_{}.png'.format(filename, method_name, intermediate_i, intermediate_name)))

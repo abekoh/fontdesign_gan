@@ -34,9 +34,9 @@ def define_flags():
     tf.app.flags.DEFINE_integer('img_width', 64, 'image\'s width')
     tf.app.flags.DEFINE_integer('img_height', 64, 'image\'\'s height')
     tf.app.flags.DEFINE_integer('img_dim', 3, 'image\'s dimention')
-    tf.app.flags.DEFINE_integer('font_embedding_n', 256, 'num of font embedding ids')
+    tf.app.flags.DEFINE_integer('style_embedding_n', 256, 'num of style embedding ids')
     tf.app.flags.DEFINE_string('embedding_chars_type', 'caps', 'embedding type of characters')
-    tf.app.flags.DEFINE_integer('font_z_size', 100, 'z size')
+    tf.app.flags.DEFINE_integer('style_z_size', 100, 'z size')
     tf.app.flags.DEFINE_integer('batch_size', 256, 'batch size')
 
     # Common Directories
