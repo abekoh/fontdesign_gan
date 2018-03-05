@@ -7,6 +7,13 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def get_gpu_n():
+    """ Get # of GPUs
+
+    Count rows of 'nvidia-smi -L' result.
+
+    Returns:
+        # of GPUs. If CUDA is not installed, return 0.
+    """
     result = subprocess.run('nvidia-smi -L | wc -l', shell=True, stdout=subprocess.PIPE)
     if result.returncode != 0:
         return 0
