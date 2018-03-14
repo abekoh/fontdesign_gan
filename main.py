@@ -29,6 +29,8 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('train', False, 'Train GAN')
     tf.app.flags.DEFINE_boolean('generate', False, 'Generate images')
     tf.app.flags.DEFINE_boolean('generate_walk', False, 'Generate images with random walking')
+    tf.app.flags.DEFINE_boolean('train_c', False, 'Train classifier')
+    tf.app.flags.DEFINE_boolean('test_c', False, 'Test with classifier')
 
     # Paths
     tf.app.flags.DEFINE_string('font_ttfs', '', 'Path of font files\' directory')
