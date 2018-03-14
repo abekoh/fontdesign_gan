@@ -67,7 +67,7 @@ class GeneratingFontDesignGAN():
         self._setup_dirs()
         self._setup_params()
         self._setup_embedding_chars()
-        if FLAGS.generate_walk:
+        if FLAGS.generate_test or FLAGS.generate_walk:
             self.batch_size = FLAGS.batch_size
             while ((FLAGS.char_img_n * self.char_embedding_n) % self.batch_size != 0) or (self.batch_size % self.char_embedding_n != 0):
                 self.batch_size -= 1
@@ -86,12 +86,17 @@ class GeneratingFontDesignGAN():
         If destinations are not existed, make directories like this:
             FLAGS.gan_dir
             ├ generated
+            ├ recognition_test
             └ random_walking
         """
         self.src_log = os.path.join(FLAGS.gan_dir, 'log')
         self.dst_generated = os.path.join(FLAGS.gan_dir, 'generated')
         if not os.path.exists(self.dst_generated):
             os.mkdir(self.dst_generated)
+        if FLAGS.generate_test:
+            self.dst_recognition_test = os.path.join(FLAGS.gan_dir, 'recognition_test')
+            if not os.path.exists(self.dst_recognition_test):
+                os.makedirs(self.dst_recognition_test)
         if FLAGS.generate_walk:
             self.dst_walk = os.path.join(FLAGS.gan_dir, 'random_walking')
             if not os.path.exists(self.dst_walk):
@@ -161,7 +166,9 @@ class GeneratingFontDesignGAN():
         elif self.arch == 'ResNet':
             generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
 
-        if FLAGS.generate_walk:
+        if FLAGS.generate_test:
+            style_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.style_z_size)).astype(np.float32)
+        elif FLAGS.generate_walk:
             style_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n // self.walk_step, self.style_z_size)).astype(np.float32)
         else:
             style_embedding_np = np.random.uniform(-1, 1, (self.style_ids_n, self.style_z_size)).astype(np.float32)
@@ -205,7 +212,7 @@ class GeneratingFontDesignGAN():
         self.sess = tf.Session(config=sess_config)
         self.sess.run(tf.global_variables_initializer())
 
-        if FLAGS.generate_walk:
+        if FLAGS.generate_test or FLAGS.generate_walk:
             var_list = [var for var in tf.global_variables() if 'embedding' not in var.name]
         else:
             var_list = [var for var in tf.global_variables()]
@@ -245,6 +252,37 @@ class GeneratingFontDesignGAN():
                                                   self.char_ids_y: self.char_gen_ids_y,
                                                   self.char_ids_alpha: self.char_gen_ids_alpha})
         self._concat_and_save_imgs(generated_imgs, os.path.join(self.dst_generated, '{}.png'.format(filename)))
+
+    def generate_for_recognition_test(self):
+        """Generate fonts for recognition test
+
+        Generate many fonts for recognition test.
+        # of images is defined as FLAGS.char_img_n.
+        """
+        for c in self.embedding_chars:
+            dst_dir = os.path.join(self.dst_recognition_test, c)
+            if not os.path.exists(dst_dir):
+                os.mkdir(dst_dir)
+        batch_n = (self.char_embedding_n * FLAGS.char_img_n) // self.batch_size
+        c_ids = self.real_dataset.get_ids_from_labels(self.embedding_chars)
+        for batch_i in tqdm(range(batch_n)):
+            batch_style_n = self.batch_size // self.char_embedding_n
+            style_id_start = batch_i * batch_style_n
+            style_id_end = (batch_i + 1) * batch_style_n
+            generated_imgs = self.sess.run(self.generated_imgs,
+                                           feed_dict={self.style_ids_x: np.repeat(np.arange(style_id_start, style_id_end), self.char_embedding_n),
+                                                      self.style_ids_y: np.repeat(np.arange(style_id_start, style_id_end), self.char_embedding_n),
+                                                      self.style_ids_alpha: np.zeros(self.batch_size),
+                                                      self.char_ids_x: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_y: np.tile(c_ids, self.batch_size // self.char_embedding_n),
+                                                      self.char_ids_alpha: np.zeros(self.batch_size)})
+            for img_i in range(generated_imgs.shape[0]):
+                img = generated_imgs[img_i]
+                img = (img + 1.) * 127.5
+                pil_img = Image.fromarray(np.uint8(img))
+                pil_img.save(os.path.join(self.dst_recognition_test,
+                             str(self.embedding_chars[img_i % self.char_embedding_n]),
+                             '{:05d}.png'.format(style_id_start + img_i // self.char_embedding_n)))
 
     def generate_random_walking(self):
         """Generate fonts with random walking
