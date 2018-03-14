@@ -108,6 +108,12 @@ def main(argv=None):
         gan = GeneratingFontDesignGAN()
         gan.generate(filename=FLAGS.gen_name)
         del gan
+    if FLAGS.generate_test:
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
+        from generate import GeneratingFontDesignGAN
+        gan = GeneratingFontDesignGAN()
+        gan.generate_for_recognition_test()
+        del gan
     if FLAGS.generate_walk:
         assert FLAGS.gan_dir != '', 'have to set --gan_dir'
         from generate import GeneratingFontDesignGAN
