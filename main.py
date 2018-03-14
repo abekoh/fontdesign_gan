@@ -56,6 +56,9 @@ def define_flags():
     tf.app.flags.DEFINE_integer('keep_ckpt_interval', 250, 'Interval of keeping TensorFlow\'s dumps')
     tf.app.flags.DEFINE_boolean('run_tensorboard', True, 'Run tensorboard or not')
     tf.app.flags.DEFINE_integer('tensorboard_port', 6006, 'Port of tensorboard')
+    tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
+    tf.app.flags.DEFINE_integer('c_epoch_n', 10, '# of epochs for training Classifier.')
+    tf.app.flags.DEFINE_boolean('labelacc', False, 'Save accuracies of each labels.')
 
 
 def main(argv=None):
@@ -107,6 +110,18 @@ def main(argv=None):
         gan = GeneratingFontDesignGAN()
         gan.generate_random_walking()
         del gan
+    if FLAGS.train_c:
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        from classifier import ManagementClassifier
+        cl = ManagementClassifier()
+        cl.train_and_test()
+        del cl
+    if FLAGS.test_c:
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        from classifier import ManagementClassifier
+        cl = ManagementClassifier()
+        cl.test()
+        del cl
 
 
 if __name__ == '__main__':
