@@ -41,6 +41,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('ids', '', 'Path of input IDs settings\' JSON file')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'Filename of saving image')
     tf.app.flags.DEFINE_integer('char_img_n', 256, '# of frames for generate_walk mode')
+    tf.app.flags.DEFINE_string('classifier_dir', 'result/classifier/' + now_str, 'path of result\'s destination')
 
     # Other options
     tf.app.flags.DEFINE_integer('img_width', 64, 'Image\'s width')

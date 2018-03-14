@@ -189,7 +189,7 @@ class ManagementClassifier():
                 train_metrics.append([epoch_i + 1] + train_rets)
                 test_metrics.append([epoch_i + 1] + test_rets)
         except KeyboardInterrupt:
-            print('cancelled. but write csv...')
+            print('cancelled. writing csv...')
         finally:
             self._write_csv('train', train_metrics)
             self._write_csv('test', test_metrics)
