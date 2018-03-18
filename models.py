@@ -1,19 +1,12 @@
 import tensorflow as tf
 
-from ops import lrelu, batch_norm, linear, conv2d, maxpool2d, fc, layer_norm, upsample2x, downsample2x
-
-"""
-2 type models are defined:
-- DCGAN [Radford+, ICLR2016]
-- ResNet [He+, CVPR2016]
-  - This model needs a lot of GPU memory, so you should reduce batch size.
-"""
+from ops import lrelu, batch_norm, linear, conv2d, deconv2d, maxpool2d, avgpool2d, fc, layer_norm, upsample2x, downsample2x
 
 
 class GeneratorDCGAN():
 
     def __init__(self, img_size=(128, 128), img_dim=1, z_size=100, k_size=5, layer_n=3,
-                 smallest_hidden_unit_n=128, is_bn=True):
+                 smallest_hidden_unit_n=128, is_bn=True, is_transpose=False):
         self.img_size = img_size
         self.img_dim = img_dim
         self.z_size = z_size
@@ -21,8 +14,9 @@ class GeneratorDCGAN():
         self.layer_n = layer_n
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.is_bn = is_bn
+        self.is_transpose = is_transpose
 
-    def __call__(self, x, is_reuse=False, is_train=True):
+    def __call__(self, x, is_reuse=False, is_train=True, is_intermediate=False):
         with tf.variable_scope('generator') as scope:
             if is_reuse:
                 scope.reuse_variables()
@@ -30,6 +24,8 @@ class GeneratorDCGAN():
             unit_size = self.img_size[0] // (2 ** self.layer_n)
             unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - 1))
             batch_size = int(x.shape[0])
+            if is_intermediate:
+                intermediate_xs = list()
 
             with tf.variable_scope('pre'):
                 x = linear(x, unit_size * unit_size * unit_n)
@@ -37,6 +33,10 @@ class GeneratorDCGAN():
                 if self.is_bn:
                     x = batch_norm(x, is_train)
                 x = tf.nn.relu(x)
+                if is_intermediate:
+                    y = avgpool2d(x, unit_size, 1, 'VALID')
+                    y = tf.reshape(y, (batch_size, -1))
+                    intermediate_xs.append(y)
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i)):
@@ -45,14 +45,22 @@ class GeneratorDCGAN():
                     else:
                         unit_n = self.smallest_hidden_unit_n * (2 ** (self.layer_n - i - 2))
                     x_shape = x.get_shape().as_list()
-                    x = tf.image.resize_bilinear(x, (x_shape[1] * 2, x_shape[2] * 2))
-                    x = conv2d(x, unit_n, self.k_size, 1, 'SAME')
+                    if self.is_transpose:
+                        x = deconv2d(x, [x_shape[0], x_shape[1] * 2, x_shape[1] * 2, unit_n], self.k_size, 2, 'SAME')
+                    else:
+                        x = tf.image.resize_bilinear(x, (x_shape[1] * 2, x_shape[2] * 2))
+                        x = conv2d(x, unit_n, self.k_size, 1, 'SAME')
                     if i != self.layer_n - 1:
                         if self.is_bn:
                             x = batch_norm(x, is_train)
                         x = tf.nn.relu(x)
+                        if is_intermediate:
+                            y = tf.reshape(x, (batch_size, -1))
+                            intermediate_xs.append(y)
             x = tf.nn.tanh(x)
 
+            if is_intermediate:
+                return x, intermediate_xs
             return x
 
 
@@ -66,13 +74,15 @@ class DiscriminatorDCGAN():
         self.smallest_hidden_unit_n = smallest_hidden_unit_n
         self.is_bn = is_bn
 
-    def __call__(self, x, is_reuse=False, is_train=True):
+    def __call__(self, x, is_reuse=False, is_train=True, is_intermediate=False):
         with tf.variable_scope('discriminator') as scope:
             if is_reuse:
                 scope.reuse_variables()
 
             unit_n = self.smallest_hidden_unit_n
             batch_size = int(x.shape[0])
+            if is_intermediate:
+                intermediate_xs = list()
 
             for i in range(self.layer_n):
                 with tf.variable_scope('layer{}'.format(i + 1)):
@@ -80,11 +90,16 @@ class DiscriminatorDCGAN():
                     if self.is_bn and i != 0:
                         x = batch_norm(x, is_train)
                     x = lrelu(x)
+                    if is_intermediate:
+                        y = tf.reshape(x, (batch_size, -1))
+                        intermediate_xs.append(y)
                     unit_n = self.smallest_hidden_unit_n * (2 ** (i + 1))
 
             x = tf.reshape(x, (batch_size, -1))
             x = linear(x, 1)
 
+            if is_intermediate:
+                return x, intermediate_xs
             return x
 
 

@@ -6,12 +6,17 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
+from sklearn.decomposition import PCA
+from sklearn.manifold import MDS
+from MulticoreTSNE import MulticoreTSNE as TSNE
+import matplotlib
 
 from dataset import Dataset
-from models import GeneratorDCGAN, GeneratorResNet
+from models import GeneratorDCGAN, DiscriminatorDCGAN, GeneratorResNet, DiscriminatorResNet
 from utils import set_chars_type, concat_imgs, make_gif
 
 FLAGS = tf.app.flags.FLAGS
+matplotlib.use('Agg')
 
 
 def construct_ids(ids):
@@ -87,7 +92,8 @@ class GeneratingFontDesignGAN():
             FLAGS.gan_dir
             ├ generated
             ├ recognition_test
-            └ random_walking
+            ├ random_walking
+            └ intermediate
         """
         self.src_log = os.path.join(FLAGS.gan_dir, 'log')
         self.dst_generated = os.path.join(FLAGS.gan_dir, 'generated')
@@ -101,6 +107,10 @@ class GeneratingFontDesignGAN():
             self.dst_walk = os.path.join(FLAGS.gan_dir, 'random_walking')
             if not os.path.exists(self.dst_walk):
                 os.makedirs(self.dst_walk)
+        if FLAGS.intermediate:
+            self.dst_intermediate = os.path.join(FLAGS.gan_dir, 'intermediate')
+            if not os.path.exists(self.dst_intermediate):
+                os.makedirs(self.dst_intermediate)
 
     def _setup_params(self):
         """Setup paramaters
@@ -139,6 +149,28 @@ class GeneratingFontDesignGAN():
         self.batch_size = self.style_gen_ids_x.shape[0]
         self.col_n = json_dict['col_n']
         self.row_n = math.ceil(self.batch_size / self.col_n)
+        if FLAGS.change_align:
+            self.style_gen_ids_x = self._change_alignment(self.style_gen_ids_x)
+            self.style_gen_ids_y = self._change_alignment(self.style_gen_ids_y)
+            self.style_gen_ids_alpha = self._change_alignment(self.style_gen_ids_alpha)
+            self.char_gen_ids_x = self._change_alignment(self.char_gen_ids_x)
+            self.char_gen_ids_y = self._change_alignment(self.char_gen_ids_y)
+            self.char_gen_ids_alpha = self._change_alignment(self.char_gen_ids_alpha)
+
+    def _change_alignment(self, ids):
+        """Change alignment
+
+        In default, images' alignment is from left to right,
+        after they reach end of the row, put left of new row.
+        This method is change this:　Firstly they are arranged from top to bottom,
+        after that they put in new column.
+        """
+        new_ids = []
+        for row_i in range(self.row_n):
+            for col_i in range(self.col_n):
+                count = col_i * self.row_n + row_i
+                new_ids.append(ids[count])
+        return new_ids
 
     def _load_dataset(self):
         """Load dataset
@@ -163,8 +195,15 @@ class GeneratingFontDesignGAN():
                                        k_size=3,
                                        smallest_hidden_unit_n=64,
                                        is_bn=False)
+            discriminator = DiscriminatorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
+                                               img_dim=FLAGS.img_dim,
+                                               layer_n=4,
+                                               k_size=3,
+                                               smallest_hidden_unit_n=64,
+                                               is_bn=False)
         elif self.arch == 'ResNet':
             generator = GeneratorResNet(k_size=3, smallest_unit_n=64)
+            discriminator = DiscriminatorResNet(k_size=3, smallest_unit_n=64)
 
         if FLAGS.generate_test:
             style_embedding_np = np.random.uniform(-1, 1, (FLAGS.char_img_n, self.style_z_size)).astype(np.float32)
@@ -198,9 +237,27 @@ class GeneratingFontDesignGAN():
 
         z = tf.concat([style_z, char_z], axis=1)
 
-        self.generated_imgs = generator(z, is_train=False)
+        if FLAGS.intermediate:
+            self.generated_imgs, gen_intermediates = generator(z, is_train=False, is_intermediate=True)
+            _, disc_intermediates = discriminator(self.generated_imgs, is_train=False, is_intermediate=True)
+            self.intermediates = list()
+            self.intermediate_names = list()
 
-        if FLAGS.gpu_ids == "":
+            self.intermediates.append(z)
+            self.intermediate_names.append('z')
+            for i, intermediate in enumerate(gen_intermediates):
+                self.intermediates.append(intermediate)
+                self.intermediate_names.append('gen{}'.format(i))
+            reshaped_generated_imgs = tf.reshape(self.generated_imgs, [self.batch_size, -1])
+            self.intermediates.append(reshaped_generated_imgs)
+            self.intermediate_names.append('pic')
+            for i, intermediate in enumerate(disc_intermediates):
+                self.intermediates.append(intermediate)
+                self.intermediate_names.append('disc{}'.format(i))
+        else:
+            self.generated_imgs = generator(z, is_train=False)
+
+        if FLAGS.intermediate or FLAGS.gpu_ids == "":
             sess_config = tf.ConfigProto(
                 device_count={"GPU": 0},
                 log_device_placement=True
@@ -320,3 +377,68 @@ class GeneratingFontDesignGAN():
         for i in range(self.char_embedding_n):
             make_gif(os.path.join(self.dst_walk, self.embedding_chars[i]),
                      os.path.join(self.dst_walk, self.embedding_chars[i] + '.gif'))
+
+    def visualize_intermediate(self, filename='intermediate'):
+        """Visualize intermediate layers
+
+        Visualize intermediate layers' outputs when generate image from JSON input.
+
+        Args:
+            filename: The file name of output files.
+        """
+        rets = \
+            self.sess.run([self.generated_imgs] + [self.intermediates[i] for i in range(len(self.intermediates))],
+                          feed_dict={self.style_ids_x: self.style_gen_ids_x,
+                                     self.style_ids_y: self.style_gen_ids_y,
+                                     self.style_ids_alpha: self.style_gen_ids_alpha,
+                                     self.char_ids_x: self.char_gen_ids_x,
+                                     self.char_ids_y: self.char_gen_ids_y,
+                                     self.char_ids_alpha: self.char_gen_ids_alpha})
+        dst_path = os.path.join(self.dst_intermediate, '{}.png'.format(filename))
+        self._concat_and_save_imgs(rets[0], dst_path)
+        self._plot(rets[1:], filename)
+
+    def _plot(self, intermediates, filename):
+        """Plot intermediate layers' outputs
+
+        **This method is for generating caps only.**
+        Plot outputs by using matplotlib.
+        Methods of plotting are tSNE, MDS or PCA.
+        It is chosen by FLAGS.plot_method.
+
+        Args:
+            intermediates: Outputs of intermediate layers.
+            filename: The file name of output files.
+        """
+        from matplotlib import pyplot as plt
+        from matplotlib.colors import ListedColormap
+        style_n = self.batch_size // 26
+        char_labels = [chr(i + 65) for i in np.tile(np.arange(0, 26), style_n).tolist()]
+        style_labels = np.repeat(np.arange(0, style_n), 26)
+        for intermediate_i, (intermediate, intermediate_name) in enumerate(zip(intermediates, self.intermediate_names)):
+            if FLAGS.plot_method == 'MDS':
+                reduced = MDS(n_components=2, verbose=3, n_jobs=8).fit_transform(intermediate)
+                method_name = 'MDS'
+            elif FLAGS.plot_method == 'PCA':
+                reduced = PCA(n_components=2).fit_transform(intermediate)
+                method_name = 'PCA'
+            else:
+                reduced = TSNE(n_components=2, verbose=3, perplexity=FLAGS.tsne_p, n_jobs=8,
+                               n_iter=5000).fit_transform(intermediate)
+                method_name = 'TSNE({})'.format(FLAGS.tsne_p)
+            plt.figure(figsize=(16, 9))
+            plt.scatter(reduced[:, 0], reduced[:, 1], c=["w" for i in char_labels])
+            cmap = plt.get_cmap('jet')
+            splitted = list()
+            for i in range(reduced.shape[0]):
+                splitted.append(cmap(style_labels[i] / style_n))
+                plt.text(reduced[i][0], reduced[i][1], char_labels[i],
+                         fontdict={'size': 10, 'color': splitted[i]})
+                splitted_cmap = ListedColormap(splitted)
+            sm = plt.cm.ScalarMappable(cmap=splitted_cmap, norm=plt.Normalize(vmin=-0.5, vmax=style_n - 0.5))
+            sm._A = []
+            cbar = plt.colorbar(sm, ticks=[i for i in range(style_n + 1)])
+            cbar.ax.invert_yaxis()
+            plt.savefig(os.path.join(self.dst_intermediate,
+                                     '{}_{}_{}_{}.png'.format(filename, method_name, intermediate_i, intermediate_name)))
+            plt.close()

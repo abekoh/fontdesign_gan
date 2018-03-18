@@ -32,6 +32,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('generate_walk', False, 'Generate images with random walking')
     tf.app.flags.DEFINE_boolean('train_c', False, 'Train classifier')
     tf.app.flags.DEFINE_boolean('test_c', False, 'Test with classifier')
+    tf.app.flags.DEFINE_boolean('intermediate', False, 'Visualize intermediate layers\' outputs')
 
     # Paths
     tf.app.flags.DEFINE_string('font_ttfs', '', 'Path of font files\' directory')
@@ -63,6 +64,9 @@ def define_flags():
     tf.app.flags.DEFINE_float('train_rate', 0.9, 'train:test = train_rate:(1. - train_rate)')
     tf.app.flags.DEFINE_integer('c_epoch_n', 10, '# of epochs for training Classifier.')
     tf.app.flags.DEFINE_boolean('labelacc', False, 'Save accuracies of each labels.')
+    tf.app.flags.DEFINE_boolean('change_align', False, 'Change Ids alignment')
+    tf.app.flags.DEFINE_string('plot_method', 'TSNE', 'Plot method of intemediate visualization, TSNE or MDS')
+    tf.app.flags.DEFINE_integer('tsne_p', 30, 'TNSE\'s perplexity')
 
 
 def main(argv=None):
@@ -132,6 +136,13 @@ def main(argv=None):
         cl = ManagementClassifier()
         cl.test()
         del cl
+    if FLAGS.intermediate:
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
+        assert FLAGS.ids != '', 'have to set --ids'
+        from generate import GeneratingFontDesignGAN
+        gan = GeneratingFontDesignGAN()
+        gan.visualize_intermediate(FLAGS.gen_name)
+        del gan
 
 
 if __name__ == '__main__':

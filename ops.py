@@ -82,6 +82,13 @@ def maxpool2d(x, k, s, p, name='maxpool2d'):
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=p, name=name)
 
 
+def avgpool2d(x, k, s, p, name='avgpool2d'):
+    strides = [1, s, s, 1]
+    ksize = [1, k, k, 1]
+
+    return tf.nn.avg_pool(x, ksize=ksize, strides=strides, padding=p, name=name)
+
+
 def fc(x, n_out, name='fc'):
 
     with tf.variable_scope(name):
