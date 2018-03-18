@@ -1,3 +1,6 @@
 [submodule "font2img"]
 	path = font2img
 	url = https://github.com/uchidalab/font2img.git
+[submodule "Multicore-TSNE"]
+	path = Multicore-TSNE
+	url = https://github.com/DmitryUlyanov/Multicore-TSNE
