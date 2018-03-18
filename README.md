@@ -1,6 +1,14 @@
-# Font Design GAN
+# Font Design GAN (with Extensions)
 
 Code for training/generating GAN, that is for font design.
+
+This is extended from [uchidalab/fontdesign_gan](https://github.com/uchidalab/fontdesign_gan).  
+There are added functions:
+- Classifier, for multi-fonts character recognition
+- Visualize intermediate layers' outputs
+- Evaluate generated fonts by using pseudo-Hamming distance
+
+The author use this codes for writing a master's thesis, so you may know how to use them if you read. (but it's Japanese...)
 
 ## Samples
 Generated fonts, they have various styles and they are readable as a character.
@@ -149,6 +157,29 @@ If you want random walking fonts, use `--generate_walk`. A JSON file is needless
 python main.py --generate_walk --gan_dir ./result/{YYYY-MM-DD_HHmmss} --char_img_n 256
 ```
 256 styles' fonts will be generated, and they are transformed gradually.
+
+### Use Classifier
+
+In this project, Classifier is used for character recognition.
+
+When you want to train Classifier:
+```
+python main.py --train_c --font_h5 ./src/myfonts.h5
+```
+In default, train:test = 9:1. You can change by using `--train_rate`.
+Results are saved in `./result/classifier/{YYYY-MM-DD_HHmmss}`.
+You can set destination with `--classifier_dir`.
+
+To test generated fonts, run like this:
+```
+# Generate 1000 randomly in ./result/{trained}/recognition_test
+python main.py --generate_test --gan_dir ./result/{trained} --char_img_n 1000
+# Pack generated fonts into ./result/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --png2h5 --font_pngs ./result/{trained}/recognition_test/generated_1000fonts.h5
+# Test generated fonts
+python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_h5 ./result/{trained}/recognition_test/generated_1000fonts.h5
+```
+
 
 ### Options
 
