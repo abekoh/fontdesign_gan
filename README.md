@@ -70,16 +70,14 @@ with GPU:
 Install GPU Driver/CUDA/cuDNN and run following command:
 ```
 pip install -r requirements_gpu.txt
-cd Multicore-TSNE
-pip install .
+pip install Multicore-TSNE/
 ```
 
 with CPU:
 Run following command:
 ```
 pip install -r requirements_cpu.txt
-cd Multicore-TSNE
-pip install .
+pip install Multicore-TSNE/
 ```
 
 ### Prepare
