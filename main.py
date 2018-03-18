@@ -33,6 +33,7 @@ def define_flags():
     tf.app.flags.DEFINE_boolean('train_c', False, 'Train classifier')
     tf.app.flags.DEFINE_boolean('test_c', False, 'Test with classifier')
     tf.app.flags.DEFINE_boolean('intermediate', False, 'Visualize intermediate layers\' outputs')
+    tf.app.flags.DEFINE_boolean('evaluate', False, 'Evaluate fonts by measuring from real fonts')
 
     # Paths
     tf.app.flags.DEFINE_string('font_ttfs', '', 'Path of font files\' directory')
@@ -43,6 +44,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('gen_name', now_str, 'Filename of saving image')
     tf.app.flags.DEFINE_integer('char_img_n', 256, '# of frames for generate_walk mode')
     tf.app.flags.DEFINE_string('classifier_dir', 'result/classifier/' + now_str, 'path of result\'s destination')
+    tf.app.flags.DEFINE_string('generated_h5', '', 'Path of generated fonts\' HDF5 file')
 
     # Other options
     tf.app.flags.DEFINE_integer('img_width', 64, 'Image\'s width')
@@ -143,6 +145,14 @@ def main(argv=None):
         gan = GeneratingFontDesignGAN()
         gan.visualize_intermediate(FLAGS.gen_name)
         del gan
+    if FLAGS.evaluate:
+        assert FLAGS.gan_dir != '', 'have to set --gan_dir'
+        assert FLAGS.font_h5 != '', 'have to set --font_h5'
+        assert FLAGS.generated_h5 != '', 'have to set --generated_h5'
+        from evaluate import Evaluating
+        evaluating = Evaluating()
+        evaluating.calc_hamming_distance()
+        del evaluating
 
 
 if __name__ == '__main__':
