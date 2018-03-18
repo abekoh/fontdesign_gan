@@ -93,9 +93,9 @@ pip install Multicore-TSNE/
 Convert font files (.ttf) into image files (.png), and pack them into a HDF5 file (.h5)
 
 Make a directory (ex. `./ttfs`) and copy font files.
-Set destination path (ex. `./src/myfonts.h5`) and run.
+Set destination path (ex. `./src/realfonts.h5`) and run.
 ```
-python main.py --ttf2png --png2h5 --font_ttfs ./ttfs --font_h5 ./src/myfonts.h5
+python main.py --ttf2png --png2h5 --font_ttfs ./ttfs --font_h5 ./src/realfonts.h5
 ```
 
 `--ttf2png` is the option for converting, image files are saved in `./src/pngs/{YYYY-MM-DD_HHmmss}`.
@@ -107,10 +107,10 @@ If you use `--font_pngs` option, you can set path yourself.
 Set packed file's path and run.
 
 ```
-python main.py --train --font_h5 ./src/myfonts.h5
+python main.py --train --font_h5 ./src/realfonts.h5
 ```
 
-Results are saved in `./result/{YYYY-MM-DD_HHmmss}`.
+Results are saved in `./result/gan/{YYYY-MM-DD_HHmmss}`.
 You can set destination with `--gan_dir`.
 
 In `log` directory, saved same files: flags' log, latest/kept TensorFlow's dumps (.ckpt\*), TensorBoard's log.  
@@ -147,14 +147,14 @@ and, # of result columns is 4. Also check sample files (`./jsons/sample*.json`).
 
 After preparing JSON file, run like this:
 ```
-python main.py --generate --gan_dir ./result/{trained} --ids ./jsons/sample01.json
+python main.py --generate --gan_dir ./result/gan/{trained} --ids ./jsons/sample01.json
 ```
-Generated fonts are saved in `./result/{trained}/generated/{YYYY-MM-DD_HHmmss}.png`.
+Generated fonts are saved in `./result/gan/{trained}/generated/{YYYY-MM-DD_HHmmss}.png`.
 You can set output file name with `--gen_name`.
 
 If you want random walking fonts, use `--generate_walk`. A JSON file is needless.
 ```
-python main.py --generate_walk --gan_dir ./result/{YYYY-MM-DD_HHmmss} --char_img_n 256
+python main.py --generate_walk --gan_dir ./result/gan/{YYYY-MM-DD_HHmmss} --char_img_n 256
 ```
 256 styles' fonts will be generated, and they are transformed gradually.
 
@@ -164,7 +164,7 @@ In this project, Classifier is used for character recognition.
 
 When you want to train Classifier:
 ```
-python main.py --train_c --font_h5 ./src/myfonts.h5
+python main.py --train_c --font_h5 ./src/realfonts.h5
 ```
 In default, train:test = 9:1. You can change by using `--train_rate`.
 Results are saved in `./result/classifier/{YYYY-MM-DD_HHmmss}`.
@@ -172,12 +172,14 @@ You can set destination with `--classifier_dir`.
 
 To test generated fonts, run like this:
 ```
-# Generate 1000 randomly in ./result/{trained}/recognition_test
-python main.py --generate_test --gan_dir ./result/{trained} --char_img_n 1000
-# Pack generated fonts into ./result/{trained}/recognition_test/generated_1000fonts.h5
-python main.py --png2h5 --font_pngs ./result/{trained}/recognition_test/generated_1000fonts.h5
+# Generate 1000 randomly in ./result/gan/{trained}/recognition_test
+python main.py --generate_test --gan_dir ./result/gan/{trained} --char_img_n 1000
+
+# Pack generated fonts into ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --png2h5 --font_pngs ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
+
 # Test generated fonts
-python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_h5 ./result/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_h5 ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
 ```
 
 ### Visualization of intermediate layers' outputs (Extension)
@@ -185,9 +187,9 @@ python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_
 Visualize when generate from selected IDs.
 Firstly I recommend to use `jsons/sample04.json`.
 ```
-python main.py --intermediate --gan_dir ./result/{trained}/ --ids ./jsons/sample04.json
+python main.py --intermediate --gan_dir ./result/gan/{trained}/ --ids ./jsons/sample04.json --change_align
 ```
-Results are saved in `./result/{trained}/intermediate`.
+Results are saved in `./result/gan/{trained}/intermediate`.
 
 In default, the method of plotting is t-SNE.
 Also supported MDS, PCA. (See Options)
@@ -198,12 +200,14 @@ Measure between generated fonts and real fonts.
 If you want to know about "pseudo-Hamming distance", check this:
 - S. Uchida, Y. Egashira, K. Sato, "Exploring the World of Fonts for Discovering the Most Standard Fonts and the Missing Fonts", ICDAR, 2015.
 ```
-# Generate 1000 randomly in ./result/{trained}/recognition_test
-python main.py --generate_test --gan_dir ./result/{trained} --char_img_n 1000
-# Pack generated fonts into ./result/{trained}/recognition_test/generated_1000fonts.h5
-python main.py --png2h5 --font_pngs ./result/{trained}/recognition_test/generated_1000fonts.h5
+# Generate 1000 randomly in ./result/gan/{trained}/recognition_test
+python main.py --generate_test --gan_dir ./result/gan/{trained} --char_img_n 1000
+
+# Pack generated fonts into ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --png2h5 --font_pngs ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
+
 # Evaluate generated fonts
-python main.py --evaluate --gan_dir ./result/{trained} --font_h5 ./src/realfonts.h5 --generated_h5 ./result/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --evaluate --gan_dir ./result/gan/{trained} --font_h5 ./src/realfonts.h5 --generated_h5 ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
 ```
 
 ### Options
@@ -228,3 +232,9 @@ There are many options. Check following table.
 |Train|`--keep_ckpt_interval`|interval of keeping TensorFlow's dumps|250|
 |Train|`--run_tensorboard`|run tensorboard or not|True|
 |Train|`--tensorboard_port`|port for tensorboard page|6006|
+|Generate|`--change_align`|Change IDs alignment|False|
+|Classifier|`--train_rate`|train:test = train_rate:(1 - train_rate)|0.9|
+|Classifier|`--c_epoch_n`|# of epoch for training Classifier|10|
+|Classifier|`--labelacc|`|Save accuracies of each labels|False|
+|Intermediate|`--plot_method`|Method of plotting for visualization, 'TSNE' or 'MDS' or 'PCA'|'TSNE'|
+|Intermediate|`--tsne_p`|tSNE's perplexity|30|
