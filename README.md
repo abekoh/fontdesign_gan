@@ -185,7 +185,8 @@ python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_
 ### Visualization of intermediate layers' outputs (Extension)
 
 Visualize when generate from selected IDs.
-Firstly I recommend to use `jsons/sample04.json`.
+This is only for 'caps' fonts.
+Firstly I recommend to use `jsons/sample04.json` with `--change_align` option.
 ```
 python main.py --intermediate --gan_dir ./result/gan/{trained}/ --ids ./jsons/sample04.json --change_align
 ```
