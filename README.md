@@ -158,7 +158,7 @@ python main.py --generate_walk --gan_dir ./result/{YYYY-MM-DD_HHmmss} --char_img
 ```
 256 styles' fonts will be generated, and they are transformed gradually.
 
-### Use Classifier
+### Use Classifier (Extension)
 
 In this project, Classifier is used for character recognition.
 
@@ -180,6 +180,31 @@ python main.py --png2h5 --font_pngs ./result/{trained}/recognition_test/generate
 python main.py --test_c --classifier_dir ./result/classifier/{trained_c} --font_h5 ./result/{trained}/recognition_test/generated_1000fonts.h5
 ```
 
+### Visualization of intermediate layers' outputs (Extension)
+
+Visualize when generate from selected IDs.
+Firstly I recommend to use `jsons/sample04.json`.
+```
+python main.py --intermediate --gan_dir ./result/{trained}/ --ids ./jsons/sample04.json
+```
+Results are saved in `./result/{trained}/intermediate`.
+
+In default, the method of plotting is t-SNE.
+Also supported MDS, PCA. (See Options)
+
+### Evaluate generated fonts by measuring pseudo-Hamming distance (Extension)
+
+Measure between generated fonts and real fonts.
+If you want to know about "pseudo-Hamming distance", check this:
+- S. Uchida, Y. Egashira, K. Sato, "Exploring the World of Fonts for Discovering the Most Standard Fonts and the Missing Fonts", ICDAR, 2015.
+```
+# Generate 1000 randomly in ./result/{trained}/recognition_test
+python main.py --generate_test --gan_dir ./result/{trained} --char_img_n 1000
+# Pack generated fonts into ./result/{trained}/recognition_test/generated_1000fonts.h5
+python main.py --png2h5 --font_pngs ./result/{trained}/recognition_test/generated_1000fonts.h5
+# Evaluate generated fonts
+python main.py --evaluate --gan_dir ./result/{trained} --font_h5 ./src/realfonts.h5 --generated_h5 ./result/{trained}/recognition_test/generated_1000fonts.h5
+```
 
 ### Options
 
