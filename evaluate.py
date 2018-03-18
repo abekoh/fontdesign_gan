@@ -16,6 +16,11 @@ matplotlib.use('Agg')
 
 
 class Evaluating():
+    """Evaluating generated fonts
+
+    This class is for evaluating generated fonts.
+    Measure between generated fonts and real fonts by using pseudo-Hamming distance.
+    """
 
     def __init__(self):
         global FLAGS
@@ -24,22 +29,42 @@ class Evaluating():
         self._setup_chars()
 
     def _setup_dirs(self):
+        """Setup output directories
+
+        If destinations are not existed, make directories like this:
+            FLAGS.gan_dir
+            └ evaluated
+        """
         self.dst_evaluated = os.path.join(FLAGS.gan_dir, 'evaluated')
         if not os.path.exists(self.dst_evaluated):
             os.mkdir(self.dst_evaluated)
 
     def _load_dataset(self):
+        """Load dataset
+
+        Setup dataset, generated fonts and real fonts.
+        """
         self.generated_dataset = Dataset(FLAGS.generated_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.generated_dataset.set_load_data()
         self.real_dataset = Dataset(FLAGS.font_h5, 'r', FLAGS.img_width, FLAGS.img_height, FLAGS.img_dim)
         self.real_dataset.set_load_data()
 
     def _setup_chars(self):
+        """Setup characters' type
+
+        Setup characters\' type, caps or hiragana or both.
+        """
         self.embedding_chars = set_chars_type(FLAGS.chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
 
     def calc_hamming_distance(self):
+        """Calculate pseudo-Hamming distance
+
+        Measure between generated fonts and real fonts by using pseudo-Hamming distance.
+        If you want to know pseudo-Hamming distance, check this:
+        Uchida, et al. "Exploring the World of Fonts for Discovering the Most Standard Fonts and the Missing Fonts", ICDAR, 2015.
+        """
         from matplotlib import pyplot as plt
 
         def transform_backgorund_distance(src_imgs):
@@ -91,6 +116,15 @@ class Evaluating():
             self._write_csv(min_distances_list, mean_all_min_dinstances, min_real_indices_list)
 
     def _write_csv(self, distances_list, all_distances, real_indices_list):
+        """Write CSV
+
+        Write distances in CSV file.
+
+        Args:
+            distance_list: A distance, which is only 1 character's.
+            all_distances: All character's average.
+            real_indices_list: Index list of real fonts, that have minimum distance from a generated font.
+        """
         with open(os.path.join(self.dst_evaluated, 'evaluate.csv'), 'w') as csv_file:
             csv_writer = csv.writer(csv_file)
             font_n = len(all_distances)
