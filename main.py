@@ -39,7 +39,7 @@ def define_flags():
     tf.app.flags.DEFINE_string('font_ttfs', '', 'Path of font files\' directory')
     tf.app.flags.DEFINE_string('font_pngs', 'src/pngs/' + now_str, 'Path of font images\' directory')
     tf.app.flags.DEFINE_string('font_h5', '', 'Path of HDF5 file')
-    tf.app.flags.DEFINE_string('gan_dir', 'result/' + now_str, 'Path of result\'s destination')
+    tf.app.flags.DEFINE_string('gan_dir', 'result/gan/' + now_str, 'Path of result\'s destination')
     tf.app.flags.DEFINE_string('ids', '', 'Path of input IDs settings\' JSON file')
     tf.app.flags.DEFINE_string('gen_name', now_str, 'Filename of saving image')
     tf.app.flags.DEFINE_integer('char_img_n', 256, '# of frames for generate_walk mode')
