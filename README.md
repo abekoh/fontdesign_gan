@@ -209,6 +209,7 @@ python main.py --png2h5 --font_pngs ./result/gan/{trained}/recognition_test/gene
 # Evaluate generated fonts
 python main.py --evaluate --gan_dir ./result/gan/{trained} --font_h5 ./src/realfonts.h5 --generated_h5 ./result/gan/{trained}/recognition_test/generated_1000fonts.h5
 ```
+Results are saved in `./result/gan/{trained}/evaluated`.
 
 ### Options
 
@@ -235,6 +236,6 @@ There are many options. Check following table.
 |Generate|`--change_align`|Change IDs alignment|False|
 |Classifier|`--train_rate`|train:test = train_rate:(1 - train_rate)|0.9|
 |Classifier|`--c_epoch_n`|# of epoch for training Classifier|10|
-|Classifier|`--labelacc|`|Save accuracies of each labels|False|
+|Classifier|`--labelacc`|Save accuracies of each labels|False|
 |Intermediate|`--plot_method`|Method of plotting for visualization, 'TSNE' or 'MDS' or 'PCA'|'TSNE'|
 |Intermediate|`--tsne_p`|tSNE's perplexity|30|
