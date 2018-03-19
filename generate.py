@@ -120,15 +120,7 @@ class GeneratingFontDesignGAN():
         self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
-<<<<<<< HEAD
-        """Prepare generating
-
-        Make tensorflow's graph.
-        """
-        self.z_size = self.style_z_size + self.char_embedding_n
-=======
         self.z_size = self.font_z_size + self.char_embedding_n
->>>>>>> parent of 35a2272... [update] add comments
 
         if FLAGS.arch == 'DCGAN':
             generator = GeneratorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
