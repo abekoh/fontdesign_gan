@@ -21,17 +21,6 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def construct_ids(ids):
-    """Construct ID from JSON file
-
-    Prepare IDs (that will converted z) from a JSON file.
-    You can use some operand:
-        "-" means serial IDs. ("0-3" -> 0, 1, 2, 3)
-        "*" means # of IDs. ("2*5" -> 2, 2, 2, 2, 2)
-        "..:" means step of IDs. ("0..1:4" -> 0, 0.25, 0.5, 0.75)
-    You can connect some equations.
-    ("0-2", "5*4" -> 0, 1, 2, 5, 5, 5, 5)
-    Please read sample JSON file.
-    """
     ids_x = np.array([], dtype=np.int32)
     ids_y = np.array([], dtype=np.int32)
     ids_alpha = np.array([], dtype=np.float32)
@@ -63,10 +52,6 @@ def construct_ids(ids):
 
 
 class GeneratingFontDesignGAN():
-    """Generating font design GAN
-
-    This class is only for generating fonts.
-    """
 
     def __init__(self):
         global FLAGS
@@ -88,15 +73,6 @@ class GeneratingFontDesignGAN():
         self._prepare_generating()
 
     def _setup_dirs(self):
-        """Setup output directories
-
-        If destinations are not existed, make directories like this:
-            FLAGS.gan_dir
-            ├ generated
-            ├ recognition_test
-            ├ random_walking
-            └ intermediate
-        """
         self.src_log = os.path.join(FLAGS.gan_dir, 'log')
         self.dst_generated = os.path.join(FLAGS.gan_dir, 'generated')
         if not os.path.exists(self.dst_generated):
@@ -115,11 +91,6 @@ class GeneratingFontDesignGAN():
                 os.makedirs(self.dst_intermediate)
 
     def _setup_params(self):
-        """Setup paramaters
-
-        To setup GAN, read JSON file and set as attribute (self.~).
-        JSON file's path is "FLAGS.gan_dir/log/flags.json".
-        """
         with open(os.path.join(self.src_log, 'flags.json'), 'r') as json_file:
             json_dict = json.load(json_file)
         keys = ['embedding_chars_type', 'img_width', 'img_height', 'img_dim', 'style_z_size', 'font_h5',
@@ -128,19 +99,11 @@ class GeneratingFontDesignGAN():
             setattr(self, key, json_dict[key])
 
     def _setup_embedding_chars(self):
-        """Setup embedding characters
-
-        Setup generating characters, like alphabets or hiragana.
-        """
         self.embedding_chars = set_embedding_chars(self.embedding_chars_type)
         assert self.embedding_chars != [], 'embedding_chars is empty'
         self.char_embedding_n = len(self.embedding_chars)
 
     def _setup_inputs(self):
-        """Setup inputs
-
-        Setup generating inputs, batchsize and others.
-        """
         assert os.path.exists(FLAGS.src_ids), '{} is not found'.format(FLAGS.src_ids)
         with open(FLAGS.src_ids, 'r') as json_file:
             json_dict = json.load(json_file)
@@ -153,19 +116,19 @@ class GeneratingFontDesignGAN():
         self.row_n = math.ceil(self.batch_size / self.col_n)
 
     def _load_dataset(self):
-        """Load dataset
-
-        Setup dataset.
-        """
         self.real_dataset = Dataset(self.font_h5, 'r', self.img_width, self.img_height, self.img_dim)
         self.real_dataset.set_load_data()
 
     def _prepare_generating(self):
+<<<<<<< HEAD
         """Prepare generating
 
         Make tensorflow's graph.
         """
         self.z_size = self.style_z_size + self.char_embedding_n
+=======
+        self.z_size = self.font_z_size + self.char_embedding_n
+>>>>>>> parent of 35a2272... [update] add comments
 
         if FLAGS.arch == 'DCGAN':
             generator = GeneratorDCGAN(img_size=(FLAGS.img_width, FLAGS.img_height),
@@ -262,14 +225,6 @@ class GeneratingFontDesignGAN():
         pretrained_saver.restore(self.sess, checkpoint.model_checkpoint_path)
 
     def _concat_and_save_imgs(self, src_imgs, dst_path):
-        """Concatenate and save images
-
-        Connect some images and save at dst_path.
-
-        Args:
-            src_imgs: Images that will be saved.
-            dst_path: Destination path of image.
-        """
         concated_img = concat_imgs(src_imgs, self.row_n, self.col_n)
         concated_img = (concated_img + 1.) * 127.5
         if self.img_dim == 1:
@@ -280,10 +235,6 @@ class GeneratingFontDesignGAN():
         pil_img.save(dst_path)
 
     def generate(self, filename='generated'):
-        """Generate fonts
-
-        Generate fonts from JSON input.
-        """
         generated_imgs = self.sess.run(self.generated_imgs,
                                        feed_dict={self.style_ids_x: self.style_gen_ids_x,
                                                   self.style_ids_y: self.style_gen_ids_y,
@@ -294,10 +245,6 @@ class GeneratingFontDesignGAN():
         self._concat_and_save_imgs(generated_imgs, os.path.join(self.dst_generated, '{}.png'.format(filename)))
 
     def generate_for_recognition_test(self):
-        """Generate fonts for recognition test
-
-        Generate many fonts.
-        """
         for c in self.embedding_chars:
             dst_dir = os.path.join(self.dst_recognition_test, c)
             if not os.path.exists(dst_dir):
@@ -324,11 +271,6 @@ class GeneratingFontDesignGAN():
                              '{:05d}.png'.format(style_id_start + img_i // self.char_embedding_n)))
 
     def generate_random_walking(self):
-        """Generate fonts with random walking
-
-        Generate fonts from random walking inputs.
-        Results are changed gradually.
-        """
         for c in self.embedding_chars:
             dst_dir = os.path.join(self.dst_walk, c)
             if not os.path.exists(dst_dir):
@@ -364,8 +306,6 @@ class GeneratingFontDesignGAN():
         h5file.flush()
 
     def visualize_intermediate(self, filename='intermediate', is_tensorboard=True, is_plot=True):
-        """Visualize intermediate layers.
-        """
         rets = \
             self.sess.run([self.generated_imgs] + [self.intermediates[i] for i in range(len(self.intermediates))],
                           feed_dict={self.style_ids_x: self.style_gen_ids_x,

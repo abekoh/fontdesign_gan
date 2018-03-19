@@ -21,7 +21,7 @@ FLAGS = tf.app.flags.FLAGS
 class TrainingFontDesignGAN():
     """Training font design GAN.
 
-    This is main part of our programs.
+    This is main parts of our programs.
     """
 
     def __init__(self):
